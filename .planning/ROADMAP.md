@@ -49,7 +49,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The wallet screen shows available, locked, and total balance as distinct values, plus a full transaction history where every entry has a reason (deposit, lock, release, payout, commission, refund).
   4. Every balance change is an atomic, append-only ledger entry — a duplicated or replayed PaySuite deposit webhook (signature-verified) credits the wallet exactly once, with no direct balance mutation.
   5. The interface presents Duelo's own visual identity (color, typography, micro-interactions) and renders cleanly on a low-end mobile device.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 01-01-PLAN.md — Walking skeleton: Next.js scaffold + Duelo design system + register/login/session + deployed (AUTH-01/02/03, DESIGN-01)
+- [ ] 01-02-PLAN.md — Wallet foundation: append-only ledger + row-locked atomic credit/hold/release (concurrency-tested) + wallet screen (WALLET-01/02/03)
+- [ ] 01-03-PLAN.md — Deposit slice: M-Pesa/e-Mola via PaySuite, signed idempotent webhook, transaction history (PAY-01/02/03, WALLET-04)
+- [ ] 01-04-PLAN.md — Password reset: enumeration-safe recover → email link → set new password (AUTH-04)
 **UI hint**: yes
 
 ### Phase 2: Peer Bet Loop (Escrow)
@@ -110,7 +114,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Identity & Funded Wallet | 0/TBD | Not started | - |
+| 1. Identity & Funded Wallet | 0/4 | Not started | - |
 | 2. Peer Bet Loop (Escrow) | 0/TBD | Not started | - |
 | 3. Automatic Settlement & Payout | 0/TBD | Not started | - |
 | 4. Cash Out & Player Profile | 0/TBD | Not started | - |
