@@ -99,24 +99,47 @@ Reconhecido, mas fora do roadmap atual.
 
 ## Traceability
 
-Populada durante a criação do roadmap.
+Cada requisito v1 mapeia para exatamente uma fase (ver ROADMAP.md).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01..04 | TBD | Pending |
-| WALLET-01..04 | TBD | Pending |
-| PAY-01..04 | TBD | Pending |
-| BET-01..07 | TBD | Pending |
-| SETL-01..04 | TBD | Pending |
-| PROF-01..02 | TBD | Pending |
-| ADMIN-01..02 | TBD | Pending |
-| DESIGN-01..02 | TBD | Pending |
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Pending |
+| WALLET-01 | Phase 1 | Pending |
+| WALLET-02 | Phase 1 | Pending |
+| WALLET-03 | Phase 1 | Pending |
+| WALLET-04 | Phase 1 | Pending |
+| PAY-01 | Phase 1 | Pending |
+| PAY-02 | Phase 1 | Pending |
+| PAY-03 | Phase 1 | Pending |
+| DESIGN-01 | Phase 1 | Pending |
+| BET-01 | Phase 2 | Pending |
+| BET-02 | Phase 2 | Pending |
+| BET-03 | Phase 2 | Pending |
+| BET-04 | Phase 2 | Pending |
+| BET-05 | Phase 2 | Pending |
+| BET-06 | Phase 2 | Pending |
+| BET-07 | Phase 2 | Pending |
+| DESIGN-02 | Phase 2 | Pending |
+| SETL-01 | Phase 3 | Pending |
+| SETL-02 | Phase 3 | Pending |
+| SETL-03 | Phase 3 | Pending |
+| SETL-04 | Phase 3 | Pending |
+| PROF-02 | Phase 3 | Pending |
+| PAY-04 | Phase 4 | Pending |
+| PROF-01 | Phase 4 | Pending |
+| ADMIN-01 | Phase 5 | Pending |
+| ADMIN-02 | Phase 5 | Pending |
+
+**Note:** device/IP fraud data capture is implemented in Phase 2 (bet create/accept); the flag-and-review capability (ADMIN-02) lands in Phase 5, which consumes that captured data.
 
 **Coverage:**
-- v1 requirements: 27 total
-- Mapped to phases: 0 (pending roadmap creation)
-- Unmapped: 27 ⚠️
+- v1 requirements: 29 total (AUTH 4, WALLET 4, PAY 4, BET 7, SETL 4, PROF 2, ADMIN 2, DESIGN 2)
+- Mapped to phases: 29 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-09*
-*Last updated: 2026-07-09 after initial definition*
+*Last updated: 2026-07-09 after roadmap creation (traceability populated, 29/29 mapped)*
