@@ -30,7 +30,7 @@ forgotten.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Identity & Funded Wallet** - Register, log in, and deposit via mobile money onto a correct, auditable ledger
+- [/] **Phase 1: Identity & Funded Wallet** - Register, log in, and deposit via mobile money onto a correct, auditable ledger
 - [ ] **Phase 2: Peer Bet Loop (Escrow)** - Create, match, and cancel 1X2 bets with both stakes locked in escrow
 - [ ] **Phase 3: Automatic Settlement & Payout** - Fetch official results and pay the winner automatically, with notifications
 - [ ] **Phase 4: Cash Out & Player Profile** - Withdraw winnings to mobile money and view player stats
@@ -114,7 +114,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Identity & Funded Wallet | 0/4 | Not started | - |
+| 1. Identity & Funded Wallet | 1/4 | In progress | - |
 | 2. Peer Bet Loop (Escrow) | 0/TBD | Not started | - |
 | 3. Automatic Settlement & Payout | 0/TBD | Not started | - |
 | 4. Cash Out & Player Profile | 0/TBD | Not started | - |

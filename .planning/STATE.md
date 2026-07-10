@@ -1,12 +1,20 @@
 ---
-gsd_state_version: '1.0'  # placeholder; syncStateFrontmatter overwrites on first state.* call
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+current_phase: 1
+current_phase_name: Identity & Funded Wallet
 status: planning
+stopped_at: Plan 01-01 completed
+last_updated: "2026-07-09T11:58:00Z"
+last_activity: 2026-07-09
+last_activity_desc: Plan 01-01 completed (Next.js, Drizzle, Supabase, Tailwind v4 theme, proxy.ts router, and auth routes fully functional)
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 4
+  completed_plans: 1
+  percent: 25
 ---
 
 # Project State
@@ -15,21 +23,22 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-07-08)
 
-**Core value:** Dois utilizadores conseguem apostar um contra o outro, com o dinheiro de ambos protegido em custódia e a liquidação do vencedor totalmente automática e confiável após o resultado oficial — sem que a plataforma corra qualquer risco financeiro.
+**Core value:** Dois utilizadores conseguem apostar um contra o outro, com o dinheiro de ambos protegido em custódia e a liquidação do vencedor totalmente automática e confiável após o resultado oficial — sem que a plataforma corra qualquer risco financial.
 **Current focus:** Phase 1 — Identity & Funded Wallet
 
 ## Current Position
 
 Phase: 1 of 5 (Identity & Funded Wallet)
-Plan: - of - (not yet planned)
-Status: Ready to plan
-Last activity: 2026-07-09 — Roadmap created (5 phases, 29/29 v1 requirements mapped)
+Plan: 1 of 4 (01-01-PLAN.md)
+Status: Completed
+Last activity: 2026-07-09 — Plan 01-01 completed (Walking Skeleton & Auth Flow)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [▓▓░░░░░░░░] 25% (Phase 1) / 5% (Total Project)
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: - min
 - Total execution time: 0.0 hours
@@ -41,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: -
 - Trend: -
 
@@ -83,6 +93,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-09
-Stopped at: ROADMAP.md and STATE.md created; REQUIREMENTS.md traceability updated
-Resume file: None
+Last session: 2026-07-09T08:59:37.554Z
+Stopped at: Phase 1 UI-SPEC approved
+Resume file: .planning/phases/01-identity-funded-wallet/01-UI-SPEC.md

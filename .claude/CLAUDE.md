@@ -188,17 +188,9 @@ No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skill
 
 <!-- GSD:workflow-start source:GSD defaults -->
 
-## GSD Workflow Enforcement
+## Workflow
 
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
-
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
-
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+GSD workflow is disabled for this project (too token-expensive for this team's preference). Work directly with Edit/Write/Bash — no need to route through GSD skills or subagents for day-to-day changes. Use judgment and confirm with the user for larger decisions instead of formal planning docs.
 <!-- GSD:workflow-end -->
 
 <!-- GSD:profile-start -->
