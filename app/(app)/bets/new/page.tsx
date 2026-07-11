@@ -9,6 +9,7 @@ import { CreateBetForm } from "@/components/bets/create-bet-form";
 import { getUpcomingMatches } from "@/lib/bets";
 import { getWalletBalance } from "@/lib/wallet";
 import { BackLink } from "@/components/ui/back-link";
+import { CalendarX } from "lucide-react";
 
 export const metadata: Metadata = { title: "Nova aposta | Duelo" };
 
@@ -36,12 +37,7 @@ export default async function NewBetPage() {
 
   return (
     <AppShell active="bets" displayName={profile.displayName} availableCents={availableCents} currentUserId={user.id}>
-      <BackLink fallbackHref="/bets" className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
-        <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
-          <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Voltar
-      </BackLink>
+      <BackLink href="/bets" label="Minhas Apostas" className="mb-5" />
 
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Cria uma aposta</h1>
@@ -51,7 +47,9 @@ export default async function NewBetPage() {
       <div className="max-w-lg">
         {matchOptions.length === 0 ? (
           <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-5 py-12 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-3xl" aria-hidden>📅</div>
+            <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground" aria-hidden>
+              <CalendarX className="size-7" />
+            </div>
             <p className="mb-2 text-base font-bold">Sem jogos disponíveis</p>
             <p className="max-w-64 text-sm leading-relaxed text-muted-foreground">
               Não há jogos abertos para apostar de momento. Volta mais tarde.

@@ -9,6 +9,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Lock } from "lucide-react";
 
 export default function LoginPage() {
   const [isPending, startTransition] = useTransition();
@@ -76,8 +77,9 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-xs text-muted-foreground">
-        🔒 Sessão protegida e encriptada
+      <p className="mt-5 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+        <Lock className="size-3.5" aria-hidden />
+        Sessão protegida e encriptada
       </p>
     </AuthShell>
   );

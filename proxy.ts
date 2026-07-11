@@ -6,7 +6,7 @@ const PROTECTED_ROUTES = ["/dashboard", "/wallet", "/bet", "/perfil", "/admin"];
 
 const DEVICE_ID_COOKIE = "device_id";
 
-// Routes that should redirect authenticated users to dashboard
+// Routes that should redirect authenticated users to the feed
 const AUTH_ROUTES = ["/login", "/register"];
 
 export async function proxy(request: NextRequest) {
@@ -25,10 +25,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages — to the feed, the
+  // heart of the app (matches the post-login/register landing in
+  // lib/actions/auth.ts). Sending them to /dashboard instead read as
+  // "where are the bets?".
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

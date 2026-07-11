@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Swords } from "lucide-react";
 import type { UserBetRow } from "@/lib/profile";
 import { formatCentsAsMt } from "@/lib/format";
 
@@ -66,7 +67,9 @@ export function BetsList({ bets }: { bets: UserBetRow[] }) {
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-5 py-10 text-center">
-          <div className="mb-4 flex h-13 w-13 items-center justify-center rounded-2xl bg-muted text-2xl" aria-hidden>🎯</div>
+          <div className="mb-4 flex size-13 items-center justify-center rounded-2xl bg-muted text-muted-foreground" aria-hidden>
+            <Swords className="size-6" />
+          </div>
           <p className="mb-1 text-base font-bold">Sem apostas aqui</p>
           <p className="text-sm text-muted-foreground">As apostas nesta categoria vão aparecer aqui.</p>
         </div>

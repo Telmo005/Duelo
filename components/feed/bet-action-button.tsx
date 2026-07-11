@@ -9,11 +9,13 @@ export function BetActionButton({
   betId,
   mode,
   label,
+  icon,
   className,
 }: {
   betId: string;
   mode: "accept" | "cancel";
   label: string;
+  icon?: React.ReactNode;
   className: string;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -28,7 +30,7 @@ export function BetActionButton({
 
   return (
     <button type="button" onClick={handleClick} disabled={isPending} className={className}>
-      {isPending && <Spinner />}
+      {isPending ? <Spinner /> : icon}
       {isPending ? "A processar…" : label}
     </button>
   );

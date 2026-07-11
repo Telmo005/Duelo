@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { depositSchema } from "@/lib/validation/deposit";
-import { normalizePhone } from "@/lib/phone";
 import { PayGateClient } from "@/lib/paygate-client";
 
 type ActionResult = { error?: string; depositId?: string; checkoutUrl?: string };
@@ -27,7 +26,6 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
   if (authError || !user) redirect("/login");
 
   const amountCents = Math.round(parsed.data.amountMt * 100);
-  const phone = normalizePhone(parsed.data.phone);
   const reference = `DUE-DEP-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
   const service = createServiceClient();
@@ -38,7 +36,6 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
       user_id: user.id,
       amount_cents: amountCents,
       method: parsed.data.method,
-      phone,
       reference,
     })
     .select("id")

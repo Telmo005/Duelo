@@ -10,14 +10,6 @@ export function SiteHeader({ displayName, availableCents }: { displayName?: stri
           Duelo
         </Link>
 
-        {/* Search (desktop only, decorative) */}
-        <div className="hidden max-w-xs flex-1 lg:block">
-          <div className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm text-muted-foreground">
-            <span aria-hidden>🔍</span>
-            Pesquisar apostas, jogos, ligas…
-          </div>
-        </div>
-
         {displayName ? (
           <div className="flex items-center gap-2.5">
             {availableCents != null && <WalletChip availableCents={availableCents} compact />}

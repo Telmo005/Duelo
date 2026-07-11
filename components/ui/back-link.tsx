@@ -1,37 +1,34 @@
-"use client";
-
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
- * A "back" affordance that actually goes back in browser history, instead
- * of a fixed Link to one hardcoded destination. In practice these pages are
- * always reached by clicking an in-app link from the page `fallbackHref`
- * points to, so router.back() lands exactly where the user came from — the
- * old fixed-Link version always jumped to the same page regardless of the
- * actual path taken, which read as "back does nothing" after a few clicks.
- * `fallbackHref` stays as the plain `href` so middle-click / no-JS still work.
+ * A "back" affordance with a fixed, predictable destination. We deliberately
+ * do NOT use router.back() here: on a P2P app users arrive at a page from many
+ * places (a link, a redirect, a notification, a hard refresh), and history-back
+ * could bounce them out of the app entirely or somewhere unexpected. A plain
+ * link to the known parent always lands where the user expects, and still works
+ * with middle-click / no-JS.
  */
 export function BackLink({
-  fallbackHref,
-  children,
+  href,
+  label = "Voltar",
   className,
 }: {
-  fallbackHref: string;
-  children: React.ReactNode;
+  href: string;
+  label?: string;
   className?: string;
 }) {
-  const router = useRouter();
-
   return (
-    <a
-      href={fallbackHref}
-      onClick={(e) => {
-        e.preventDefault();
-        router.back();
-      }}
-      className={className}
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground",
+        className
+      )}
     >
-      {children}
-    </a>
+      <ChevronLeft className="size-4" strokeWidth={2.2} aria-hidden />
+      {label}
+    </Link>
   );
 }
