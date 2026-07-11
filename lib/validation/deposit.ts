@@ -14,7 +14,7 @@ export const depositSchema = z
     amountMt: z.coerce
       .number()
       .positive("O valor tem de ser positivo")
-      .min(10, "O depósito mínimo é 10 MT")
+      .min(1, "O depósito mínimo é 1 MT")
       .max(1_000_000, "Valor demasiado alto"),
     phone: z.string().regex(phoneRegex, "Número inválido. Formato: +258 84 XXX XXXX"),
   })
