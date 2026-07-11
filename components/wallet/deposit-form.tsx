@@ -30,6 +30,8 @@ export function DepositForm() {
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<string | null>(null);
   const [depositId, setDepositId] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [popupBlocked, setPopupBlocked] = useState(false);
   const pollStartedAt = useRef<number>(0);
 
   // "+258" alone has no real local number yet — only its 3 country-code digits.
@@ -86,13 +88,25 @@ export function DepositForm() {
     }
 
     if (result.checkoutUrl && result.depositId) {
-      window.open(result.checkoutUrl, "_blank");
+      // Alguns navegadores (sobretudo em telemóvel) bloqueiam popups abertos
+      // depois de um `await` — deixamos de contar como "gesto directo" do
+      // utilizador. Guardamos o URL e mostramos sempre um botão manual na
+      // tela de espera, para o caso desta tentativa automática ser bloqueada.
+      const popup = window.open(result.checkoutUrl, "_blank");
+      setPopupBlocked(!popup || popup.closed);
+      setCheckoutUrl(result.checkoutUrl);
       setDepositId(result.depositId);
       setPhase("waiting");
     } else {
       setError("Não foi possível iniciar o pagamento. Tenta novamente.");
       setPhase("form");
     }
+  }
+
+  function openCheckout() {
+    if (!checkoutUrl) return;
+    const popup = window.open(checkoutUrl, "_blank");
+    setPopupBlocked(!popup || popup.closed);
   }
 
   if (phase === "waiting" || phase === "timeout") {
@@ -104,10 +118,24 @@ export function DepositForm() {
             <div>
               <p className="text-base font-bold">A confirmar o teu depósito…</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Abrimos uma nova aba para concluíres o pagamento com segurança. Confirma no teu
-                telemóvel quando for solicitado — isto pode demorar alguns segundos.
+                {popupBlocked
+                  ? "O teu navegador bloqueou a aba de pagamento. Clica no botão abaixo para abrir manualmente."
+                  : "Abrimos uma nova aba para concluíres o pagamento com segurança. Confirma no teu telemóvel quando for solicitado — isto pode demorar alguns segundos."}
               </p>
             </div>
+            {checkoutUrl ? (
+              <button
+                type="button"
+                onClick={openCheckout}
+                className={`press flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold transition-colors ${
+                  popupBlocked
+                    ? "bg-primary text-primary-foreground shadow-[var(--shadow-elevated)]"
+                    : "border border-border bg-card text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                Abrir página de pagamento
+              </button>
+            ) : null}
           </>
         ) : (
           <>
@@ -117,6 +145,15 @@ export function DepositForm() {
               o saldo aparece assim que for processado — podes voltar à carteira e verificar mais
               tarde.
             </p>
+            {checkoutUrl ? (
+              <button
+                type="button"
+                onClick={openCheckout}
+                className="press rounded-2xl border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground hover:bg-accent"
+              >
+                Abrir página de pagamento
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setPhase("waiting")}
