@@ -8,15 +8,16 @@ import { eq } from "drizzle-orm";
 import { AppShell } from "@/components/layout/app-shell";
 import { getWalletBalance, getWalletLedger, describeLedgerEntry, formatCentsAsMt } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { ArrowDownToLine, Lock, RotateCcw, Trophy, HeartCrack, Plus, ChartColumn, type LucideIcon } from "lucide-react";
 
 export const metadata: Metadata = { title: "Carteira | Duelo" };
 
-const LEDGER_ICON: Record<string, { icon: string; tint: string }> = {
-  deposit: { icon: "📥", tint: "#34D399" },
-  hold: { icon: "🔒", tint: "#94A3B8" },
-  release: { icon: "↩️", tint: "#3B82F6" },
-  settle_win: { icon: "🏆", tint: "#34D399" },
-  settle_loss: { icon: "💔", tint: "#F0455B" },
+const LEDGER_ICON: Record<string, { Icon: LucideIcon; tint: string }> = {
+  deposit: { Icon: ArrowDownToLine, tint: "#34D399" },
+  hold: { Icon: Lock, tint: "#94A3B8" },
+  release: { Icon: RotateCcw, tint: "#3B82F6" },
+  settle_win: { Icon: Trophy, tint: "#34D399" },
+  settle_loss: { Icon: HeartCrack, tint: "#F0455B" },
 };
 
 export default async function DashboardPage() {
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
 
         {lockedCents > 0 && (
           <p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <span aria-hidden>🔒</span>
+            <Lock className="size-3.5" aria-hidden />
             <span id="locked-balance" className="font-bold text-foreground">{formatCentsAsMt(lockedCents)} MT</span>
             em custódia nas tuas apostas activas
           </p>
@@ -63,7 +64,8 @@ export default async function DashboardPage() {
             id="cta-deposit"
             className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-extrabold tracking-tight text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90 sm:flex-initial sm:px-8"
           >
-            + Depositar
+            <Plus className="size-[18px]" strokeWidth={2.6} aria-hidden />
+            Depositar
             <LinkPendingSpinner />
           </Link>
           <Link
@@ -84,7 +86,9 @@ export default async function DashboardPage() {
 
         {ledger.length === 0 ? (
           <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-5 py-8 text-center">
-            <div className="mb-4 flex h-13 w-13 items-center justify-center rounded-2xl bg-muted text-2xl" aria-hidden>📊</div>
+            <div className="mb-4 flex size-13 items-center justify-center rounded-2xl bg-muted text-muted-foreground" aria-hidden>
+              <ChartColumn className="size-6" />
+            </div>
             <p className="mb-2 text-base font-bold">Ainda não há movimentos</p>
             <p className="mb-5 max-w-60 text-sm leading-relaxed text-muted-foreground">
               As tuas transações vão aparecer aqui depois do primeiro depósito.
@@ -99,18 +103,19 @@ export default async function DashboardPage() {
             {ledger.map((entry, i) => {
               const { label, netCents } = describeLedgerEntry(entry);
               const isPositive = netCents > 0;
-              const meta = LEDGER_ICON[entry.type] ?? { icon: "•", tint: "#94A3B8" };
+              const meta = LEDGER_ICON[entry.type] ?? { Icon: ChartColumn, tint: "#94A3B8" };
+              const Icon = meta.Icon;
               return (
                 <div
                   key={entry.id}
                   className={`flex items-center gap-3 px-5 py-4 ${i > 0 ? "border-t border-border" : ""}`}
                 >
                   <span
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-sm"
-                    style={{ background: `${meta.tint}22` }}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full"
+                    style={{ background: `${meta.tint}22`, color: meta.tint }}
                     aria-hidden
                   >
-                    {meta.icon}
+                    <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold">{label}</p>

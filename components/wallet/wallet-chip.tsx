@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Wallet, Plus } from "lucide-react";
 import { formatCentsAsMt } from "@/lib/format";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 
@@ -8,14 +9,15 @@ export function WalletChip({ availableCents, compact = false }: { availableCents
   return (
     <Link
       href="/wallet/deposit"
+      aria-label="Depositar"
       className={`press flex items-center gap-1.5 rounded-full border border-success/25 bg-success/10 font-bold text-success transition-colors hover:bg-success/20 ${
         compact ? "px-2.5 py-1 text-xs" : "px-3.5 py-1.5 text-sm"
       }`}
     >
-      <span aria-hidden>💰</span>
+      <Wallet className={compact ? "size-3.5" : "size-4"} aria-hidden />
       {formatCentsAsMt(availableCents)} MT
       <LinkPendingSpinner className="size-3" />
-      <span className="text-success/70" aria-hidden>+</span>
+      <Plus className="size-3.5 text-success/70" strokeWidth={2.6} aria-hidden />
     </Link>
   );
 }

@@ -23,12 +23,7 @@ export default async function DepositPage() {
 
   return (
     <AppShell active="wallet" displayName={profile.displayName} availableCents={availableCents} currentUserId={user.id}>
-      <BackLink fallbackHref="/dashboard" className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
-        <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
-          <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Voltar
-      </BackLink>
+      <BackLink href="/dashboard" label="Carteira" className="mb-5" />
 
       <div className="mb-7">
         <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Depositar</h1>

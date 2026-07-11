@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Handshake, X, Lock, Clock } from "lucide-react";
 import { BetActionButton } from "./bet-action-button";
 import { DuelSecondaryActions } from "./duel-secondary-actions";
 import { TeamBadge } from "@/components/match/team-badge";
@@ -96,8 +97,8 @@ function PitchEmbed({ duel }: { duel: Duel }) {
             {duel.minute ?? "AO VIVO"}
           </span>
         ) : (
-          <span className="rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur-sm">
-            🕐 {duel.match.time}
+          <span className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur-sm">
+            <Clock className="size-3" aria-hidden /> {duel.match.time}
           </span>
         )}
       </div>
@@ -130,31 +131,21 @@ function PitchEmbed({ duel }: { duel: Duel }) {
   );
 }
 
-/** Sportsbook-style pick button (label + emphasized value on the right),
- *  styled after the reference feed. Duelo has no odds, so the emphasized
- *  value is the 1:1 stake rather than a decimal odd. */
-function SideButton({
-  kicker,
-  label,
-  value,
-  gold = false,
-}: {
-  kicker: string;
-  label: string;
-  value: string;
-  gold?: boolean;
-}) {
+/** The two sides of the duel, rendered as clearly STATIC information (flat,
+ *  no border-box, no hover) so it can never be confused with the single action
+ *  button below. Before, these were button-shaped boxes that did nothing —
+ *  the #1 source of "which thing do I press?" confusion. */
+function DuelSides({ duel }: { duel: Duel }) {
   return (
-    <div
-      className={`flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 ${
-        gold ? "border-primary/45 bg-primary/[0.08]" : "border-border bg-secondary/50"
-      }`}
-    >
-      <div className="min-w-0">
-        <p className="text-[11px] font-medium text-muted-foreground">{kicker}</p>
-        <p className="truncate text-sm font-bold">{label}</p>
+    <div className="mx-4 mb-3 grid grid-cols-2 divide-x divide-border overflow-hidden rounded-lg bg-secondary/40">
+      <div className="min-w-0 px-3.5 py-2.5">
+        <p className="text-[11px] font-medium text-muted-foreground">Previsão</p>
+        <p className="truncate text-sm font-bold">{duel.prediction}</p>
       </div>
-      <span className="shrink-0 text-sm font-extrabold text-primary">{value}</span>
+      <div className="min-w-0 px-3.5 py-2.5">
+        <p className="text-[11px] font-medium text-muted-foreground">{duel.b ? "Contra" : "Lado em aberto"}</p>
+        <p className="truncate text-sm font-bold">Resultado contrário</p>
+      </div>
     </div>
   );
 }
@@ -173,7 +164,6 @@ export function DuelPost({
   const isOwnBet = live && duel.creatorId === currentUserId;
   const pot = duel.stake * (duel.b ? 2 : 1);
   const firstName = duel.a.name.split(" ")[0];
-  const stakeLabel = `MT ${duel.stake.toLocaleString("pt")}`;
 
   return (
     <article
@@ -213,62 +203,42 @@ export function DuelPost({
         </div>
       )}
 
-      {/* Pot — centred gold ribbon + custody line */}
-      <div className="px-4 pb-3">
-        <div className="mb-2 flex justify-center">
-          <span
-            className="relative py-1.5 pl-4 pr-5 text-sm font-extrabold tracking-tight text-primary-foreground"
-            style={{
-              background: "linear-gradient(180deg, #F7D65C 0%, #F2C22A 55%, #C99406 100%)",
-              clipPath: "polygon(8px 0%, calc(100% - 8px) 0%, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0% 50%)",
-              boxShadow: "0 0 20px rgba(242,194,42,0.45)",
-            }}
-          >
-            <span
-              className="pointer-events-none absolute inset-x-2 top-0 h-1/2 opacity-40"
-              style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.7), transparent)" }}
-            />
-            <span className="relative">MT {pot.toLocaleString("pt")} (Pote)</span>
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">🔒 Pote em jogo</span>
-          <span className="text-sm font-extrabold tabular-nums">MT {pot.toLocaleString("pt")}</span>
-        </div>
+      {/* Sides (static info) */}
+      <DuelSides duel={duel} />
+
+      {/* Pot — one clear line of information */}
+      <div className="flex items-center justify-between px-4 pb-3.5">
+        <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Lock className="size-3.5 text-primary" aria-hidden /> Pote em jogo
+        </span>
+        <span className="text-base font-extrabold tabular-nums text-primary">MT {pot.toLocaleString("pt")}</span>
       </div>
 
-      {/* The two sides — sportsbook-style pick buttons */}
-      <div className="flex gap-2 px-4 pb-3.5">
-        <SideButton kicker="A previsão" label={duel.prediction} value={stakeLabel} />
-        {duel.b ? (
-          <SideButton kicker="Contra" label="Resultado contrário" value={stakeLabel} />
-        ) : (
-          <SideButton kicker="Em aberto" label="Aceita este lado" value={stakeLabel} gold />
-        )}
-      </div>
-
-      {/* Action bar — like Facebook's Like/Comment/Share row */}
+      {/* Action bar — the ONLY pressable element in the card */}
       <div className="border-t border-border px-2 py-1.5">
         {isWaiting && isOwnBet ? (
           <BetActionButton
             betId={duel.id}
             mode="cancel"
-            label="✕ Cancelar a minha aposta"
-            className="press flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-destructive transition-colors hover:bg-accent disabled:opacity-60"
+            icon={<X className="size-4" aria-hidden />}
+            label="Cancelar a minha aposta"
+            className="press flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
           />
         ) : isWaiting && live ? (
           <BetActionButton
             betId={duel.id}
             mode="accept"
-            label={`🤝 Aceitar aposta de ${firstName}`}
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary/10 py-3 text-sm font-bold text-primary transition-colors hover:bg-primary/20 disabled:opacity-60"
+            icon={<Handshake className="size-[18px]" aria-hidden />}
+            label={`Aceitar aposta de ${firstName}`}
+            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90 disabled:opacity-60"
           />
         ) : isWaiting ? (
           <Link
             href="/register"
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary/10 py-3 text-sm font-bold text-primary transition-colors hover:bg-primary/20"
+            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90"
           >
-            🤝 Aceitar aposta de {firstName}
+            <Handshake className="size-[18px]" aria-hidden />
+            Aceitar aposta de {firstName}
           </Link>
         ) : (
           <DuelSecondaryActions duelId={duel.id} />

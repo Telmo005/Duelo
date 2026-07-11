@@ -18,7 +18,7 @@ export const registerSchema = z.object({
 
   password: z
     .string()
-    .min(8, "Password deve ter pelo menos 8 caracteres")
+    .min(4, "Password deve ter pelo menos 4 caracteres")
     .max(72, "Password demasiado longa"),
 
   ageConfirmed: z

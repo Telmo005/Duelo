@@ -1,19 +1,15 @@
 "use client";
 
 import { useTransition } from "react";
+import { Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
 
-/** "Seguir"/"Partilhar" row shown on closed/read-only duels. Partilhar has a
- *  real, backend-free implementation (Web Share API, clipboard fallback).
- *  Seguir has no following feature behind it yet — clicking gives an honest
- *  "em breve" toast rather than silently doing nothing. */
+/** "Partilhar" action shown on closed/read-only duels. Real, backend-free
+ *  implementation (Web Share API with clipboard fallback). No "coming soon"
+ *  dead buttons — only actions that actually do something ship. */
 export function DuelSecondaryActions({ duelId }: { duelId: string }) {
   const [isSharing, startShare] = useTransition();
-
-  function handleFollow() {
-    toast("Seguir apostadores chega em breve.");
-  }
 
   function handleShare() {
     startShare(async () => {
@@ -36,23 +32,14 @@ export function DuelSecondaryActions({ duelId }: { duelId: string }) {
   }
 
   return (
-    <div className="flex items-center">
-      <button
-        type="button"
-        onClick={handleFollow}
-        className="press flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent"
-      >
-        👀 Seguir
-      </button>
-      <button
-        type="button"
-        onClick={handleShare}
-        disabled={isSharing}
-        className="press flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {isSharing && <Spinner className="size-3.5" />}
-        {isSharing ? "A partilhar…" : "↗ Partilhar"}
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={handleShare}
+      disabled={isSharing}
+      className="press flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {isSharing ? <Spinner className="size-3.5" /> : <Share2 className="size-4" aria-hidden />}
+      {isSharing ? "A partilhar…" : "Partilhar"}
+    </button>
   );
 }

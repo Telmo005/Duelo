@@ -10,6 +10,7 @@ import { BetsList } from "@/components/bets/bets-list";
 import { getUserBets } from "@/lib/profile";
 import { getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { Plus, Swords, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = { title: "Minhas Apostas | Duelo" };
 
@@ -37,20 +38,24 @@ export default async function BetsPage() {
           href="/bets/new"
           className="press flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-primary-foreground transition-colors hover:bg-primary/90"
         >
-          + Nova aposta
+          <Plus className="size-[18px]" strokeWidth={2.6} aria-hidden />
+          Nova aposta
           <LinkPendingSpinner />
         </Link>
       </div>
 
       {bets.length === 0 ? (
         <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-5 py-12 text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-3xl" aria-hidden>🎯</div>
+          <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary" aria-hidden>
+            <Swords className="size-7" />
+          </div>
           <p className="mb-2 text-base font-bold">Ainda não tens apostas</p>
           <p className="mb-5 max-w-64 text-sm leading-relaxed text-muted-foreground">
             Cria a tua primeira aposta e desafia outro utilizador a apostar contra ti.
           </p>
           <Link href="/bets/new" className="press flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-extrabold text-primary-foreground">
-            Criar aposta →
+            Criar aposta
+            <ArrowRight className="size-4" aria-hidden />
             <LinkPendingSpinner />
           </Link>
         </div>

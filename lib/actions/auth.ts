@@ -112,7 +112,10 @@ export async function registerUser(
     redirect("/login");
   }
 
-  redirect("/dashboard");
+  // Land on the feed — that's the heart of the app (open duels to browse and
+  // accept). The wallet is one tap away in the nav; forcing a new user to the
+  // wallet first read as "where are the bets?".
+  redirect("/");
 }
 
 /** signIn — phone + password (the app's sole login identity for now). */
@@ -144,7 +147,7 @@ export async function signIn(
     };
   }
 
-  redirect("/dashboard");
+  redirect("/");
 }
 
 /**

@@ -11,6 +11,7 @@ import { getUserStats } from "@/lib/profile";
 import { getWalletBalance, formatCentsAsMt } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { EditableDisplayName } from "@/components/profile/editable-display-name";
+import { Wallet, Swords } from "lucide-react";
 
 export const metadata: Metadata = { title: "Perfil | Duelo" };
 
@@ -87,7 +88,9 @@ export default async function ProfilePage() {
       {/* Quick links */}
       <section className="mb-7 grid grid-cols-2 gap-3">
         <Link href="/dashboard" className="press flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-accent">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success/10 text-lg" aria-hidden>💳</span>
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success" aria-hidden>
+            <Wallet className="size-5" />
+          </span>
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5 text-sm font-bold">
               Carteira
@@ -97,7 +100,9 @@ export default async function ProfilePage() {
           </div>
         </Link>
         <Link href="/bets" className="press flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-accent">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg" aria-hidden>🎯</span>
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden>
+            <Swords className="size-5" />
+          </span>
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5 text-sm font-bold">
               Minhas Apostas

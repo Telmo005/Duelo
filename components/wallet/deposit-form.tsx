@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Smartphone, ShieldCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { SectionLabel } from "@/components/ui/section-label";
+import { OptionCard } from "@/components/ui/option-card";
+import { ActionButton } from "@/components/ui/action-button";
 import { createDepositAction } from "@/lib/actions/deposit";
 
 const METHODS = [
-  { key: "mpesa", label: "M-Pesa", hint: "Números 84 / 85", color: "#F0455B" },
-  { key: "emola", label: "e-Mola", hint: "Números 86 / 87", color: "#F2C22A" },
+  { key: "mpesa", label: "M-Pesa", hint: "Números 84 · 85" },
+  { key: "emola", label: "e-Mola", hint: "Números 86 · 87" },
 ] as const;
 
 const QUICK_AMOUNTS = [100, 250, 500, 1000, 2500];
@@ -26,7 +30,6 @@ export function DepositForm() {
   const router = useRouter();
   const [method, setMethod] = useState<MethodKey | null>(null);
   const [amount, setAmount] = useState("");
-  const [phone, setPhone] = useState("+258 ");
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<string | null>(null);
   const [depositId, setDepositId] = useState<string | null>(null);
@@ -34,9 +37,7 @@ export function DepositForm() {
   const [popupBlocked, setPopupBlocked] = useState(false);
   const pollStartedAt = useRef<number>(0);
 
-  // "+258" alone has no real local number yet — only its 3 country-code digits.
-  const hasNumber = phone.replace(/\D/g, "").length > 3;
-  const canSubmit = method !== null && Number(amount) > 0 && hasNumber;
+  const canSubmit = method !== null && Number(amount) > 0;
   const methodLabel = METHODS.find((m) => m.key === method)?.label;
 
   useEffect(() => {
@@ -79,7 +80,7 @@ export function DepositForm() {
     setError(null);
     setPhase("submitting");
 
-    const result = await createDepositAction({ method, amountMt: amount, phone });
+    const result = await createDepositAction({ method, amountMt: amount });
 
     if (result.error) {
       setError(result.error);
@@ -114,27 +115,24 @@ export function DepositForm() {
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-card p-8 text-center">
         {phase === "waiting" ? (
           <>
-            <Spinner />
+            <Spinner className="size-7" />
             <div>
               <p className="text-base font-bold">A confirmar o teu depósito…</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {popupBlocked
-                  ? "O teu navegador bloqueou a aba de pagamento. Clica no botão abaixo para abrir manualmente."
-                  : "Abrimos uma nova aba para concluíres o pagamento com segurança. Confirma no teu telemóvel quando for solicitado — isto pode demorar alguns segundos."}
+                  ? "O teu navegador bloqueou a aba de pagamento. Toca no botão abaixo para abrir e concluíres no PaySuite."
+                  : "Abrimos uma nova aba para concluíres o pagamento com segurança. Confirma no teu telemóvel quando for solicitado — pode demorar alguns segundos."}
               </p>
             </div>
             {checkoutUrl ? (
-              <button
+              <ActionButton
                 type="button"
                 onClick={openCheckout}
-                className={`press flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold transition-colors ${
-                  popupBlocked
-                    ? "bg-primary text-primary-foreground shadow-[var(--shadow-elevated)]"
-                    : "border border-border bg-card text-muted-foreground hover:bg-accent"
-                }`}
+                variant={popupBlocked ? "primary" : "secondary"}
+                block
               >
                 Abrir página de pagamento
-              </button>
+              </ActionButton>
             ) : null}
           </>
         ) : (
@@ -146,24 +144,16 @@ export function DepositForm() {
               tarde.
             </p>
             {checkoutUrl ? (
-              <button
-                type="button"
-                onClick={openCheckout}
-                className="press rounded-2xl border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground hover:bg-accent"
-              >
+              <ActionButton type="button" onClick={openCheckout} variant="secondary" size="sm">
                 Abrir página de pagamento
-              </button>
+              </ActionButton>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setPhase("waiting")}
-              className="press mt-2 rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground"
-            >
+            <ActionButton type="button" onClick={() => setPhase("waiting")} size="sm">
               Continuar a aguardar
-            </button>
+            </ActionButton>
           </>
         )}
-        <Link href="/dashboard" className="mt-2 text-sm font-semibold text-primary">
+        <Link href="/dashboard" className="mt-1 text-sm font-semibold text-primary">
           Voltar à carteira
         </Link>
       </div>
@@ -174,43 +164,31 @@ export function DepositForm() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {/* Method selection */}
       <div>
-        <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          <span className="flex size-5 items-center justify-center rounded-full bg-primary/15 text-[11px] text-primary">1</span>
-          Método
-        </p>
+        <SectionLabel step={1}>Método</SectionLabel>
         <div className="grid grid-cols-2 gap-3">
-          {METHODS.map((m) => {
-            const isActive = method === m.key;
-            return (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => setMethod(m.key)}
-                aria-pressed={isActive}
-                className={`press flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-colors ${
-                  isActive ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-accent"
-                }`}
-              >
-                <span
-                  className="flex size-9 items-center justify-center rounded-full text-sm font-extrabold text-white"
-                  style={{ background: m.color }}
-                >
-                  {m.label.charAt(0)}
-                </span>
-                <span className="text-[15px] font-bold">{m.label}</span>
-                <span className="text-xs text-muted-foreground">{m.hint}</span>
-              </button>
-            );
-          })}
+          {METHODS.map((m) => (
+            <OptionCard
+              key={m.key}
+              selected={method === m.key}
+              onSelect={() => setMethod(m.key)}
+              ariaLabel={m.label}
+              className="flex flex-col items-start gap-2.5"
+            >
+              <span className="flex size-10 items-center justify-center rounded-xl bg-secondary text-foreground">
+                <Smartphone className="size-5" aria-hidden />
+              </span>
+              <span className="text-[15px] font-bold">{m.label}</span>
+              <span className="text-xs text-muted-foreground">{m.hint}</span>
+            </OptionCard>
+          ))}
         </div>
       </div>
 
       {/* Amount */}
       <div>
-        <label htmlFor="amount" className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          <span className="flex size-5 items-center justify-center rounded-full bg-primary/15 text-[11px] text-primary">2</span>
+        <SectionLabel step={2} htmlFor="amount">
           Valor a depositar
-        </label>
+        </SectionLabel>
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 focus-within:border-primary">
           <input
             id="amount"
@@ -243,50 +221,25 @@ export function DepositForm() {
         </div>
       </div>
 
-      {/* Phone */}
-      <div>
-        <label htmlFor="phone" className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          <span className="flex size-5 items-center justify-center rounded-full bg-primary/15 text-[11px] text-primary">3</span>
-          Número de telemóvel
-        </label>
-        <input
-          id="phone"
-          type="tel"
-          inputMode="tel"
-          maxLength={16}
-          placeholder="84 XXX XXXX"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          onFocus={(e) => {
-            const el = e.currentTarget;
-            requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
-          }}
-          className="w-full rounded-2xl border border-border bg-card px-4 py-3.5 text-[15px] outline-none focus:border-primary"
-        />
-      </div>
-
       {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
 
-      {phase === "submitting" ? (
-        <div className="flex items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-extrabold text-primary-foreground opacity-70">
-          <Spinner />
-          A iniciar pagamento…
-        </div>
-      ) : (
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="press flex items-center justify-center rounded-2xl bg-primary py-4 text-base font-extrabold tracking-tight text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none"
-        >
-          {methodLabel ? `Depositar via ${methodLabel}` : "Depositar"}
-        </button>
-      )}
+      <ActionButton
+        type="submit"
+        size="lg"
+        block
+        disabled={!canSubmit}
+        loading={phase === "submitting"}
+      >
+        {phase === "submitting"
+          ? "A iniciar pagamento…"
+          : methodLabel
+          ? `Depositar via ${methodLabel}`
+          : "Depositar"}
+      </ActionButton>
 
-      <p className="text-center text-xs leading-relaxed text-muted-foreground">
-        🔒 Pagamento processado com segurança via PaySuite.{" "}
-        <Link href="/dashboard" className="font-semibold text-primary">
-          Voltar à carteira
-        </Link>
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs leading-relaxed text-muted-foreground">
+        <ShieldCheck className="size-3.5 text-success" aria-hidden />
+        Pagamento processado com segurança via PaySuite. O número é pedido no checkout.
       </p>
     </form>
   );
