@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Spinner } from "@/components/ui/spinner";
+import { createDepositAction } from "@/lib/actions/deposit";
 
 const METHODS = [
   { key: "mpesa", label: "M-Pesa", hint: "Números 84 / 85", color: "#F0455B" },
@@ -11,25 +13,124 @@ const METHODS = [
 
 const QUICK_AMOUNTS = [100, 250, 500, 1000, 2500];
 
+// PayGate/PaySuite não confirma na hora — o webhook normalmente chega em
+// poucos segundos, mas o utilizador pode demorar a concluir no telemóvel.
+// Para de perguntar depois deste tempo e mostra a mensagem de fallback.
+const POLL_INTERVAL_MS = 2500;
+const POLL_TIMEOUT_MS = 3 * 60 * 1000;
+
 type MethodKey = (typeof METHODS)[number]["key"];
+type Phase = "form" | "submitting" | "waiting" | "timeout";
 
 export function DepositForm() {
+  const router = useRouter();
   const [method, setMethod] = useState<MethodKey | null>(null);
   const [amount, setAmount] = useState("");
   const [phone, setPhone] = useState("+258 ");
-  const [submitting, setSubmitting] = useState(false);
+  const [phase, setPhase] = useState<Phase>("form");
+  const [error, setError] = useState<string | null>(null);
+  const [depositId, setDepositId] = useState<string | null>(null);
+  const pollStartedAt = useRef<number>(0);
 
   // "+258" alone has no real local number yet — only its 3 country-code digits.
   const hasNumber = phone.replace(/\D/g, "").length > 3;
   const canSubmit = method !== null && Number(amount) > 0 && hasNumber;
   const methodLabel = METHODS.find((m) => m.key === method)?.label;
 
-  function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    if (phase !== "waiting" || !depositId) return;
+
+    pollStartedAt.current = Date.now();
+    const interval = setInterval(async () => {
+      if (Date.now() - pollStartedAt.current > POLL_TIMEOUT_MS) {
+        clearInterval(interval);
+        setPhase("timeout");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/deposits/${depositId}`);
+        if (!res.ok) return; // transient — try again next tick
+        const data: { status: "pending" | "success" | "failed" } = await res.json();
+
+        if (data.status === "success") {
+          clearInterval(interval);
+          router.push("/dashboard");
+          router.refresh();
+        } else if (data.status === "failed") {
+          clearInterval(interval);
+          setError("O pagamento falhou. Tenta novamente.");
+          setPhase("form");
+        }
+      } catch {
+        // network hiccup — keep polling
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [phase, depositId, router]);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
-    setSubmitting(true);
-    // PaySuite integration lands in a later phase — this is the visual/interactive shell only.
-    setTimeout(() => setSubmitting(false), 900);
+    if (!canSubmit || !method) return;
+
+    setError(null);
+    setPhase("submitting");
+
+    const result = await createDepositAction({ method, amountMt: amount, phone });
+
+    if (result.error) {
+      setError(result.error);
+      setPhase("form");
+      return;
+    }
+
+    if (result.checkoutUrl && result.depositId) {
+      window.open(result.checkoutUrl, "_blank");
+      setDepositId(result.depositId);
+      setPhase("waiting");
+    } else {
+      setError("Não foi possível iniciar o pagamento. Tenta novamente.");
+      setPhase("form");
+    }
+  }
+
+  if (phase === "waiting" || phase === "timeout") {
+    return (
+      <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-card p-8 text-center">
+        {phase === "waiting" ? (
+          <>
+            <Spinner />
+            <div>
+              <p className="text-base font-bold">A confirmar o teu depósito…</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Abrimos uma nova aba para concluíres o pagamento com segurança. Confirma no teu
+                telemóvel quando for solicitado — isto pode demorar alguns segundos.
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-base font-bold">Ainda a processar</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Isto está a demorar mais que o esperado. Se já confirmaste o pagamento no telemóvel,
+              o saldo aparece assim que for processado — podes voltar à carteira e verificar mais
+              tarde.
+            </p>
+            <button
+              type="button"
+              onClick={() => setPhase("waiting")}
+              className="press mt-2 rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground"
+            >
+              Continuar a aguardar
+            </button>
+          </>
+        )}
+        <Link href="/dashboard" className="mt-2 text-sm font-semibold text-primary">
+          Voltar à carteira
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -127,10 +228,12 @@ export function DepositForm() {
         />
       </div>
 
-      {submitting ? (
+      {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
+
+      {phase === "submitting" ? (
         <div className="flex items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-extrabold text-primary-foreground opacity-70">
           <Spinner />
-          A confirmar…
+          A iniciar pagamento…
         </div>
       ) : (
         <button

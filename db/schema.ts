@@ -5,6 +5,8 @@ import {
   timestamp,
   bigint,
   boolean,
+  uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -84,6 +86,36 @@ export const walletLedger = pgTable("wallet_ledger", {
 });
 
 export type WalletLedgerEntry = typeof walletLedger.$inferSelect;
+
+/**
+ * deposits — one row per deposit attempt via the PayGate gateway
+ * (mpesa/emola, PaySuite behind the scenes). Created 'pending' when the
+ * charge is created; flipped to 'success'/'failed' exclusively by the
+ * PayGate webhook (app/api/webhooks/paygate/route.ts), which then calls
+ * wallet_credit() to move the money into the user's wallet. Never
+ * written from the client — see supabase/migrations/0012_deposits.sql.
+ */
+export const deposits = pgTable("deposits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+  method: text("method").notNull(), // 'mpesa' | 'emola'
+  phone: text("phone").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending' | 'success' | 'failed'
+  reference: text("reference").notNull(),
+  gatewayPaymentId: text("gateway_payment_id"),
+  checkoutUrl: text("checkout_url"),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("deposits_reference_uq").on(t.reference),
+  uniqueIndex("deposits_gateway_payment_id_uq").on(t.gatewayPaymentId),
+  index("deposits_user_id_created_at_idx").on(t.userId, t.createdAt),
+]);
+
+export type Deposit = typeof deposits.$inferSelect;
 
 /**
  * matches — football fixtures available to bet on. Manually seeded for
