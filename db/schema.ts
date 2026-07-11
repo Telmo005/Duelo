@@ -168,3 +168,36 @@ export const platformLedger = pgTable("platform_ledger", {
 });
 
 export type PlatformLedgerEntry = typeof platformLedger.$inferSelect;
+
+/**
+ * auth_attempts — sliding-window login attempt log backing the signIn
+ * rate limiter (lib/rateLimit.ts). The synthetic-email identity is
+ * derivable from any known phone number, so this table is the actual
+ * brute-force defense. Never exposed to RLS/PostgREST — internal only.
+ */
+export const authAttempts = pgTable("auth_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  phone: text("phone").notNull(),
+  ip: text("ip"),
+  success: boolean("success").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AuthAttempt = typeof authAttempts.$inferSelect;
+
+/**
+ * admin_audit_log — append-only trail of admin actions (password resets,
+ * manual settlement/void). Written exclusively by lib/adminAudit.ts.
+ * Satisfies the "auditoria e rastreabilidade completa" requirement for
+ * anything an admin does on another user's behalf.
+ */
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  adminId: uuid("admin_id").notNull(),
+  action: text("action").notNull(),
+  targetUserId: uuid("target_user_id"),
+  detail: text("detail"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AdminAuditLogEntry = typeof adminAuditLog.$inferSelect;

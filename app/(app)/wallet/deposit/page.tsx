@@ -22,7 +22,7 @@ export default async function DepositPage() {
   const { availableCents } = await getWalletBalance(user.id);
 
   return (
-    <AppShell active="wallet" displayName={profile.displayName} availableCents={availableCents}>
+    <AppShell active="wallet" displayName={profile.displayName} availableCents={availableCents} currentUserId={user.id}>
       <BackLink fallbackHref="/dashboard" className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
         <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
           <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

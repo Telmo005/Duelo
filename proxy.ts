@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 // Routes that require authentication
-const PROTECTED_ROUTES = ["/dashboard", "/wallet", "/bet", "/profile", "/admin"];
+const PROTECTED_ROUTES = ["/dashboard", "/wallet", "/bet", "/perfil", "/admin"];
 
 const DEVICE_ID_COOKIE = "device_id";
 

@@ -9,6 +9,7 @@ import { FeedSidebarLeft } from "@/components/layout/feed-sidebar-left";
 import { FeedSidebarRight } from "@/components/layout/feed-sidebar-right";
 import { Composer } from "@/components/feed/composer";
 import { DuelFeed } from "@/components/feed/duel-feed";
+import { FeedListener } from "@/components/realtime/feed-listener";
 import type { Duel } from "@/components/feed/duel-post";
 import { getFeedDuels } from "@/lib/bets";
 import { getWalletBalance } from "@/lib/wallet";
@@ -135,6 +136,7 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {loggedIn && <FeedListener currentUserId={user?.id} />}
       <SiteHeader displayName={displayName} availableCents={availableCents} />
 
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[260px_1fr_300px] lg:py-6">

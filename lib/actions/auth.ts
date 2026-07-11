@@ -6,6 +6,8 @@ import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { registerSchema, signInSchema } from "@/lib/validation/auth";
 import { normalizePhone } from "@/lib/phone";
+import { getRequestFingerprint } from "@/lib/requestInfo";
+import { checkLoginRateLimit, recordLoginAttempt } from "@/lib/rateLimit";
 
 type ActionResult = { error?: string };
 
@@ -123,9 +125,18 @@ export async function signIn(
   }
 
   const phone = normalizePhone(parsed.data.phone);
+  const { ip } = await getRequestFingerprint();
+
+  const rateLimit = await checkLoginRateLimit(phone, ip);
+  if (!rateLimit.allowed) {
+    return { error: rateLimit.message };
+  }
+
   const syntheticEmail = phoneToSyntheticEmail(phone);
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password: parsed.data.password });
+
+  await recordLoginAttempt(phone, ip, !error);
 
   if (error) {
     return {

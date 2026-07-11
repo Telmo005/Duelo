@@ -31,7 +31,7 @@ export default async function ProfilePage() {
   const isPositive = stats.netCents >= 0;
 
   return (
-    <AppShell active="profile" displayName={profile.displayName} availableCents={availableCents}>
+    <AppShell active="profile" displayName={profile.displayName} availableCents={availableCents} currentUserId={user.id}>
       {/* Header */}
       <div className="mb-7 flex items-center gap-4">
         <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary text-2xl font-extrabold text-primary-foreground">

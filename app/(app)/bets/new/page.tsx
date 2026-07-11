@@ -35,7 +35,7 @@ export default async function NewBetPage() {
   }));
 
   return (
-    <AppShell active="bets" displayName={profile.displayName} availableCents={availableCents}>
+    <AppShell active="bets" displayName={profile.displayName} availableCents={availableCents} currentUserId={user.id}>
       <BackLink fallbackHref="/bets" className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
         <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
           <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

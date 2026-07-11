@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getRequestFingerprint } from "@/lib/requestInfo";
+import { broadcastFeedEvent } from "@/lib/realtime";
+import { db } from "@/db";
+import { bets } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 type ActionResult = { error?: string; betId?: string };
@@ -18,6 +22,9 @@ const createBetSchema = z.object({
 function friendlyBetError(message: string): string {
   if (message.includes("insufficient available balance")) {
     return "Saldo insuficiente. Deposita antes de criar esta aposta.";
+  }
+  if (message.includes("cannot accept")) {
+    return "Este jogo já começou — já não é possível aceitar esta aposta.";
   }
   if (message.includes("match has already started")) {
     return "Este jogo já começou — já não é possível apostar.";
@@ -63,6 +70,8 @@ export async function createBetAction(input: Record<string, unknown>): Promise<A
     return { error: friendlyBetError(error.message) };
   }
 
+  await broadcastFeedEvent({ type: "bet_created", matchId: parsed.data.matchId });
+
   revalidatePath("/");
   redirect("/");
   // unreachable, satisfies the ActionResult type for callers that don't redirect
@@ -87,6 +96,11 @@ export async function acceptBetAction(betId: string): Promise<ActionResult> {
     return { error: friendlyBetError(error.message) };
   }
 
+  const [acceptedBet] = await db.select({ creatorId: bets.creatorId, matchId: bets.matchId }).from(bets).where(eq(bets.id, betId)).limit(1);
+  if (acceptedBet) {
+    await broadcastFeedEvent({ type: "bet_accepted", betId, matchId: acceptedBet.matchId, creatorId: acceptedBet.creatorId });
+  }
+
   revalidatePath("/");
   return {};
 }
@@ -101,6 +115,11 @@ export async function cancelBetAction(betId: string): Promise<ActionResult> {
 
   if (error) {
     return { error: friendlyBetError(error.message) };
+  }
+
+  const [cancelledBet] = await db.select({ matchId: bets.matchId }).from(bets).where(eq(bets.id, betId)).limit(1);
+  if (cancelledBet) {
+    await broadcastFeedEvent({ type: "bet_cancelled", betId, matchId: cancelledBet.matchId });
   }
 
   revalidatePath("/");

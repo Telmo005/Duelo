@@ -102,7 +102,7 @@ export function UserPasswordReset() {
               </button>
               <button
                 type="submit"
-                disabled={isResetting || newPassword.length < 4}
+                disabled={isResetting || newPassword.length < 8}
                 className="press flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isResetting && <Spinner className="size-3.5" />}

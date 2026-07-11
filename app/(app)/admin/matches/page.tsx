@@ -23,7 +23,7 @@ export default async function AdminMatchesPage() {
   ]);
 
   return (
-    <AppShell active="feed" displayName={profile.displayName} availableCents={availableCents}>
+    <AppShell active="feed" displayName={profile.displayName} availableCents={availableCents} currentUserId={profile.id}>
       <div className="mb-7 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Liquidar jogos</h1>

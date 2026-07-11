@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { broadcastFeedEvent } from "@/lib/realtime";
 
 /**
  * Refunds any 'waiting' bet whose match has already kicked off with no
@@ -22,6 +23,10 @@ export async function GET(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (typeof data === "number" && data > 0) {
+    await broadcastFeedEvent({ type: "bets_refunded" });
   }
 
   return NextResponse.json({ refunded: data });

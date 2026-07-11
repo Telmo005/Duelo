@@ -27,7 +27,7 @@ export default async function BetsPage() {
   ]);
 
   return (
-    <AppShell active="bets" displayName={profile.displayName} availableCents={availableCents}>
+    <AppShell active="bets" displayName={profile.displayName} availableCents={availableCents} currentUserId={user.id}>
       <div className="mb-7 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Minhas Apostas</h1>

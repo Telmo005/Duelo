@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { requireAdmin } from "@/lib/admin";
 import { getFinancialSummary, getFlaggedBets, getRecentBets, getWalletOverview } from "@/lib/adminData";
+import { getRecentAdminActions } from "@/lib/adminAudit";
 import { formatCentsAsMt, getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 
@@ -21,18 +22,25 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   settled: { label: "Liquidada", className: "bg-success/10 text-success" },
 };
 
+const ADMIN_ACTION_LABELS: Record<string, string> = {
+  password_reset: "Reposição de password",
+  settle_match: "Liquidação manual",
+  void_match: "Anulação de jogo",
+};
+
 export default async function AdminPage() {
   const profile = await requireAdmin();
-  const [summary, flagged, recentBets, wallets, { availableCents }] = await Promise.all([
+  const [summary, flagged, recentBets, wallets, adminActions, { availableCents }] = await Promise.all([
     getFinancialSummary(),
     getFlaggedBets(),
     getRecentBets(),
     getWalletOverview(),
+    getRecentAdminActions(),
     getWalletBalance(profile.id),
   ]);
 
   return (
-    <AppShell active="feed" displayName={profile.displayName} availableCents={availableCents}>
+    <AppShell active="feed" displayName={profile.displayName} availableCents={availableCents} currentUserId={profile.id}>
       <div className="mb-7 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Admin</h1>
@@ -139,6 +147,33 @@ export default async function AdminPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Admin audit trail */}
+      <section className="mt-7">
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Ações administrativas recentes</h2>
+        {adminActions.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            Nenhuma ação administrativa registada ainda.
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            {adminActions.map((a) => (
+              <div key={a.id} className="flex flex-col gap-0.5 border-b border-border p-3.5 text-sm last:border-b-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold">{ADMIN_ACTION_LABELS[a.action] ?? a.action}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(a.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {a.adminName}
+                  {a.targetName ? ` → ${a.targetName}` : ""} · {a.detail}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </AppShell>
   );

@@ -33,7 +33,7 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <AppShell active="wallet" displayName={profile.displayName} availableCents={availableCents}>
+    <AppShell active="wallet" displayName={profile.displayName} availableCents={availableCents} currentUserId={user.id}>
       <div className="mb-7">
         <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Carteira</h1>
         <p className="mt-1 text-sm text-muted-foreground">O teu saldo, sempre em custódia segura até haver um vencedor.</p>

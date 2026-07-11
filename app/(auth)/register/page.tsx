@@ -64,7 +64,7 @@ export default function RegisterPage() {
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="password">Password</Label>
           <Input
-            id="password" name="password" type="password" placeholder="Mínimo 4 caracteres"
+            id="password" name="password" type="password" placeholder="Mínimo 8 caracteres"
             required disabled={isPending} maxLength={72}
             className="h-11 rounded-xl px-4 text-[15px]"
           />

@@ -4,6 +4,7 @@ import { matches } from "@/db/schema";
 import { and, eq, isNotNull, lt } from "drizzle-orm";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fetchFixtureResult } from "@/lib/sportsData";
+import { broadcastFeedEvent } from "@/lib/realtime";
 
 const GRACE_WINDOW_MS = 72 * 60 * 60 * 1000; // SETL-04: void if no result 72h after kickoff
 
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
           p_result_away: result.awayGoals,
         });
         if (error) throw error;
+        await broadcastFeedEvent({ type: "bets_settled", matchId: match.id });
         results.push({ matchId: match.id, action: "settled", detail: `${data} bet(s)` });
         continue;
       }
@@ -46,6 +48,7 @@ export async function GET(request: Request) {
       if (result.status === "postponed" || result.status === "abandoned") {
         const { data, error } = await service.rpc("bet_void_match", { p_match_id: match.id, p_status: result.status });
         if (error) throw error;
+        await broadcastFeedEvent({ type: "bets_voided", matchId: match.id });
         results.push({ matchId: match.id, action: "voided", detail: `${data} bet(s)` });
         continue;
       }
@@ -55,6 +58,7 @@ export async function GET(request: Request) {
       if (pastGraceWindow) {
         const { data, error } = await service.rpc("bet_void_match", { p_match_id: match.id, p_status: "abandoned" });
         if (error) throw error;
+        await broadcastFeedEvent({ type: "bets_voided", matchId: match.id });
         results.push({ matchId: match.id, action: "voided_grace_window", detail: `${data} bet(s)` });
       } else {
         results.push({ matchId: match.id, action: "skipped_not_final", detail: result.status });

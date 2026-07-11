@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/server";
 import { normalizePhone } from "@/lib/phone";
+import { logAdminAction } from "@/lib/adminAudit";
 
 type FindUserResult = {
   error?: string;
@@ -40,15 +41,17 @@ export async function findUserByPhoneAction(phoneInput: string): Promise<FindUse
 type ResetResult = { error?: string; success?: boolean };
 
 export async function adminResetPasswordAction(userId: string, newPassword: string): Promise<ResetResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
-  if (newPassword.length < 4 || newPassword.length > 72) {
-    return { error: "A password deve ter entre 4 e 72 caracteres." };
+  if (newPassword.length < 8 || newPassword.length > 72) {
+    return { error: "A password deve ter entre 8 e 72 caracteres." };
   }
 
   const service = createServiceClient();
   const { error } = await service.auth.admin.updateUserById(userId, { password: newPassword });
   if (error) return { error: "Não foi possível repor a password. Tenta novamente." };
+
+  await logAdminAction(admin.id, "password_reset", userId, "Password reposta via /admin/users");
 
   return { success: true };
 }

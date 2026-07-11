@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/admin";
+import { logAdminAction } from "@/lib/adminAudit";
+import { broadcastFeedEvent } from "@/lib/realtime";
 
 type ActionResult = { error?: string };
 
@@ -13,7 +15,7 @@ type ActionResult = { error?: string };
  * to finish. Gated by requireAdmin — redirects non-admins away.
  */
 export async function settleMatchAction(matchId: string, resultHome: number, resultAway: number): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const service = createServiceClient();
   const { error } = await service.rpc("bet_settle_match", {
@@ -24,6 +26,9 @@ export async function settleMatchAction(matchId: string, resultHome: number, res
 
   if (error) return { error: error.message };
 
+  await logAdminAction(admin.id, "settle_match", null, `Liquidação manual do jogo ${matchId}: ${resultHome}-${resultAway}`);
+  await broadcastFeedEvent({ type: "bets_settled", matchId });
+
   revalidatePath("/admin/matches");
   revalidatePath("/admin");
   revalidatePath("/");
@@ -31,12 +36,15 @@ export async function settleMatchAction(matchId: string, resultHome: number, res
 }
 
 export async function voidMatchAction(matchId: string, status: "postponed" | "abandoned"): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const service = createServiceClient();
   const { error } = await service.rpc("bet_void_match", { p_match_id: matchId, p_status: status });
 
   if (error) return { error: error.message };
+
+  await logAdminAction(admin.id, "void_match", null, `Jogo ${matchId} marcado como ${status}`);
+  await broadcastFeedEvent({ type: "bets_voided", matchId });
 
   revalidatePath("/admin/matches");
   revalidatePath("/admin");

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { WalletChip } from "@/components/wallet/wallet-chip";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { FeedListener } from "@/components/realtime/feed-listener";
 
 const NAV_ITEMS = (active: string) => [
   { label: "Feed", href: "/", icon: "🏠", key: "feed" },
@@ -14,11 +15,13 @@ export function AppShell({
   active,
   displayName,
   availableCents,
+  currentUserId,
   children,
 }: {
   active: "feed" | "wallet" | "bets" | "profile";
   displayName: string;
   availableCents: number;
+  currentUserId?: string;
   children: React.ReactNode;
 }) {
   const initial = displayName.charAt(0).toUpperCase();
@@ -26,6 +29,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-background text-foreground lg:flex">
+      <FeedListener currentUserId={currentUserId} />
       {/* ── Sidebar (desktop) ─────────────────────────────────── */}
       <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:justify-between lg:border-r lg:border-border lg:bg-card lg:p-6">
         <div>
