@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/db";
@@ -9,7 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { CreateBetForm } from "@/components/bets/create-bet-form";
 import { getUpcomingMatches } from "@/lib/bets";
 import { getWalletBalance } from "@/lib/wallet";
-import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { BackLink } from "@/components/ui/back-link";
 
 export const metadata: Metadata = { title: "Nova aposta | Duelo" };
 
@@ -37,13 +36,12 @@ export default async function NewBetPage() {
 
   return (
     <AppShell active="bets" displayName={profile.displayName} availableCents={availableCents}>
-      <Link href="/bets" className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
+      <BackLink fallbackHref="/bets" className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
         <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
           <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Minhas Apostas
-        <LinkPendingSpinner className="size-3" />
-      </Link>
+        Voltar
+      </BackLink>
 
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Cria uma aposta</h1>

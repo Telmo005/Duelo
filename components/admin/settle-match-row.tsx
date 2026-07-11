@@ -50,6 +50,8 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="number"
+          min={0}
+          max={20}
           placeholder="0"
           value={home}
           onChange={(e) => setHome(e.target.value)}
@@ -58,6 +60,8 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
         <span className="text-muted-foreground">—</span>
         <input
           type="number"
+          min={0}
+          max={20}
           placeholder="0"
           value={away}
           onChange={(e) => setAway(e.target.value)}

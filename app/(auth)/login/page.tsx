@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signIn } from "@/lib/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -40,9 +41,8 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="phone">Número de telemóvel</Label>
-          <Input
-            id="phone" name="phone" type="tel"
-            placeholder="+258 84 XXX XXXX"
+          <PhoneInput
+            id="phone" name="phone" placeholder="84 XXX XXXX" defaultValue="+258 "
             required autoComplete="username" disabled={isPending}
             className="h-11 rounded-xl px-4 text-[15px]"
           />
@@ -56,7 +56,7 @@ export default function LoginPage() {
           <Input
             id="password" name="password" type="password"
             placeholder="A tua password"
-            required autoComplete="current-password" disabled={isPending}
+            required autoComplete="current-password" disabled={isPending} maxLength={72}
             className="h-11 rounded-xl px-4 text-[15px]"
           />
         </div>

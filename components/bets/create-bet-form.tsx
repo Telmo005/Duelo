@@ -167,6 +167,7 @@ export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
             type="number"
             inputMode="numeric"
             min={1}
+            max={1000000}
             placeholder="0"
             value={stake}
             onChange={(e) => setStake(e.target.value)}

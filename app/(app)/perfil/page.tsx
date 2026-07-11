@@ -10,6 +10,7 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { getUserStats } from "@/lib/profile";
 import { getWalletBalance, formatCentsAsMt } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { EditableDisplayName } from "@/components/profile/editable-display-name";
 
 export const metadata: Metadata = { title: "Perfil | Duelo" };
 
@@ -37,7 +38,7 @@ export default async function ProfilePage() {
           {profile.displayName.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-extrabold tracking-tight">{profile.displayName}</h1>
+          <EditableDisplayName initialName={profile.displayName} />
           <p className="text-sm text-muted-foreground">Membro desde {memberSince}</p>
         </div>
       </div>

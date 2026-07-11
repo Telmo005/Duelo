@@ -16,10 +16,12 @@ type MethodKey = (typeof METHODS)[number]["key"];
 export function DepositForm() {
   const [method, setMethod] = useState<MethodKey | null>(null);
   const [amount, setAmount] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("+258 ");
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = method !== null && Number(amount) > 0 && phone.trim().length > 0;
+  // "+258" alone has no real local number yet — only its 3 country-code digits.
+  const hasNumber = phone.replace(/\D/g, "").length > 3;
+  const canSubmit = method !== null && Number(amount) > 0 && hasNumber;
   const methodLabel = METHODS.find((m) => m.key === method)?.label;
 
   function handleSubmit(e: React.FormEvent) {
@@ -77,6 +79,7 @@ export function DepositForm() {
             type="number"
             inputMode="numeric"
             min={1}
+            max={1000000}
             placeholder="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -111,9 +114,15 @@ export function DepositForm() {
         <input
           id="phone"
           type="tel"
-          placeholder="+258 84 XXX XXXX"
+          inputMode="tel"
+          maxLength={16}
+          placeholder="84 XXX XXXX"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          onFocus={(e) => {
+            const el = e.currentTarget;
+            requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
+          }}
           className="w-full rounded-2xl border border-border bg-card px-4 py-3.5 text-[15px] outline-none focus:border-primary"
         />
       </div>

@@ -5,19 +5,28 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { registerSchema, signInSchema } from "@/lib/validation/auth";
+import { normalizePhone } from "@/lib/phone";
 
 type ActionResult = { error?: string };
 
-/** Supabase's phone identity wants a clean E.164 string — our form/regex
- *  allows optional spaces for readability ("+258 84 XXX XXXX"), so strip
- *  them before this ever reaches Supabase or gets stored. */
-function normalizePhone(phone: string): string {
-  return phone.replace(/\s+/g, "");
+/**
+ * Supabase's native Phone auth provider requires an SMS provider (Twilio/
+ * MessageBird/Vonage) configured in the project dashboard before it can even
+ * be turned on — real cost and setup we don't need for password-based login.
+ * Instead we keep the already-working Email provider and derive a synthetic,
+ * never-shown, never-emailed address deterministically from the phone
+ * number. The user only ever sees/enters their phone number; this is purely
+ * an internal identity key for Supabase Auth.
+ */
+function phoneToSyntheticEmail(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return `p${digits}@duelo.mz`;
 }
 
 /**
- * registerUser — create Supabase Auth user (phone identity) + profiles row.
- * ageConfirmed is enforced server-side — this is the primary trust boundary.
+ * registerUser — create Supabase Auth user (via synthetic email identity,
+ * see phoneToSyntheticEmail) + profiles row. ageConfirmed is enforced
+ * server-side — this is the primary trust boundary.
  */
 export async function registerUser(
   input: Record<string, unknown>
@@ -31,21 +40,21 @@ export async function registerUser(
 
   const { displayName, password, ageConfirmed } = parsed.data;
   const phone = normalizePhone(parsed.data.phone);
+  const syntheticEmail = phoneToSyntheticEmail(phone);
 
   // 2. Enforce 18+ server-side — belt AND suspenders (client also disables the button)
   if (!ageConfirmed) {
     return { error: "Deves confirmar que tens 18 anos ou mais" };
   }
 
-  // 3. Create Supabase Auth user with a phone identity (owns credential
-  //    hashing — never hand-rolled). No SMS/OTP involved: phone_confirm
-  //    marks it confirmed immediately, same trade-off email_confirm made
-  //    for the previous email-based flow.
+  // 3. Create Supabase Auth user (owns credential hashing — never hand-rolled).
+  //    Uses the synthetic email as the identity (see phoneToSyntheticEmail) —
+  //    email_confirm skips confirmation since no email is ever actually sent.
   const supabase = await createServiceClient();
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-    phone,
+    email: syntheticEmail,
     password,
-    phone_confirm: true,
+    email_confirm: true,
   });
 
   if (authError) {
@@ -92,7 +101,7 @@ export async function registerUser(
   // 6. Sign user in immediately after registration
   const anonClient = await createClient();
   const { error: signInError } = await anonClient.auth.signInWithPassword({
-    phone,
+    email: syntheticEmail,
     password,
   });
 
@@ -114,8 +123,9 @@ export async function signIn(
   }
 
   const phone = normalizePhone(parsed.data.phone);
+  const syntheticEmail = phoneToSyntheticEmail(phone);
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ phone, password: parsed.data.password });
+  const { error } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password: parsed.data.password });
 
   if (error) {
     return {

@@ -38,10 +38,16 @@ export default async function AdminPage() {
           <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Admin</h1>
           <p className="mt-1 text-sm text-muted-foreground">Visibilidade financeira e revisão de apostas suspeitas.</p>
         </div>
-        <Link href="/admin/matches" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
-          Liquidar jogos →
-          <LinkPendingSpinner />
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/users" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
+            Recuperar conta →
+            <LinkPendingSpinner />
+          </Link>
+          <Link href="/admin/matches" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
+            Liquidar jogos →
+            <LinkPendingSpinner />
+          </Link>
+        </div>
       </div>
 
       {/* Financial summary */}

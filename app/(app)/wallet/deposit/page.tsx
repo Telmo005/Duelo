@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/db";
@@ -8,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { AppShell } from "@/components/layout/app-shell";
 import { DepositForm } from "@/components/wallet/deposit-form";
 import { getWalletBalance } from "@/lib/wallet";
-import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { BackLink } from "@/components/ui/back-link";
 
 export const metadata: Metadata = { title: "Depositar | Duelo" };
 
@@ -24,13 +23,12 @@ export default async function DepositPage() {
 
   return (
     <AppShell active="wallet" displayName={profile.displayName} availableCents={availableCents}>
-      <Link href="/dashboard" className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+      <BackLink fallbackHref="/dashboard" className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
         <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
           <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Carteira
-        <LinkPendingSpinner className="size-3" />
-      </Link>
+        Voltar
+      </BackLink>
 
       <div className="mb-7">
         <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Depositar</h1>

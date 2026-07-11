@@ -5,15 +5,10 @@ import Link from "next/link";
 import { registerUser } from "@/lib/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-
-const FIELDS = [
-  { label: "Nome", id: "displayName", name: "displayName", type: "text", placeholder: "Como te chamam?", hint: undefined },
-  { label: "Número de telemóvel", id: "phone", name: "phone", type: "tel", placeholder: "+258 84 XXX XXXX", hint: "M-Pesa (84/85) ou e-Mola (86/87)" },
-  { label: "Password", id: "password", name: "password", type: "password", placeholder: "Mínimo 8 caracteres", hint: undefined },
-];
 
 export default function RegisterPage() {
   const [isPending, startTransition] = useTransition();
@@ -47,17 +42,33 @@ export default function RegisterPage() {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-        {FIELDS.map(({ label, id, name, type, placeholder, hint }) => (
-          <div key={id} className="flex flex-col gap-1.5">
-            <Label htmlFor={id}>{label}</Label>
-            <Input
-              id={id} name={name} type={type} placeholder={placeholder}
-              required disabled={isPending}
-              className="h-11 rounded-xl px-4 text-[15px]"
-            />
-            {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
-          </div>
-        ))}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="displayName">Nome</Label>
+          <Input
+            id="displayName" name="displayName" type="text" placeholder="Como te chamam?"
+            required disabled={isPending} maxLength={50}
+            className="h-11 rounded-xl px-4 text-[15px]"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="phone">Número de telemóvel</Label>
+          <PhoneInput
+            id="phone" name="phone" placeholder="84 XXX XXXX" defaultValue="+258 "
+            required disabled={isPending}
+            className="h-11 rounded-xl px-4 text-[15px]"
+          />
+          <p className="text-[11px] text-muted-foreground">M-Pesa (84/85) ou e-Mola (86/87)</p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password" name="password" type="password" placeholder="Mínimo 4 caracteres"
+            required disabled={isPending} maxLength={72}
+            className="h-11 rounded-xl px-4 text-[15px]"
+          />
+        </div>
 
         {/* 18+ toggle */}
         <button
