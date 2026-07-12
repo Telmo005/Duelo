@@ -18,11 +18,11 @@ export const actionButtonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-primary text-primary-foreground shadow-[var(--shadow-elevated)] hover:bg-primary/90 disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none",
+          "bg-primary text-primary-foreground shadow-[var(--shadow-elevated)] hover:bg-primary-90 disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none",
         secondary:
           "border border-border bg-card text-foreground hover:bg-accent disabled:opacity-60",
         ghost: "text-muted-foreground hover:bg-accent hover:text-foreground",
-        danger: "text-destructive hover:bg-destructive/10 disabled:opacity-60",
+        danger: "text-destructive hover:bg-destructive-10 disabled:opacity-60",
       },
       size: {
         lg: "px-6 py-4 text-base",

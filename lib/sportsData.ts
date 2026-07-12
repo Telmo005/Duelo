@@ -129,6 +129,45 @@ export async function fetchTeamLogo(teamName: string): Promise<string | null> {
 export type TeamSearchResult = { id: number; name: string; country: string; logo: string };
 
 /**
+ * National teams are searched by their ENGLISH name in API-Football
+ * ("France", not "França") — club names usually survive translation fine
+ * (Barcelona, Manchester United, Ferroviário read the same or close enough
+ * in both languages), but country names very often don't. This is a closed,
+ * small set (world's footballing nations), so a lookup table is the right
+ * fix — no ambiguity, no guessing, unlike club names which are too numerous
+ * and varied to hand-map. Keys are ASCII-folded + lowercased (matches how
+ * the query is normalised below) so "frança"/"França"/"FRANÇA" all hit it.
+ */
+const PT_TO_EN_COUNTRY: Record<string, string> = {
+  "africa do sul": "South Africa", "alemanha": "Germany", "arabia saudita": "Saudi Arabia",
+  "argelia": "Algeria", "argentina": "Argentina", "australia": "Australia", "austria": "Austria",
+  "belgica": "Belgium", "bolivia": "Bolivia", "bosnia": "Bosnia and Herzegovina", "brasil": "Brazil",
+  "bulgaria": "Bulgaria", "camaroes": "Cameroon", "canada": "Canada", "catar": "Qatar",
+  "chile": "Chile", "china": "China", "colombia": "Colombia", "coreia do norte": "North Korea",
+  "coreia do sul": "South Korea", "costa do marfim": "Ivory Coast", "costa rica": "Costa Rica",
+  "croacia": "Croatia", "dinamarca": "Denmark", "egipto": "Egypt", "egito": "Egypt",
+  "equador": "Ecuador", "escocia": "Scotland", "eslovaquia": "Slovakia", "eslovenia": "Slovenia",
+  "espanha": "Spain", "estados unidos": "USA", "franca": "France", "gales": "Wales",
+  "gana": "Ghana", "grecia": "Greece", "holanda": "Netherlands", "hungria": "Hungary",
+  "inglaterra": "England", "irlanda": "Ireland", "islandia": "Iceland", "italia": "Italy",
+  "jamaica": "Jamaica", "japao": "Japan", "mali": "Mali", "marrocos": "Morocco",
+  "mexico": "Mexico", "mocambique": "Mozambique", "nigeria": "Nigeria", "noruega": "Norway",
+  "panama": "Panama", "paraguai": "Paraguay", "peru": "Peru", "polonia": "Poland",
+  "portugal": "Portugal", "quenia": "Kenya", "republica checa": "Czech Republic",
+  "romenia": "Romania", "russia": "Russia", "senegal": "Senegal", "servia": "Serbia",
+  "suecia": "Sweden", "suica": "Switzerland", "tunisia": "Tunisia", "turquia": "Turkey",
+  "ucrania": "Ukraine", "uruguai": "Uruguay", "zambia": "Zambia",
+};
+
+function asciiFold(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // combining diacritical marks (accents) left behind by NFD
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .trim();
+}
+
+/**
  * Live team search (API-Football /teams?search=), for the "pesquisar
  * equipa" picker in the manual add-match form. Exists because guessing a
  * crest from whatever name an admin typed (fetchTeamLogo above) silently
@@ -136,40 +175,46 @@ export type TeamSearchResult = { id: number; name: string; country: string; logo
  * outright (e.g. "França"), and its database is keyed by English/official
  * names, so a Portuguese name like "Espanha" matches nothing even though
  * "Spain" returns instantly. Letting the admin search and pick the real
- * team sidesteps both — no translation guessing needed. Free-plan-friendly:
- * this is plain team metadata, not fixture/season data, so it isn't gated
- * behind a paid plan the way current-season fixtures are.
+ * team sidesteps both — no translation guessing needed for CLUBS. National
+ * teams need the extra PT_TO_EN_COUNTRY lookup above, tried first since it's
+ * the more likely intent when the query is a bare country name (an admin
+ * looking up "França" almost always wants the national team, not some club
+ * that happens to be based in France). Free-plan-friendly: this is plain
+ * team metadata, not fixture/season data, so it isn't gated behind a paid
+ * plan the way current-season fixtures are.
  */
 export async function searchTeams(query: string): Promise<TeamSearchResult[]> {
   const apiKey = process.env.API_FOOTBALL_KEY;
   if (!apiKey || query.trim().length < 3) return [];
 
-  // API-Football's search param rejects anything but letters/digits/spaces
-  // (e.g. "ç", accents) with a 400 — strip to ASCII letters/spaces so a
-  // Portuguese-flavoured query still gets a best-effort match instead of
-  // erroring out silently.
-  const asciiQuery = query
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // combining diacritical marks (accents) left behind by NFD
-    .replace(/[^a-zA-Z0-9 ]/g, "")
-    .trim();
+  const asciiQuery = asciiFold(query);
   if (asciiQuery.length < 3) return [];
 
-  try {
-    const res = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(asciiQuery)}`, {
-      headers: { "x-apisports-key": apiKey },
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
+  const countryTranslation = PT_TO_EN_COUNTRY[asciiQuery.toLowerCase()];
+  const searchTerms = countryTranslation ? [countryTranslation, asciiQuery] : [asciiQuery];
 
-    const body = await res.json();
-    const response: Array<{ team: { id: number; name: string; country: string; logo: string } }> = body?.response ?? [];
-    return response.slice(0, 8).map((r) => ({
-      id: r.team.id,
-      name: r.team.name,
-      country: r.team.country,
-      logo: r.team.logo,
-    }));
+  try {
+    const seen = new Set<number>();
+    const results: TeamSearchResult[] = [];
+
+    for (const term of searchTerms) {
+      const res = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(term)}`, {
+        headers: { "x-apisports-key": apiKey },
+        cache: "no-store",
+      });
+      if (!res.ok) continue;
+
+      const body = await res.json();
+      const response: Array<{ team: { id: number; name: string; country: string; logo: string } }> = body?.response ?? [];
+      for (const r of response) {
+        if (seen.has(r.team.id)) continue;
+        seen.add(r.team.id);
+        results.push({ id: r.team.id, name: r.team.name, country: r.team.country, logo: r.team.logo });
+      }
+      if (results.length >= 8) break;
+    }
+
+    return results.slice(0, 8);
   } catch {
     return [];
   }

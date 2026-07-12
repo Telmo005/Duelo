@@ -31,7 +31,7 @@ export default function ResetPasswordPage() {
           href={SUPPORT_WHATSAPP_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90"
+          className="press flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90"
         >
           💬 Falar no WhatsApp
         </a>

@@ -57,7 +57,7 @@ export function AvatarMenu({ displayName }: { displayName: string }) {
               setOpen(false);
               startTransition(() => signOut());
             }}
-            className="press flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
+            className="press flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm font-semibold text-destructive hover:bg-destructive-10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? <Spinner className="size-4" /> : <LogOut className="size-4" aria-hidden />}
             {isPending ? "A terminar sessão…" : "Terminar sessão"}

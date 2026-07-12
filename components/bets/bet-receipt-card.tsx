@@ -13,11 +13,11 @@ import { formatCentsAsMt } from "@/lib/format";
 import type { BetReceipt } from "@/lib/bets";
 
 const STATUS_LABEL: Record<BetReceipt["status"], { label: string; className: string }> = {
-  waiting: { label: "À espera de adversário", className: "bg-primary/10 text-primary" },
-  matched: { label: "Em jogo", className: "bg-live/10 text-live" },
-  settled: { label: "Concluída", className: "bg-success/10 text-success" },
+  waiting: { label: "À espera de adversário", className: "bg-primary-10 text-primary" },
+  matched: { label: "Em jogo", className: "bg-live-10 text-live" },
+  settled: { label: "Concluída", className: "bg-success-10 text-success" },
   cancelled: { label: "Cancelada", className: "bg-muted text-muted-foreground" },
-  refunded: { label: "Reembolsada", className: "bg-locked/10 text-locked" },
+  refunded: { label: "Reembolsada", className: "bg-locked-10 text-locked" },
 };
 
 export function BetReceiptCard({
@@ -168,16 +168,16 @@ export function BetReceiptCard({
             Aceitar aposta
           </ActionButton>
         ) : bet.status === "waiting" ? (
-          <Link href="/register" className="press flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90">
+          <Link href="/register" className="press flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90">
             <Lock className="size-[18px]" aria-hidden />
             Criar conta para aceitar
           </Link>
         ) : bet.status === "refunded" ? (
-          <p className="flex items-center justify-center gap-2 rounded-xl bg-locked/10 py-3 text-sm font-semibold text-locked">
+          <p className="flex items-center justify-center gap-2 rounded-xl bg-locked-10 py-3 text-sm font-semibold text-locked">
             <RotateCcw className="size-4" aria-hidden /> Sem adversário — valor devolvido
           </p>
         ) : bet.status === "settled" ? (
-          <p className="flex items-center justify-center gap-2 rounded-xl bg-success/10 py-3 text-sm font-semibold text-success">
+          <p className="flex items-center justify-center gap-2 rounded-xl bg-success-10 py-3 text-sm font-semibold text-success">
             <Trophy className="size-4" aria-hidden /> Aposta liquidada automaticamente
           </p>
         ) : null}

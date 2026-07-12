@@ -75,7 +75,7 @@ export default async function LandingPage() {
 function EmptyFeed({ loggedIn }: { loggedIn: boolean }) {
   return (
     <div className="flex flex-col items-center rounded-xl border border-border bg-card px-6 py-12 text-center shadow-[var(--shadow-card)]">
-      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary" aria-hidden>
+      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary-10 text-primary" aria-hidden>
         <Swords className="size-7" />
       </div>
       <p className="mb-1.5 text-lg font-extrabold">Ainda não há duelos abertos</p>
@@ -84,7 +84,7 @@ function EmptyFeed({ loggedIn }: { loggedIn: boolean }) {
       </p>
       <Link
         href={loggedIn ? "/bets/new" : "/register"}
-        className="press inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-[15px] font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90"
+        className="press inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-[15px] font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90"
       >
         <Plus className="size-[18px]" strokeWidth={2.6} aria-hidden />
         {loggedIn ? "Criar o primeiro duelo" : "Criar conta e começar"}

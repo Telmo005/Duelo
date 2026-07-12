@@ -37,10 +37,10 @@ function InitialAvatar({ name, color, size = 40 }: { name: string; color: string
 
 function StatusPill({ status }: { status: Duel["status"] }) {
   const map: Record<Duel["status"], { label: string; className: string; dot?: boolean }> = {
-    live: { label: "AO VIVO", className: "bg-live/10 text-live", dot: true },
-    open: { label: "Aberto", className: "bg-success/10 text-success" },
-    waiting: { label: "Aguarda adversário", className: "bg-primary/10 text-primary" },
-    closed: { label: "Fechado", className: "bg-locked/10 text-locked" },
+    live: { label: "AO VIVO", className: "bg-live-10 text-live", dot: true },
+    open: { label: "Aberto", className: "bg-success-10 text-success" },
+    waiting: { label: "Aguarda adversário", className: "bg-primary-10 text-primary" },
+    closed: { label: "Fechado", className: "bg-locked-10 text-locked" },
   };
   const s = map[status];
   return (
@@ -59,7 +59,7 @@ function PitchEmbed({ duel }: { duel: Duel }) {
   const hasScore = isLive && !!duel.score;
 
   return (
-    <div className="relative mx-4 mb-3 h-[124px] overflow-hidden rounded-xl border border-success/20">
+    <div className="relative mx-4 mb-3 h-[124px] overflow-hidden rounded-xl border border-success-20">
       {/* Turf */}
       <div
         className="absolute inset-0"
@@ -169,7 +169,7 @@ export function DuelPost({
     <article
       className={`overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-card)] transition-shadow ${
         isWaiting
-          ? "border-primary/30 shadow-[0_0_24px_rgba(242,194,42,0.12)] hover:shadow-[0_0_32px_rgba(242,194,42,0.22)]"
+          ? "border-primary-30 shadow-[0_0_24px_rgba(242,194,42,0.12)] hover:shadow-[0_0_32px_rgba(242,194,42,0.22)]"
           : "border-border"
       }`}
     >
@@ -222,7 +222,7 @@ export function DuelPost({
             mode="cancel"
             icon={<X className="size-4" aria-hidden />}
             label="Cancelar a minha aposta"
-            className="press flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
+            className="press flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-destructive transition-colors hover:bg-destructive-10 disabled:opacity-60"
           />
         ) : isWaiting && live ? (
           <BetActionButton
@@ -230,12 +230,12 @@ export function DuelPost({
             mode="accept"
             icon={<Handshake className="size-[18px]" aria-hidden />}
             label={`Aceitar aposta de ${firstName}`}
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90 disabled:opacity-60"
+            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90 disabled:opacity-60"
           />
         ) : isWaiting ? (
           <Link
             href="/register"
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90"
+            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90"
           >
             <Handshake className="size-[18px]" aria-hidden />
             Aceitar aposta de {firstName}
