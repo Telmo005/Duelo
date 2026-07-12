@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/admin";
 import { logAdminAction } from "@/lib/adminAudit";
 import { db } from "@/db";
 import { matches } from "@/db/schema";
-import { fetchTeamLogo } from "@/lib/sportsData";
+import { fetchTeamLogo, searchTeams, type TeamSearchResult } from "@/lib/sportsData";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 
 type ActionResult = { error?: string };
@@ -16,7 +16,21 @@ const addMatchSchema = z.object({
   away: z.string().trim().min(1, "Indica a equipa visitante").max(100),
   league: z.string().trim().min(1, "Indica a liga/competição").max(100),
   kickoffAt: z.coerce.date().refine((d) => d.getTime() > Date.now(), { message: "O jogo tem de estar no futuro" }),
+  // Set when the admin picked a team from the search picker — skips the
+  // name-guessing fetchTeamLogo fallback below, since we already have the
+  // exact crest for the exact team they chose.
+  homeLogoUrl: z.string().url().optional().or(z.literal("")),
+  awayLogoUrl: z.string().url().optional().or(z.literal("")),
 });
+
+/** Search-as-you-type backing the "pesquisar equipa" picker in the add-match
+ *  form (components/admin/team-search-picker.tsx). Admin-gated like every
+ *  other matches action, even though it's read-only, to keep API-Football
+ *  quota usage (100 req/day on Free) restricted to trusted callers. */
+export async function searchTeamsAction(query: string): Promise<TeamSearchResult[]> {
+  await requireAdmin();
+  return searchTeams(query);
+}
 
 /**
  * Manual fixture entry. This is the fallback for leagues no automated feed
@@ -36,8 +50,8 @@ export async function addMatchAction(input: Record<string, unknown>): Promise<Ac
   }
 
   const [homeLogoUrl, awayLogoUrl] = await Promise.all([
-    fetchTeamLogo(parsed.data.home),
-    fetchTeamLogo(parsed.data.away),
+    parsed.data.homeLogoUrl || fetchTeamLogo(parsed.data.home),
+    parsed.data.awayLogoUrl || fetchTeamLogo(parsed.data.away),
   ]);
 
   await db.insert(matches).values({
@@ -45,8 +59,8 @@ export async function addMatchAction(input: Record<string, unknown>): Promise<Ac
     away: parsed.data.away,
     league: parsed.data.league,
     kickoffAt: parsed.data.kickoffAt,
-    homeLogoUrl,
-    awayLogoUrl,
+    homeLogoUrl: homeLogoUrl || null,
+    awayLogoUrl: awayLogoUrl || null,
   });
 
   await logAdminAction(

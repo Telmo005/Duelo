@@ -4,6 +4,7 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { WalletChip } from "@/components/wallet/wallet-chip";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { FeedListener } from "@/components/realtime/feed-listener";
+import { AvatarMenu } from "@/components/layout/avatar-menu";
 import { MobileTabBar, type TabKey } from "@/components/layout/mobile-tab-bar";
 import { actionButtonVariants } from "@/components/ui/action-button";
 import { cn } from "@/lib/utils";
@@ -92,19 +93,13 @@ export function AppShell({
       {/* ── Main content ──────────────────────────────────────── */}
       <div className="flex-1">
         {/* Top bar (mobile) */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-card/95 px-4 backdrop-blur-md lg:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-card px-4 lg:hidden">
           <Link href="/" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
             Duelo
           </Link>
           <div className="flex items-center gap-2.5">
             <WalletChip availableCents={availableCents} compact />
-            <Link
-              href="/perfil"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground"
-              aria-label={`Perfil de ${displayName}`}
-            >
-              {initial}
-            </Link>
+            <AvatarMenu displayName={displayName} />
           </div>
         </header>
 

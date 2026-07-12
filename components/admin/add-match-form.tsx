@@ -7,6 +7,7 @@ import { addMatchAction } from "@/lib/actions/matches";
 import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TeamSearchPicker } from "@/components/admin/team-search-picker";
 
 export function AddMatchForm() {
   const [isPending, startTransition] = useTransition();
@@ -21,6 +22,8 @@ export function AddMatchForm() {
         away: fd.get("away"),
         league: fd.get("league"),
         kickoffAt: fd.get("kickoffAt"),
+        homeLogoUrl: fd.get("homeLogoUrl"),
+        awayLogoUrl: fd.get("awayLogoUrl"),
       });
       if (result?.error) toast.error(result.error);
       else {
@@ -32,14 +35,22 @@ export function AddMatchForm() {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-5">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="home">Equipa da casa</Label>
-        <Input id="home" name="home" placeholder="Ferroviário" required disabled={isPending} maxLength={100} />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="away">Equipa visitante</Label>
-        <Input id="away" name="away" placeholder="Costa do Sol" required disabled={isPending} maxLength={100} />
-      </div>
+      <TeamSearchPicker
+        id="home"
+        name="home"
+        logoFieldName="homeLogoUrl"
+        label="Equipa da casa"
+        placeholder="Ferroviário"
+        disabled={isPending}
+      />
+      <TeamSearchPicker
+        id="away"
+        name="away"
+        logoFieldName="awayLogoUrl"
+        label="Equipa visitante"
+        placeholder="Costa do Sol"
+        disabled={isPending}
+      />
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="league">Liga / competição</Label>
         <Input id="league" name="league" placeholder="Moçambola" required disabled={isPending} maxLength={100} />

@@ -10,7 +10,7 @@ export function WalletChip({ availableCents, compact = false }: { availableCents
     <Link
       href="/wallet/deposit"
       aria-label="Depositar"
-      className={`press flex items-center gap-1.5 rounded-full border border-success/25 bg-success/10 font-bold text-success transition-colors hover:bg-success/20 ${
+      className={`press flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-success/25 bg-success/10 font-bold text-success transition-colors hover:bg-success/20 ${
         compact ? "px-2.5 py-1 text-xs" : "px-3.5 py-1.5 text-sm"
       }`}
     >
