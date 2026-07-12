@@ -2,10 +2,11 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { SettleMatchRow } from "@/components/admin/settle-match-row";
+import { ProcessedMatchRow } from "@/components/admin/processed-match-row";
 import { RefundExpiredBetsButton } from "@/components/admin/refund-expired-bets-button";
 import { AddMatchForm } from "@/components/admin/add-match-form";
 import { ImportFixturesButton } from "@/components/admin/import-fixtures-button";
-import { getUnsettledMatches } from "@/lib/bets";
+import { getUnsettledMatches, getProcessedMatches } from "@/lib/bets";
 import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
@@ -20,8 +21,9 @@ export const metadata: Metadata = { title: "Liquidar jogos | Duelo" };
  */
 export default async function AdminMatchesPage() {
   const profile = await requireAdmin();
-  const [unsettled, { availableCents }] = await Promise.all([
+  const [unsettled, processed, { availableCents }] = await Promise.all([
     getUnsettledMatches(),
+    getProcessedMatches(),
     getWalletBalance(profile.id),
   ]);
 
@@ -49,7 +51,7 @@ export default async function AdminMatchesPage() {
         <AddMatchForm />
       </section>
 
-      <section>
+      <section className="mb-7">
         <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Por liquidar</h2>
         {unsettled.length === 0 ? (
           <p className="text-sm text-muted-foreground">Não há jogos por liquidar.</p>
@@ -61,6 +63,17 @@ export default async function AdminMatchesPage() {
           </div>
         )}
       </section>
+
+      {processed.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Jogos processados</h2>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            {processed.map((match) => (
+              <ProcessedMatchRow key={match.id} match={match} />
+            ))}
+          </div>
+        </section>
+      )}
     </AppShell>
   );
 }

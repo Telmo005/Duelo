@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { matches, bets, profiles, type MatchRow } from "@/db/schema";
-import { eq, desc, inArray, gt, sql } from "drizzle-orm";
+import { eq, ne, desc, inArray, gt, and, sql } from "drizzle-orm";
 import type { Duel } from "@/components/feed/duel-post";
 
 export type BetReceipt = {
@@ -135,17 +135,36 @@ async function fetchLiveByMatch(matchIds: string[]): Promise<Map<string, LiveRow
   }
 }
 
-/** Fixtures a user can still bet on: kickoff strictly in the future.
- *  bet_create rejects already-started matches server-side, but filtering
- *  here keeps them out of the picker so the user never selects a match
- *  only to be told it already began. */
+/** Fixtures a user can still bet on: kickoff strictly in the future AND
+ *  still 'scheduled'. bet_create rejects already-started matches
+ *  server-side, but filtering here keeps them out of the picker so the
+ *  user never selects a match only to be told it already began — and,
+ *  just as importantly, never selects one an admin already marked
+ *  postponed/abandoned (its kickoff time can still be in the future even
+ *  though there's nothing left to bet on). */
 export async function getUpcomingMatches(): Promise<MatchRow[]> {
-  return db.select().from(matches).where(gt(matches.kickoffAt, new Date())).orderBy(matches.kickoffAt);
+  return db
+    .select()
+    .from(matches)
+    .where(and(gt(matches.kickoffAt, new Date()), eq(matches.matchStatus, "scheduled")))
+    .orderBy(matches.kickoffAt);
 }
 
 /** Matches still awaiting a result — the manual settlement tool's worklist. */
 export async function getUnsettledMatches(): Promise<MatchRow[]> {
   return db.select().from(matches).where(eq(matches.matchStatus, "scheduled")).orderBy(desc(matches.kickoffAt));
+}
+
+/** Matches already processed (postponed/abandoned/finished) — shown in
+ *  /admin/matches purely so a stale one (e.g. voided by mistake, or just
+ *  clutter) can still be removed from the catalogue. Settlement itself
+ *  never touches this list. */
+export async function getProcessedMatches(): Promise<MatchRow[]> {
+  return db
+    .select()
+    .from(matches)
+    .where(ne(matches.matchStatus, "scheduled"))
+    .orderBy(desc(matches.kickoffAt));
 }
 
 const AVATAR_COLORS = ["#F2C22A", "#9C98F7", "#34D399", "#F0455B", "#8B7CFF"];
