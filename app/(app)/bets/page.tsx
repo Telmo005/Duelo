@@ -36,7 +36,7 @@ export default async function BetsPage() {
         </div>
         <Link
           href="/bets/new"
-          className="press flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-primary-foreground transition-colors hover:bg-primary/90"
+          className="press flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-primary-foreground transition-colors hover:bg-primary-90"
         >
           <Plus className="size-[18px]" strokeWidth={2.6} aria-hidden />
           Nova aposta
@@ -46,7 +46,7 @@ export default async function BetsPage() {
 
       {bets.length === 0 ? (
         <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-5 py-12 text-center">
-          <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary" aria-hidden>
+          <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary-10 text-primary" aria-hidden>
             <Swords className="size-7" />
           </div>
           <p className="mb-2 text-base font-bold">Ainda não tens apostas</p>

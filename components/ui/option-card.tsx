@@ -39,8 +39,8 @@ export function OptionCard({
         "press relative rounded-2xl border p-4 text-left outline-none transition-colors",
         "focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-50",
         selected
-          ? "border-primary bg-primary/10 ring-1 ring-primary/50"
-          : "border-border bg-card hover:border-primary/40 hover:bg-accent",
+          ? "border-primary bg-primary-10 ring-1 ring-primary-50"
+          : "border-border bg-card hover:border-primary-40 hover:bg-accent",
         className
       )}
     >

@@ -168,14 +168,14 @@ export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
 
       {/* ── Bet slip (static information) ───────────────────────── */}
       {stakeNum > 0 && (
-        <div className="animate-fade-up overflow-hidden rounded-2xl border border-success/25 bg-success/[0.06] px-4">
-          <InfoRow label="A tua entrada" value={`${fmt(stakeNum)} MT`} className="border-b border-success/15" />
-          <InfoRow label="Pote total (2 lados)" value={`${fmt(pot)} MT`} className="border-b border-success/15" />
+        <div className="animate-fade-up overflow-hidden rounded-2xl border border-success-25 bg-success/[0.06] px-4">
+          <InfoRow label="A tua entrada" value={`${fmt(stakeNum)} MT`} className="border-b border-success-15" />
+          <InfoRow label="Pote total (2 lados)" value={`${fmt(pot)} MT`} className="border-b border-success-15" />
           <InfoRow
             label="Comissão da plataforma (10%)"
             value={`−${fmt(pot * 0.1)} MT`}
             valueClassName="text-muted-foreground"
-            className="border-b border-success/15"
+            className="border-b border-success-15"
           />
           <InfoRow
             label="Recebes se ganhares"
@@ -191,7 +191,7 @@ export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
       )}
 
       {error && (
-        <div role="alert" className="rounded-xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm leading-snug text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive-35 bg-destructive-10 px-4 py-3 text-sm leading-snug text-destructive">
           {error}
         </div>
       )}

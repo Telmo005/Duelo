@@ -16,7 +16,7 @@ export function FeedSidebarRight({ loggedIn = false }: { loggedIn?: boolean }) {
           <ol className="flex flex-col gap-3">
             {STEPS.map((s) => (
               <li key={s.n} className="flex items-start gap-2.5 text-sm">
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary-10 text-xs font-bold text-primary">
                   {s.n}
                 </span>
                 <span className="text-muted-foreground">{s.text}</span>
@@ -33,7 +33,7 @@ export function FeedSidebarRight({ loggedIn = false }: { loggedIn?: boolean }) {
             </p>
             <Link
               href="/bets/new"
-              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-90"
             >
               Criar aposta
               <LinkPendingSpinner />
@@ -47,7 +47,7 @@ export function FeedSidebarRight({ loggedIn = false }: { loggedIn?: boolean }) {
             </p>
             <Link
               href="/register"
-              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-90"
             >
               Criar conta grátis
               <LinkPendingSpinner />

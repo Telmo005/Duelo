@@ -75,7 +75,7 @@ export default function RegisterPage() {
           onClick={() => setAgeConfirmed((v) => !v)}
           disabled={isPending}
           className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors ${
-            ageConfirmed ? "border-primary/40 bg-primary/[0.08]" : "border-border bg-background"
+            ageConfirmed ? "border-primary-40 bg-primary/[0.08]" : "border-border bg-background"
           }`}
         >
           <span
@@ -95,7 +95,7 @@ export default function RegisterPage() {
         </button>
 
         {error && (
-          <div role="alert" className="rounded-xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm leading-snug text-destructive">
+          <div role="alert" className="rounded-xl border border-destructive-35 bg-destructive-10 px-4 py-3 text-sm leading-snug text-destructive">
             {error}
           </div>
         )}
@@ -103,7 +103,7 @@ export default function RegisterPage() {
         <Button
           id="register-submit" type="submit" disabled={!ageConfirmed || isPending}
           className={`press h-12 w-full rounded-xl text-[15px] font-extrabold ${
-            ageConfirmed ? "shadow-[var(--shadow-elevated)] hover:bg-primary/90" : ""
+            ageConfirmed ? "shadow-[var(--shadow-elevated)] hover:bg-primary-90" : ""
           }`}
         >
           {isPending && <Spinner />}

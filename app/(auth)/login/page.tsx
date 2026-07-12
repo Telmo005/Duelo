@@ -62,14 +62,14 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div role="alert" className="rounded-xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm leading-snug text-destructive">
+          <div role="alert" className="rounded-xl border border-destructive-35 bg-destructive-10 px-4 py-3 text-sm leading-snug text-destructive">
             {error}
           </div>
         )}
 
         <Button
           id="login-submit" type="submit" disabled={isPending}
-          className="press h-12 w-full rounded-xl text-[15px] font-extrabold shadow-[var(--shadow-elevated)] hover:bg-primary/90"
+          className="press h-12 w-full rounded-xl text-[15px] font-extrabold shadow-[var(--shadow-elevated)] hover:bg-primary-90"
         >
           {isPending && <Spinner />}
           {isPending ? "A entrar…" : "Entrar"}

@@ -61,7 +61,7 @@ export function EditableDisplayName({ initialName }: { initialName: string }) {
           if (e.key === "Enter") handleSave();
           if (e.key === "Escape") handleCancel();
         }}
-        className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-card px-2.5 py-1 text-xl font-extrabold tracking-tight outline-none"
+        className="min-w-0 flex-1 rounded-lg border border-primary-40 bg-card px-2.5 py-1 text-xl font-extrabold tracking-tight outline-none"
       />
       <button
         type="button"

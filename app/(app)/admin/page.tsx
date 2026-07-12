@@ -16,11 +16,11 @@ const FLAG_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  waiting: { label: "Aguarda adversário", className: "bg-primary/10 text-primary" },
-  matched: { label: "Aberto", className: "bg-success/10 text-success" },
+  waiting: { label: "Aguarda adversário", className: "bg-primary-10 text-primary" },
+  matched: { label: "Aberto", className: "bg-success-10 text-success" },
   cancelled: { label: "Cancelada", className: "bg-muted text-muted-foreground" },
-  refunded: { label: "Reembolsada", className: "bg-locked/10 text-locked" },
-  settled: { label: "Liquidada", className: "bg-success/10 text-success" },
+  refunded: { label: "Reembolsada", className: "bg-locked-10 text-locked" },
+  settled: { label: "Liquidada", className: "bg-success-10 text-success" },
 };
 
 const ADMIN_ACTION_LABELS: Record<string, string> = {
@@ -98,7 +98,7 @@ export default async function AdminPage() {
             Nenhuma aposta sinalizada de momento.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-destructive/30 bg-card">
+          <div className="overflow-hidden rounded-2xl border border-destructive-30 bg-card">
             {flagged.map((bet) => (
               <div key={bet.id} className="flex flex-col gap-1 border-b border-border p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -109,7 +109,7 @@ export default async function AdminPage() {
                     {formatCentsAsMt(bet.stakeCents)} MT · {new Date(bet.flaggedAt!).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
                   </p>
                 </div>
-                <span className="w-fit rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-bold text-destructive">
+                <span className="w-fit rounded-full bg-destructive-10 px-2.5 py-1 text-xs font-bold text-destructive">
                   {FLAG_LABELS[bet.flaggedReason!] ?? bet.flaggedReason}
                 </span>
               </div>
@@ -140,7 +140,7 @@ export default async function AdminPage() {
                     {d.method === "mpesa" ? "M-Pesa" : "e-Mola"} · {d.reference} · {new Date(d.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
                   </p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${d.status === "pending" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${d.status === "pending" ? "bg-primary-10 text-primary" : "bg-destructive-10 text-destructive"}`}>
                   {d.status === "pending" ? "Pendente" : "Falhado"}
                 </span>
               </div>

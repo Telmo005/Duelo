@@ -42,7 +42,7 @@ export default async function DashboardPage() {
 
       {/* Hero balance card */}
       <div
-        className="relative mb-7 overflow-hidden rounded-2xl border border-primary/20 p-6"
+        className="relative mb-7 overflow-hidden rounded-2xl border border-primary-20 p-6"
         style={{ background: "linear-gradient(160deg, rgba(242,194,42,0.14), transparent 60%)" }}
       >
         <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Saldo disponível</p>
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
           <Link
             href="/wallet/deposit"
             id="cta-deposit"
-            className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-extrabold tracking-tight text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary/90 sm:flex-initial sm:px-8"
+            className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-extrabold tracking-tight text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90 sm:flex-initial sm:px-8"
           >
             <Plus className="size-[18px]" strokeWidth={2.6} aria-hidden />
             Depositar

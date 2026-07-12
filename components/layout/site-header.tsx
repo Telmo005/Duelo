@@ -31,7 +31,7 @@ export function SiteHeader({ displayName, availableCents }: { displayName?: stri
             </Link>
             <Link
               href="/register"
-              className="press flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 sm:px-4"
+              className="press flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-90 sm:px-4"
             >
               Criar conta
               <LinkPendingSpinner />
