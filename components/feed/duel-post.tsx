@@ -44,7 +44,7 @@ function StatusPill({ status }: { status: Duel["status"] }) {
   };
   const s = map[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${s.className}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${s.className}`}>
       {s.dot && <span className="inline-block size-1.5 animate-[pulse-dot_1.5s_ease-in-out_infinite] rounded-full bg-live" />}
       {s.label}
     </span>
@@ -175,15 +175,15 @@ export function DuelPost({
     >
       {/* Post header — who created this bet */}
       <div className="flex items-start justify-between gap-3 p-4 pb-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <InitialAvatar name={duel.a.name} color={duel.a.avatar} />
-          <div>
-            <p className="text-[15px] font-semibold leading-tight">
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-semibold leading-tight">
               {duel.a.name}
               <span className="font-normal text-muted-foreground"> apostou que </span>
               <span className="font-semibold">{duel.prediction}</span>
             </p>
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
               {duel.a.city} · {duel.createdAgo} · {duel.match.league}
             </p>
           </div>

@@ -125,3 +125,52 @@ export async function fetchTeamLogo(teamName: string): Promise<string | null> {
     return null;
   }
 }
+
+export type TeamSearchResult = { id: number; name: string; country: string; logo: string };
+
+/**
+ * Live team search (API-Football /teams?search=), for the "pesquisar
+ * equipa" picker in the manual add-match form. Exists because guessing a
+ * crest from whatever name an admin typed (fetchTeamLogo above) silently
+ * fails for two common cases: API-Football rejects non-ASCII characters
+ * outright (e.g. "França"), and its database is keyed by English/official
+ * names, so a Portuguese name like "Espanha" matches nothing even though
+ * "Spain" returns instantly. Letting the admin search and pick the real
+ * team sidesteps both — no translation guessing needed. Free-plan-friendly:
+ * this is plain team metadata, not fixture/season data, so it isn't gated
+ * behind a paid plan the way current-season fixtures are.
+ */
+export async function searchTeams(query: string): Promise<TeamSearchResult[]> {
+  const apiKey = process.env.API_FOOTBALL_KEY;
+  if (!apiKey || query.trim().length < 3) return [];
+
+  // API-Football's search param rejects anything but letters/digits/spaces
+  // (e.g. "ç", accents) with a 400 — strip to ASCII letters/spaces so a
+  // Portuguese-flavoured query still gets a best-effort match instead of
+  // erroring out silently.
+  const asciiQuery = query
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // combining diacritical marks (accents) left behind by NFD
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .trim();
+  if (asciiQuery.length < 3) return [];
+
+  try {
+    const res = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(asciiQuery)}`, {
+      headers: { "x-apisports-key": apiKey },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+
+    const body = await res.json();
+    const response: Array<{ team: { id: number; name: string; country: string; logo: string } }> = body?.response ?? [];
+    return response.slice(0, 8).map((r) => ({
+      id: r.team.id,
+      name: r.team.name,
+      country: r.team.country,
+      logo: r.team.logo,
+    }));
+  } catch {
+    return [];
+  }
+}
