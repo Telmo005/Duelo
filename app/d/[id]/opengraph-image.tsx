@@ -22,7 +22,31 @@ function teamColor(name: string) {
   return TEAM_COLORS[hash % TEAM_COLORS.length];
 }
 
-function Crest({ name }: { name: string }) {
+/** Real crest (from API-Football, hot-linked) when the match has one —
+ *  set via the team-search picker in /admin/matches — otherwise the same
+ *  coloured-initials placeholder the rest of the app falls back to. */
+function Crest({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
+  if (logoUrl) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          width: 140,
+          height: 140,
+          borderRadius: 32,
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#fff",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+          padding: 16,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- next/image doesn't work inside ImageResponse's satori renderer */}
+        <img src={logoUrl} width={108} height={108} style={{ objectFit: "contain" }} alt="" />
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -52,6 +76,7 @@ export default async function OpengraphImage({ params }: { params: Promise<{ id:
   const away = bet?.match.away ?? "Aposta P2P";
   const league = bet?.match.league ?? "Moçambique";
   const stakeLabel = bet ? `${formatCentsAsMt(bet.potCents)} MT em jogo` : "Apostas P2P entre pessoas reais";
+  const isChallenge = bet?.status === "waiting";
 
   return new ImageResponse(
     (
@@ -87,16 +112,30 @@ export default async function OpengraphImage({ params }: { params: Promise<{ id:
           <span style={{ fontSize: 30, fontWeight: 800, color: "#F2C22A", letterSpacing: -0.5 }}>Duelo</span>
         </div>
 
+        {isChallenge && (
+          <span
+            style={{
+              display: "flex",
+              fontSize: 26,
+              fontWeight: 800,
+              color: "#F2C22A",
+              marginBottom: 20,
+            }}
+          >
+            ⚔️ Desafio em aberto
+          </span>
+        )}
+
         <span style={{ fontSize: 22, fontWeight: 600, color: "#94989F", marginBottom: 28 }}>{league}</span>
 
         <div style={{ display: "flex", alignItems: "center", gap: 56 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-            <Crest name={home} />
+            <Crest name={home} logoUrl={bet?.match.homeLogoUrl} />
             <span style={{ fontSize: 30, fontWeight: 700, color: "#E9EAF0" }}>{home}</span>
           </div>
           <span style={{ fontSize: 34, fontWeight: 700, color: "#94989F" }}>vs</span>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-            <Crest name={away} />
+            <Crest name={away} logoUrl={bet?.match.awayLogoUrl} />
             <span style={{ fontSize: 30, fontWeight: 700, color: "#E9EAF0" }}>{away}</span>
           </div>
         </div>

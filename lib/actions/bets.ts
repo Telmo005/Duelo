@@ -75,7 +75,9 @@ export async function createBetAction(input: Record<string, unknown>): Promise<A
   revalidatePath("/");
   // Land on the shareable receipt page (reference, match, share button) —
   // more useful right after creating a bet than dropping back into the feed.
-  redirect(`/d/${data!.bet_id}`);
+  // Uses the short reference, not the raw bet id — a bare UUID in the URL
+  // reads as a spammy tracking link once shared.
+  redirect(`/d/${data!.reference}`);
 }
 
 export async function acceptBetAction(betId: string): Promise<ActionResult> {

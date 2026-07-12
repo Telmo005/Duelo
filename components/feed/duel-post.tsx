@@ -6,6 +6,11 @@ import { TeamBadge } from "@/components/match/team-badge";
 
 export type Duel = {
   id: string;
+  /** Short human code (DUE-BET-XXXXXXXX) — used for the share link instead
+   *  of the raw id, since a bare UUID in a shared URL reads as a spammy
+   *  tracking link. Optional because the logged-out marketing preview
+   *  (no real bet backing it) has no reference to give. */
+  reference?: string;
   a: { name: string; avatar: string; city: string };
   b: { name: string; avatar: string; city: string } | null;
   match: { home: string; away: string; league: string; time: string; homeLogoUrl?: string | null; awayLogoUrl?: string | null };
@@ -241,7 +246,7 @@ export function DuelPost({
             Aceitar aposta de {firstName}
           </Link>
         ) : (
-          <DuelSecondaryActions duelId={duel.id} />
+          <DuelSecondaryActions duelId={duel.id} reference={duel.reference} creatorName={duel.a.name} />
         )}
       </div>
     </article>

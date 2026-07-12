@@ -35,8 +35,18 @@ export type BetReceipt = {
  *  via drizzle (bypasses RLS, same as getFeedDuels) so the page works for
  *  logged-out visitors who followed a shared link — that's the whole point
  *  of a share target. Returns null if the bet doesn't exist. */
-export async function getBetReceipt(betId: string): Promise<BetReceipt | null> {
-  const [bet] = await db.select().from(bets).where(eq(bets.id, betId)).limit(1);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Accepts either the raw bet id (old links, still valid) or its short
+ *  reference (DUE-BET-XXXXXXXX — what every new share link/redirect uses,
+ *  since a bare UUID in a shared URL reads as a spammy tracking link). */
+export async function getBetReceipt(idOrReference: string): Promise<BetReceipt | null> {
+  const isUuid = UUID_RE.test(idOrReference);
+  const [bet] = await db
+    .select()
+    .from(bets)
+    .where(isUuid ? eq(bets.id, idOrReference) : eq(bets.reference, idOrReference.toUpperCase()))
+    .limit(1);
   if (!bet) return null;
 
   const [match] = await db.select().from(matches).where(eq(matches.id, bet.matchId)).limit(1);
@@ -221,6 +231,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
 
       return {
         id: bet.id,
+        reference: bet.reference,
         creatorId: bet.creatorId,
         a: { name: creator.displayName, avatar: colorFor(creator.id), city: "" },
         b: opponent ? { name: opponent.displayName, avatar: colorFor(opponent.id), city: "" } : null,

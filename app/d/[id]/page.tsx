@@ -12,8 +12,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const bet = await getBetReceipt(id);
   if (!bet) return { title: "Aposta não encontrada | Duelo" };
 
-  const title = `${bet.match.home} vs ${bet.match.away} — ${bet.predictionLabel}`;
-  const description = `${formatCentsAsMt(bet.stakeCents)} MT em jogo · ${bet.match.league} · Referência ${bet.reference}. Entra no duelo na Duelo.`;
+  // Framed as a challenge invitation only while there's an actual challenge
+  // to accept ('waiting') — the whole reason this page gets shared is
+  // "venha aceitar o meu desafio", so the link preview itself should read
+  // that way instead of a neutral match-result statement. Once matched/
+  // settled/etc. there's nothing left to accept, so it reverts to plain
+  // match info.
+  const title =
+    bet.status === "waiting"
+      ? `${bet.creator.name} desafiou-te para um duelo! ⚔️`
+      : `${bet.match.home} vs ${bet.match.away} — ${bet.predictionLabel}`;
+  const description =
+    bet.status === "waiting"
+      ? `Aposta em ${bet.predictionLabel} · ${formatCentsAsMt(bet.stakeCents)} MT em jogo · ${bet.match.league}. Aceita o desafio na Duelo.`
+      : `${formatCentsAsMt(bet.stakeCents)} MT em jogo · ${bet.match.league} · Referência ${bet.reference}. Entra no duelo na Duelo.`;
 
   // The og:image / twitter:image tags themselves are generated automatically
   // by the sibling opengraph-image.tsx file convention — no need to point at
