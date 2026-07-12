@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 import { settleMatchAction, voidMatchAction } from "@/lib/actions/settlement";
 import { deleteMatchAction } from "@/lib/actions/matches";
+import { EditMatchForm } from "@/components/admin/edit-match-form";
 import type { MatchRow } from "@/db/schema";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -16,6 +17,11 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return <EditMatchForm match={match} onDone={() => setEditing(false)} />;
+  }
 
   function handleDelete() {
     if (!confirmDelete) {
@@ -112,6 +118,15 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
         >
           {activeAction === "abandoned" && <Spinner className="size-3" />}
           {activeAction === "abandoned" ? "A processar…" : "Abandonado"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          disabled={isPending}
+          className="press inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Pencil className="size-3" aria-hidden />
+          Editar
         </button>
         <button
           type="button"

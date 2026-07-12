@@ -9,6 +9,7 @@ export type AdminAction =
   | "refund_expired_bets"
   | "reconcile_deposits"
   | "add_match"
+  | "edit_match"
   | "delete_match"
   | "import_fixtures";
 

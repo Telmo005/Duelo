@@ -78,6 +78,59 @@ export async function addMatchAction(input: Record<string, unknown>): Promise<Ac
 }
 
 /**
+ * Corrects a match already in the catalogue — team names, league, or
+ * kickoff time (the "eu enganei-me na hora" case). Only while it's still
+ * 'scheduled': once settled/voided the match is part of a closed financial
+ * record, so it shouldn't be rewritten after the fact. Unlike delete, this
+ * is allowed even if bets already exist against the match — fixing a wrong
+ * kickoff time is exactly the situation where someone may have already bet
+ * on it.
+ */
+export async function updateMatchAction(matchId: string, input: Record<string, unknown>): Promise<ActionResult> {
+  const admin = await requireAdmin();
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!match) return { error: "Jogo não encontrado." };
+  if (match.matchStatus !== "scheduled") {
+    return { error: "Este jogo já foi liquidado/anulado e não pode ser editado." };
+  }
+
+  const parsed = addMatchSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const [homeLogoUrl, awayLogoUrl] = await Promise.all([
+    parsed.data.homeLogoUrl || (parsed.data.home !== match.home ? fetchTeamLogo(parsed.data.home) : match.homeLogoUrl),
+    parsed.data.awayLogoUrl || (parsed.data.away !== match.away ? fetchTeamLogo(parsed.data.away) : match.awayLogoUrl),
+  ]);
+
+  await db
+    .update(matches)
+    .set({
+      home: parsed.data.home,
+      away: parsed.data.away,
+      league: parsed.data.league,
+      kickoffAt: parsed.data.kickoffAt,
+      homeLogoUrl: homeLogoUrl || null,
+      awayLogoUrl: awayLogoUrl || null,
+    })
+    .where(eq(matches.id, matchId));
+
+  await logAdminAction(
+    admin.id,
+    "edit_match",
+    null,
+    `Jogo editado: ${match.home} vs ${match.away} → ${parsed.data.home} vs ${parsed.data.away}, ${new Date(parsed.data.kickoffAt).toLocaleString("pt")}`
+  );
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/bets/new");
+  revalidatePath("/");
+  return {};
+}
+
+/**
  * Removes a match from the catalogue. Only safe while nothing references
  * it yet — bets.match_id and platform_ledger.match_id are both foreign
  * keys with no ON DELETE CASCADE (supabase/migrations/0002_bets.sql,

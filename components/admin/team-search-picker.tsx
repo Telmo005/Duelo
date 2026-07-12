@@ -29,6 +29,8 @@ export function TeamSearchPicker({
   logoFieldName,
   placeholder,
   disabled,
+  defaultValue = "",
+  defaultLogoUrl = "",
 }: {
   id: string;
   label: string;
@@ -36,9 +38,12 @@ export function TeamSearchPicker({
   logoFieldName: string;
   placeholder: string;
   disabled?: boolean;
+  /** Pre-fills the field when editing an existing match. */
+  defaultValue?: string;
+  defaultLogoUrl?: string;
 }) {
-  const [query, setQuery] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
+  const [query, setQuery] = useState(defaultValue);
+  const [logoUrl, setLogoUrl] = useState(defaultLogoUrl);
   const [results, setResults] = useState<TeamSearchResult[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
