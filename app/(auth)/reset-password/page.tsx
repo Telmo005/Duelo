@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
-
-// TODO: replace with the real support WhatsApp/phone number before launch.
-const SUPPORT_PHONE_DISPLAY = "+258 84 000 0000";
-const SUPPORT_WHATSAPP_URL = "https://wa.me/258840000000";
+import { SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from "@/lib/support";
 
 /**
  * Recovery is support-assisted for now: no SMS/email channel is wired up

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
-import { registerSchema, signInSchema } from "@/lib/validation/auth";
+import { registerSchema, signInSchema, changePasswordSchema } from "@/lib/validation/auth";
 import { normalizePhone } from "@/lib/phone";
 import { getRequestFingerprint } from "@/lib/requestInfo";
 import { checkLoginRateLimit, recordLoginAttempt } from "@/lib/rateLimit";
@@ -157,4 +157,29 @@ export async function signOut(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/");
+}
+
+/**
+ * changePasswordAction — self-service password change from /perfil. No
+ * current-password confirmation required: the user already has an active,
+ * cookie-verified Supabase session at this point (same trust level the
+ * "esqueci a password" admin-assisted reset relies on), and
+ * supabase.auth.updateUser() only ever acts on that session's own account.
+ */
+export async function changePasswordAction(input: Record<string, unknown>): Promise<ActionResult> {
+  const parsed = changePasswordSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) redirect("/login");
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) {
+    return { error: "Não foi possível alterar a password. Tenta novamente." };
+  }
+
+  return {};
 }
