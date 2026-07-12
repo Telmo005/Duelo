@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { SettleMatchRow } from "@/components/admin/settle-match-row";
 import { RefundExpiredBetsButton } from "@/components/admin/refund-expired-bets-button";
+import { AddMatchForm } from "@/components/admin/add-match-form";
+import { ImportFixturesButton } from "@/components/admin/import-fixtures-button";
 import { getUnsettledMatches } from "@/lib/bets";
 import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
@@ -33,6 +35,7 @@ export default async function AdminMatchesPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <ImportFixturesButton />
           <RefundExpiredBetsButton />
           <Link href="/admin" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
             ← Admin
@@ -41,15 +44,23 @@ export default async function AdminMatchesPage() {
         </div>
       </div>
 
-      {unsettled.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Não há jogos por liquidar.</p>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          {unsettled.map((match) => (
-            <SettleMatchRow key={match.id} match={match} />
-          ))}
-        </div>
-      )}
+      <section className="mb-7">
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Adicionar jogo</h2>
+        <AddMatchForm />
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Por liquidar</h2>
+        {unsettled.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Não há jogos por liquidar.</p>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            {unsettled.map((match) => (
+              <SettleMatchRow key={match.id} match={match} />
+            ))}
+          </div>
+        )}
+      </section>
     </AppShell>
   );
 }
