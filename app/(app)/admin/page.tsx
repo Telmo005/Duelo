@@ -29,6 +29,8 @@ const ADMIN_ACTION_LABELS: Record<string, string> = {
   void_match: "Anulação de jogo",
   refund_expired_bets: "Reembolso de apostas sem adversário",
   reconcile_deposits: "Reconciliação de depósitos",
+  add_match: "Jogo adicionado manualmente",
+  import_fixtures: "Importação de jogos",
 };
 
 export default async function AdminPage() {
