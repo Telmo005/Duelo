@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { matches, bets, profiles, type MatchRow } from "@/db/schema";
-import { eq, desc, inArray, gt, sql } from "drizzle-orm";
+import { eq, ne, desc, inArray, gt, and, sql } from "drizzle-orm";
 import type { Duel } from "@/components/feed/duel-post";
 
 export type BetReceipt = {
@@ -35,8 +35,18 @@ export type BetReceipt = {
  *  via drizzle (bypasses RLS, same as getFeedDuels) so the page works for
  *  logged-out visitors who followed a shared link — that's the whole point
  *  of a share target. Returns null if the bet doesn't exist. */
-export async function getBetReceipt(betId: string): Promise<BetReceipt | null> {
-  const [bet] = await db.select().from(bets).where(eq(bets.id, betId)).limit(1);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Accepts either the raw bet id (old links, still valid) or its short
+ *  reference (DUE-BET-XXXXXXXX — what every new share link/redirect uses,
+ *  since a bare UUID in a shared URL reads as a spammy tracking link). */
+export async function getBetReceipt(idOrReference: string): Promise<BetReceipt | null> {
+  const isUuid = UUID_RE.test(idOrReference);
+  const [bet] = await db
+    .select()
+    .from(bets)
+    .where(isUuid ? eq(bets.id, idOrReference) : eq(bets.reference, idOrReference.toUpperCase()))
+    .limit(1);
   if (!bet) return null;
 
   const [match] = await db.select().from(matches).where(eq(matches.id, bet.matchId)).limit(1);
@@ -135,17 +145,36 @@ async function fetchLiveByMatch(matchIds: string[]): Promise<Map<string, LiveRow
   }
 }
 
-/** Fixtures a user can still bet on: kickoff strictly in the future.
- *  bet_create rejects already-started matches server-side, but filtering
- *  here keeps them out of the picker so the user never selects a match
- *  only to be told it already began. */
+/** Fixtures a user can still bet on: kickoff strictly in the future AND
+ *  still 'scheduled'. bet_create rejects already-started matches
+ *  server-side, but filtering here keeps them out of the picker so the
+ *  user never selects a match only to be told it already began — and,
+ *  just as importantly, never selects one an admin already marked
+ *  postponed/abandoned (its kickoff time can still be in the future even
+ *  though there's nothing left to bet on). */
 export async function getUpcomingMatches(): Promise<MatchRow[]> {
-  return db.select().from(matches).where(gt(matches.kickoffAt, new Date())).orderBy(matches.kickoffAt);
+  return db
+    .select()
+    .from(matches)
+    .where(and(gt(matches.kickoffAt, new Date()), eq(matches.matchStatus, "scheduled")))
+    .orderBy(matches.kickoffAt);
 }
 
 /** Matches still awaiting a result — the manual settlement tool's worklist. */
 export async function getUnsettledMatches(): Promise<MatchRow[]> {
   return db.select().from(matches).where(eq(matches.matchStatus, "scheduled")).orderBy(desc(matches.kickoffAt));
+}
+
+/** Matches already processed (postponed/abandoned/finished) — shown in
+ *  /admin/matches purely so a stale one (e.g. voided by mistake, or just
+ *  clutter) can still be removed from the catalogue. Settlement itself
+ *  never touches this list. */
+export async function getProcessedMatches(): Promise<MatchRow[]> {
+  return db
+    .select()
+    .from(matches)
+    .where(ne(matches.matchStatus, "scheduled"))
+    .orderBy(desc(matches.kickoffAt));
 }
 
 const AVATAR_COLORS = ["#F2C22A", "#9C98F7", "#34D399", "#F0455B", "#8B7CFF"];
@@ -202,6 +231,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
 
       return {
         id: bet.id,
+        reference: bet.reference,
         creatorId: bet.creatorId,
         a: { name: creator.displayName, avatar: colorFor(creator.id), city: "" },
         b: opponent ? { name: opponent.displayName, avatar: colorFor(opponent.id), city: "" } : null,

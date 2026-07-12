@@ -33,7 +33,9 @@ export function BetReceiptCard({
   const [copied, setCopied] = useState(false);
   const isCreator = viewerId === bet.creator.id;
   const status = STATUS_LABEL[bet.status];
-  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/d/${bet.id}` : "";
+  // Short reference, not the raw bet id — a bare UUID in a shared URL reads
+  // as a spammy tracking link once it lands in someone else's WhatsApp.
+  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/d/${bet.reference}` : "";
 
   function handleAccept() {
     startTransition(async () => {
@@ -51,8 +53,12 @@ export function BetReceiptCard({
 
   async function handleShare() {
     if (navigator.share) {
+      // Short, self-contained challenge line — the link's own OG preview
+      // already carries the match/crests/stake, so this only needs to say
+      // *why* the recipient is getting this link, not repeat what's in it.
+      const text = `🔥 ${bet.creator.name} desafiou-te para um duelo na Duelo. Aceita o desafio:`;
       try {
-        await navigator.share({ title: "Duelo", text: `${bet.match.home} vs ${bet.match.away} — ${bet.predictionLabel}`, url: shareUrl });
+        await navigator.share({ title: "Duelo", text, url: shareUrl });
       } catch {
         // user cancelled the native share sheet — not an error
       }

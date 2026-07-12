@@ -134,7 +134,7 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           disabled={isPending}
           className={`press inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
             confirmDelete
-              ? "border-destructive bg-destructive/10 text-destructive"
+              ? "border-destructive bg-destructive-10 text-destructive"
               : "border-border text-muted-foreground hover:bg-accent"
           }`}
         >
