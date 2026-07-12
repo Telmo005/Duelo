@@ -64,7 +64,7 @@ export async function createBetAction(input: Record<string, unknown>): Promise<A
       p_creator_ip: ip,
       p_creator_device_id: deviceId,
     })
-    .single<{ bet_id: string }>();
+    .single<{ bet_id: string; reference: string }>();
 
   if (error) {
     return { error: friendlyBetError(error.message) };
@@ -73,9 +73,9 @@ export async function createBetAction(input: Record<string, unknown>): Promise<A
   await broadcastFeedEvent({ type: "bet_created", matchId: parsed.data.matchId });
 
   revalidatePath("/");
-  redirect("/");
-  // unreachable, satisfies the ActionResult type for callers that don't redirect
-  return { betId: data?.bet_id };
+  // Land on the shareable receipt page (reference, match, share button) —
+  // more useful right after creating a bet than dropping back into the feed.
+  redirect(`/d/${data!.bet_id}`);
 }
 
 export async function acceptBetAction(betId: string): Promise<ActionResult> {
@@ -102,6 +102,7 @@ export async function acceptBetAction(betId: string): Promise<ActionResult> {
   }
 
   revalidatePath("/");
+  revalidatePath(`/d/${betId}`);
   return {};
 }
 
@@ -123,5 +124,6 @@ export async function cancelBetAction(betId: string): Promise<ActionResult> {
   }
 
   revalidatePath("/");
+  revalidatePath(`/d/${betId}`);
   return {};
 }

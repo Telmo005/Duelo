@@ -13,7 +13,7 @@ export function DuelSecondaryActions({ duelId }: { duelId: string }) {
 
   function handleShare() {
     startShare(async () => {
-      const url = `${window.location.origin}/?duel=${duelId}`;
+      const url = `${window.location.origin}/d/${duelId}`;
       if (navigator.share) {
         try {
           await navigator.share({ title: "Duelo", url });

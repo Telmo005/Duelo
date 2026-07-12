@@ -43,9 +43,8 @@ export default function LoginPage() {
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="phone">Número de telemóvel</Label>
           <PhoneInput
-            id="phone" name="phone" placeholder="84 XXX XXXX" defaultValue="+258 "
+            id="phone" name="phone" defaultValue="+258 "
             required autoComplete="username" disabled={isPending}
-            className="h-11 rounded-xl px-4 text-[15px]"
           />
         </div>
 

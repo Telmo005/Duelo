@@ -2,10 +2,11 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { requireAdmin } from "@/lib/admin";
-import { getFinancialSummary, getFlaggedBets, getRecentBets, getWalletOverview } from "@/lib/adminData";
+import { getFinancialSummary, getFlaggedBets, getRecentBets, getWalletOverview, getStuckDeposits } from "@/lib/adminData";
 import { getRecentAdminActions } from "@/lib/adminAudit";
 import { formatCentsAsMt, getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { ReconcileDepositsButton } from "@/components/admin/reconcile-deposits-button";
 
 export const metadata: Metadata = { title: "Admin | Duelo" };
 
@@ -26,16 +27,19 @@ const ADMIN_ACTION_LABELS: Record<string, string> = {
   password_reset: "Reposição de password",
   settle_match: "Liquidação manual",
   void_match: "Anulação de jogo",
+  refund_expired_bets: "Reembolso de apostas sem adversário",
+  reconcile_deposits: "Reconciliação de depósitos",
 };
 
 export default async function AdminPage() {
   const profile = await requireAdmin();
-  const [summary, flagged, recentBets, wallets, adminActions, { availableCents }] = await Promise.all([
+  const [summary, flagged, recentBets, wallets, adminActions, stuckDeposits, { availableCents }] = await Promise.all([
     getFinancialSummary(),
     getFlaggedBets(),
     getRecentBets(),
     getWalletOverview(),
     getRecentAdminActions(),
+    getStuckDeposits(),
     getWalletBalance(profile.id),
   ]);
 
@@ -105,6 +109,37 @@ export default async function AdminPage() {
                 </div>
                 <span className="w-fit rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-bold text-destructive">
                   {FLAG_LABELS[bet.flaggedReason!] ?? bet.flaggedReason}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Stuck deposits */}
+      <section className="mb-7">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Depósitos pendentes/falhados ({stuckDeposits.length})
+          </h2>
+          <ReconcileDepositsButton />
+        </div>
+        {stuckDeposits.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            Nenhum depósito por reconciliar.
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            {stuckDeposits.map((d) => (
+              <div key={d.id} className="flex items-center justify-between border-b border-border p-3.5 text-sm last:border-b-0">
+                <div>
+                  <p className="font-bold">{d.displayName} · {formatCentsAsMt(d.amountCents)} MT</p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.method === "mpesa" ? "M-Pesa" : "e-Mola"} · {d.reference} · {new Date(d.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${d.status === "pending" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                  {d.status === "pending" ? "Pendente" : "Falhado"}
                 </span>
               </div>
             ))}

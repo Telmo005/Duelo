@@ -3,6 +3,102 @@ import { matches, bets, profiles, type MatchRow } from "@/db/schema";
 import { eq, desc, inArray, gt, sql } from "drizzle-orm";
 import type { Duel } from "@/components/feed/duel-post";
 
+export type BetReceipt = {
+  id: string;
+  reference: string;
+  status: "waiting" | "matched" | "cancelled" | "refunded" | "settled";
+  prediction: "home" | "draw" | "away";
+  predictionLabel: string;
+  predictionCode: string;
+  stakeCents: number;
+  potCents: number;
+  commissionCents: number;
+  payoutCents: number;
+  createdAt: Date;
+  match: {
+    home: string;
+    away: string;
+    league: string;
+    kickoffAt: Date;
+    homeLogoUrl: string | null;
+    awayLogoUrl: string | null;
+    resultHome: number | null;
+    resultAway: number | null;
+  };
+  creator: { id: string; name: string };
+  opponent: { id: string; name: string } | null;
+  /** Only meaningful once status === 'settled'. */
+  winnerId: string | null;
+};
+
+/** A single bet, shaped for the public receipt/share page (/d/[id]). Reads
+ *  via drizzle (bypasses RLS, same as getFeedDuels) so the page works for
+ *  logged-out visitors who followed a shared link — that's the whole point
+ *  of a share target. Returns null if the bet doesn't exist. */
+export async function getBetReceipt(betId: string): Promise<BetReceipt | null> {
+  const [bet] = await db.select().from(bets).where(eq(bets.id, betId)).limit(1);
+  if (!bet) return null;
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, bet.matchId)).limit(1);
+  if (!match) return null;
+
+  const userIds = [bet.creatorId, bet.opponentId].filter((x): x is string => !!x);
+  const profileRows = await db.select().from(profiles).where(inArray(profiles.id, userIds));
+  const profileById = new Map(profileRows.map((p) => [p.id, p]));
+
+  const creator = profileById.get(bet.creatorId);
+  if (!creator) return null;
+  const opponent = bet.opponentId ? profileById.get(bet.opponentId) : null;
+
+  const pred = PREDICTION_LABEL[bet.prediction];
+  const predictionLabel = bet.prediction === "away" ? pred.awayLabel(match.away) : pred.homeLabel(match.home);
+
+  // While waiting, nobody has matched yet (opponent_id is always null here),
+  // but the breakdown should still preview what happens once someone does —
+  // same projection create-bet-form shows before the bet even exists. Once
+  // the bet is no longer waiting, show the real pot: doubled only if an
+  // opponent actually joined. A bet can be refunded either before ever
+  // matching (bet_auto_refund_expired, no opponent) or after matching but
+  // the match got voided (bet_void_match, opponent present), so status alone
+  // can't tell us which — opponent_id is the source of truth there.
+  const potCents = bet.status === "waiting" ? bet.stakeCents * 2 : bet.stakeCents * (bet.opponentId ? 2 : 1);
+  const commissionCents = Math.round(potCents * 0.1);
+  const payoutCents = potCents - commissionCents;
+
+  let winnerId: string | null = null;
+  if (bet.status === "settled" && match.resultHome != null && match.resultAway != null) {
+    const actual = match.resultHome > match.resultAway ? "home" : match.resultHome < match.resultAway ? "away" : "draw";
+    winnerId = bet.prediction === actual ? bet.creatorId : bet.opponentId;
+  }
+
+  return {
+    id: bet.id,
+    reference: bet.reference,
+    status: bet.status as BetReceipt["status"],
+    prediction: bet.prediction as BetReceipt["prediction"],
+    predictionLabel,
+    predictionCode: pred.code,
+    stakeCents: bet.stakeCents,
+    potCents,
+    commissionCents,
+    payoutCents,
+    createdAt: bet.createdAt,
+    match: {
+      home: match.home,
+      away: match.away,
+      league: match.league,
+      kickoffAt: match.kickoffAt,
+      homeLogoUrl: match.homeLogoUrl,
+      awayLogoUrl: match.awayLogoUrl,
+      resultHome: match.resultHome,
+      resultAway: match.resultAway,
+    },
+    creator: { id: creator.id, name: creator.displayName },
+    opponent: opponent ? { id: opponent.id, name: opponent.displayName } : null,
+    winnerId,
+  };
+}
+
 /** A live score is only treated as "live" if the poller refreshed it within
  *  this window — stops a stale "67'" lingering if the cron stops or the match
  *  ended but hasn't been settled yet. */

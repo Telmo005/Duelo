@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Swords } from "lucide-react";
 import type { UserBetRow } from "@/lib/profile";
 import { formatCentsAsMt } from "@/lib/format";
@@ -78,7 +79,11 @@ export function BetsList({ bets }: { bets: UserBetRow[] }) {
           {filtered.map((bet) => {
             const s = statusMeta(bet);
             return (
-              <div key={bet.id} className="relative overflow-hidden rounded-2xl border border-border bg-card p-4">
+              <Link
+                key={bet.id}
+                href={`/d/${bet.id}`}
+                className="press relative block overflow-hidden rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent"
+              >
                 <div className={`absolute inset-y-0 left-0 w-1 ${BORDER_COLOR[bet.status] ?? "bg-muted-foreground/40"}`} aria-hidden />
                 <div className="flex items-start justify-between gap-3 pl-3">
                   <div className="min-w-0 flex-1">
@@ -92,10 +97,11 @@ export function BetsList({ bets }: { bets: UserBetRow[] }) {
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {bet.opponentName ? `vs ${bet.opponentName}` : "Sem adversário ainda"} · {formatCentsAsMt(bet.stakeCents)} MT
                     </p>
+                    <p className="mt-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground/70">{bet.reference}</p>
                   </div>
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${s.className}`}>{s.label}</span>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

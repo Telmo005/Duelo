@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { wallets, walletLedger, platformLedger, bets, profiles, matches } from "@/db/schema";
-import { eq, desc, sql, isNotNull } from "drizzle-orm";
+import { wallets, walletLedger, platformLedger, bets, profiles, matches, deposits } from "@/db/schema";
+import { eq, desc, sql, isNotNull, inArray } from "drizzle-orm";
 
 export async function getFinancialSummary() {
   const [walletTotals] = await db
@@ -80,6 +80,22 @@ export async function getRecentBets(limit = 30) {
     creatorName: profileById.get(r.creatorId)?.displayName ?? "?",
     opponentName: r.opponentId ? profileById.get(r.opponentId)?.displayName ?? "?" : null,
   }));
+}
+
+/** Deposits stuck in a non-final state — the same "pending or failed"
+ *  window lib/deposit-reconcile.ts polls PayGate for. Surfaced here so an
+ *  admin can see what a reconciliation pass would look at before running
+ *  it, and what's still stuck afterward. */
+export async function getStuckDeposits(limit = 30) {
+  const rows = await db
+    .select({ deposit: deposits, displayName: profiles.displayName })
+    .from(deposits)
+    .innerJoin(profiles, eq(profiles.id, deposits.userId))
+    .where(inArray(deposits.status, ["pending", "failed"]))
+    .orderBy(desc(deposits.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({ ...r.deposit, displayName: r.displayName }));
 }
 
 export async function getWalletOverview(limit = 30) {

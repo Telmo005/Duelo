@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { adminAuditLog, profiles } from "@/db/schema";
 import { desc, sql } from "drizzle-orm";
 
-export type AdminAction = "password_reset" | "settle_match" | "void_match";
+export type AdminAction = "password_reset" | "settle_match" | "void_match" | "refund_expired_bets" | "reconcile_deposits";
 
 /** Records an admin action against the append-only audit trail. Best-effort:
  *  a logging failure must never block the underlying admin action, which has

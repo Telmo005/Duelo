@@ -54,9 +54,8 @@ export default function RegisterPage() {
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="phone">Número de telemóvel</Label>
           <PhoneInput
-            id="phone" name="phone" placeholder="84 XXX XXXX" defaultValue="+258 "
+            id="phone" name="phone" defaultValue="+258 "
             required disabled={isPending}
-            className="h-11 rounded-xl px-4 text-[15px]"
           />
           <p className="text-[11px] text-muted-foreground">M-Pesa (84/85) ou e-Mola (86/87)</p>
         </div>

@@ -168,6 +168,9 @@ export const bets = pgTable("bets", {
   prediction: text("prediction").notNull(),
   stakeCents: bigint("stake_cents", { mode: "number" }).notNull(),
   status: text("status").notNull().default("waiting"),
+  /** Short human-readable code (DUE-BET-XXXXXXXX) shown on the receipt and
+   *  shareable bet page; also the lookup key for support/audit. */
+  reference: text("reference").notNull(),
   matchedAt: timestamp("matched_at", { withTimezone: true }),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
