@@ -9,6 +9,11 @@ export const displayNameSchema = z
   .min(2, "Nome deve ter pelo menos 2 caracteres")
   .max(50, "Nome demasiado longo");
 
+export const passwordSchema = z
+  .string()
+  .min(4, "Password deve ter pelo menos 4 caracteres")
+  .max(72, "Password demasiado longa");
+
 export const registerSchema = z.object({
   displayName: displayNameSchema,
 
@@ -16,10 +21,7 @@ export const registerSchema = z.object({
     .string()
     .regex(phoneRegex, "Número inválido. Formato: +258 84 XXX XXXX"),
 
-  password: z
-    .string()
-    .min(4, "Password deve ter pelo menos 4 caracteres")
-    .max(72, "Password demasiado longa"),
+  password: passwordSchema,
 
   ageConfirmed: z
     .boolean()
@@ -38,6 +40,16 @@ export const signInSchema = z.object({
     .min(1, "Introduz a tua password")
     .max(72, "Password demasiado longa"),
 });
+
+export const changePasswordSchema = z
+  .object({
+    password: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "As passwords não coincidem",
+    path: ["confirmPassword"],
+  });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/admin";
 import { logAdminAction } from "@/lib/adminAudit";
 import { db } from "@/db";
-import { matches } from "@/db/schema";
+import { matches, bets } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { fetchTeamLogo, searchTeams, type TeamSearchResult } from "@/lib/sportsData";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 
@@ -69,6 +70,89 @@ export async function addMatchAction(input: Record<string, unknown>): Promise<Ac
     null,
     `Jogo adicionado manualmente: ${parsed.data.home} vs ${parsed.data.away} (${parsed.data.league})`
   );
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/bets/new");
+  revalidatePath("/");
+  return {};
+}
+
+/**
+ * Corrects a match already in the catalogue — team names, league, or
+ * kickoff time (the "eu enganei-me na hora" case). Only while it's still
+ * 'scheduled': once settled/voided the match is part of a closed financial
+ * record, so it shouldn't be rewritten after the fact. Unlike delete, this
+ * is allowed even if bets already exist against the match — fixing a wrong
+ * kickoff time is exactly the situation where someone may have already bet
+ * on it.
+ */
+export async function updateMatchAction(matchId: string, input: Record<string, unknown>): Promise<ActionResult> {
+  const admin = await requireAdmin();
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!match) return { error: "Jogo não encontrado." };
+  if (match.matchStatus !== "scheduled") {
+    return { error: "Este jogo já foi liquidado/anulado e não pode ser editado." };
+  }
+
+  const parsed = addMatchSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const [homeLogoUrl, awayLogoUrl] = await Promise.all([
+    parsed.data.homeLogoUrl || (parsed.data.home !== match.home ? fetchTeamLogo(parsed.data.home) : match.homeLogoUrl),
+    parsed.data.awayLogoUrl || (parsed.data.away !== match.away ? fetchTeamLogo(parsed.data.away) : match.awayLogoUrl),
+  ]);
+
+  await db
+    .update(matches)
+    .set({
+      home: parsed.data.home,
+      away: parsed.data.away,
+      league: parsed.data.league,
+      kickoffAt: parsed.data.kickoffAt,
+      homeLogoUrl: homeLogoUrl || null,
+      awayLogoUrl: awayLogoUrl || null,
+    })
+    .where(eq(matches.id, matchId));
+
+  await logAdminAction(
+    admin.id,
+    "edit_match",
+    null,
+    `Jogo editado: ${match.home} vs ${match.away} → ${parsed.data.home} vs ${parsed.data.away}, ${new Date(parsed.data.kickoffAt).toLocaleString("pt")}`
+  );
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/bets/new");
+  revalidatePath("/");
+  return {};
+}
+
+/**
+ * Removes a match from the catalogue. Only safe while nothing references
+ * it yet — bets.match_id and platform_ledger.match_id are both foreign
+ * keys with no ON DELETE CASCADE (supabase/migrations/0002_bets.sql,
+ * 0003_settlement.sql), so the database itself refuses to delete a match
+ * any bet was ever created against. That's the real safety net; the
+ * up-front check here just turns the raw FK-violation error into a
+ * friendly message instead of a stack trace.
+ */
+export async function deleteMatchAction(matchId: string): Promise<ActionResult> {
+  const admin = await requireAdmin();
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!match) return { error: "Jogo não encontrado." };
+
+  const [existingBet] = await db.select({ id: bets.id }).from(bets).where(eq(bets.matchId, matchId)).limit(1);
+  if (existingBet) {
+    return { error: "Este jogo já tem apostas associadas — não pode ser removido do catálogo." };
+  }
+
+  await db.delete(matches).where(eq(matches.id, matchId));
+
+  await logAdminAction(admin.id, "delete_match", null, `Jogo removido: ${match.home} vs ${match.away} (${match.league})`);
 
   revalidatePath("/admin/matches");
   revalidatePath("/bets/new");

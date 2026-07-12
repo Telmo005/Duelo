@@ -11,7 +11,9 @@ import { getUserStats } from "@/lib/profile";
 import { getWalletBalance, formatCentsAsMt } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { EditableDisplayName } from "@/components/profile/editable-display-name";
-import { Wallet, Swords } from "lucide-react";
+import { ChangePasswordForm } from "@/components/profile/change-password-form";
+import { SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from "@/lib/support";
+import { Wallet, Swords, MessageCircle } from "lucide-react";
 
 export const metadata: Metadata = { title: "Perfil | Duelo" };
 
@@ -111,6 +113,28 @@ export default async function ProfilePage() {
             <p className="text-xs text-muted-foreground">{stats.totalBets} no total</p>
           </div>
         </Link>
+      </section>
+
+      {/* Security + support */}
+      <section className="mb-7 flex flex-col gap-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Segurança e suporte</h2>
+
+        <ChangePasswordForm />
+
+        <a
+          href={SUPPORT_WHATSAPP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="press flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-accent"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success-10 text-success" aria-hidden>
+            <MessageCircle className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <p className="text-sm font-bold">Falar com o suporte</p>
+            <p className="text-xs text-muted-foreground">WhatsApp · {SUPPORT_PHONE_DISPLAY}</p>
+          </span>
+        </a>
       </section>
 
       <SignOutButton className="text-sm font-semibold text-muted-foreground hover:text-foreground" />
