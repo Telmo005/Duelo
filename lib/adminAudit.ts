@@ -9,6 +9,7 @@ export type AdminAction =
   | "refund_expired_bets"
   | "reconcile_deposits"
   | "add_match"
+  | "delete_match"
   | "import_fixtures";
 
 /** Records an admin action against the append-only audit trail. Best-effort:

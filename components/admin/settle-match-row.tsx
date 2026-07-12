@@ -2,17 +2,36 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import { settleMatchAction, voidMatchAction } from "@/lib/actions/settlement";
+import { deleteMatchAction } from "@/lib/actions/matches";
 import type { MatchRow } from "@/db/schema";
 import { Spinner } from "@/components/ui/spinner";
 
-type ActiveAction = "settle" | "postponed" | "abandoned" | null;
+type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | null;
 
 export function SettleMatchRow({ match }: { match: MatchRow }) {
   const [isPending, startTransition] = useTransition();
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  function handleDelete() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    setActiveAction("delete");
+    startTransition(async () => {
+      const result = await deleteMatchAction(match.id);
+      if (result?.error) toast.error(result.error);
+      else toast.success("Jogo removido do catálogo");
+      setActiveAction(null);
+      setConfirmDelete(false);
+    });
+  }
 
   function handleSettle() {
     if (home === "" || away === "") return;
@@ -93,6 +112,19 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
         >
           {activeAction === "abandoned" && <Spinner className="size-3" />}
           {activeAction === "abandoned" ? "A processar…" : "Abandonado"}
+        </button>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={isPending}
+          className={`press inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            confirmDelete
+              ? "border-destructive bg-destructive/10 text-destructive"
+              : "border-border text-muted-foreground hover:bg-accent"
+          }`}
+        >
+          {activeAction === "delete" ? <Spinner className="size-3" /> : <Trash2 className="size-3" aria-hidden />}
+          {activeAction === "delete" ? "A remover…" : confirmDelete ? "Confirmar remoção?" : "Remover"}
         </button>
       </div>
     </div>

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/admin";
 import { logAdminAction } from "@/lib/adminAudit";
 import { db } from "@/db";
-import { matches } from "@/db/schema";
+import { matches, bets } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { fetchTeamLogo, searchTeams, type TeamSearchResult } from "@/lib/sportsData";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 
@@ -69,6 +70,36 @@ export async function addMatchAction(input: Record<string, unknown>): Promise<Ac
     null,
     `Jogo adicionado manualmente: ${parsed.data.home} vs ${parsed.data.away} (${parsed.data.league})`
   );
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/bets/new");
+  revalidatePath("/");
+  return {};
+}
+
+/**
+ * Removes a match from the catalogue. Only safe while nothing references
+ * it yet — bets.match_id and platform_ledger.match_id are both foreign
+ * keys with no ON DELETE CASCADE (supabase/migrations/0002_bets.sql,
+ * 0003_settlement.sql), so the database itself refuses to delete a match
+ * any bet was ever created against. That's the real safety net; the
+ * up-front check here just turns the raw FK-violation error into a
+ * friendly message instead of a stack trace.
+ */
+export async function deleteMatchAction(matchId: string): Promise<ActionResult> {
+  const admin = await requireAdmin();
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!match) return { error: "Jogo não encontrado." };
+
+  const [existingBet] = await db.select({ id: bets.id }).from(bets).where(eq(bets.matchId, matchId)).limit(1);
+  if (existingBet) {
+    return { error: "Este jogo já tem apostas associadas — não pode ser removido do catálogo." };
+  }
+
+  await db.delete(matches).where(eq(matches.id, matchId));
+
+  await logAdminAction(admin.id, "delete_match", null, `Jogo removido: ${match.home} vs ${match.away} (${match.league})`);
 
   revalidatePath("/admin/matches");
   revalidatePath("/bets/new");
