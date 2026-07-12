@@ -51,3 +51,33 @@ export async function voidMatchAction(matchId: string, status: "postponed" | "ab
   revalidatePath("/");
   return {};
 }
+
+/**
+ * Manual trigger for bet_auto_refund_expired (BET-06) — refunds every
+ * 'waiting' bet whose match already kicked off with no opponent found.
+ * This is meant to run every few minutes via an external scheduler (see
+ * app/api/cron/refund-expired-bets/route.ts — Vercel's Hobby plan cron
+ * only allows once/day, so the real schedule lives in cron-job.org), so
+ * this button is a manual fallback: use it if the external cron isn't
+ * configured yet, or to force a refund pass without waiting for the next
+ * scheduled tick.
+ */
+export async function refundExpiredBetsAction(): Promise<ActionResult & { refunded?: number }> {
+  const admin = await requireAdmin();
+
+  const service = createServiceClient();
+  const { data, error } = await service.rpc("bet_auto_refund_expired");
+
+  if (error) return { error: error.message };
+
+  const refunded = typeof data === "number" ? data : 0;
+  if (refunded > 0) {
+    await logAdminAction(admin.id, "refund_expired_bets", null, `${refunded} aposta(s) sem adversário reembolsada(s) manualmente`);
+    await broadcastFeedEvent({ type: "bets_refunded" });
+  }
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/bets");
+  revalidatePath("/");
+  return { refunded };
+}

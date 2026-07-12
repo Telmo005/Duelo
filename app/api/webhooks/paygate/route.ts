@@ -59,10 +59,16 @@ export async function POST(request: Request) {
     if (deposit.status === "success") {
       return NextResponse.json({ received: true, already: true });
     }
-    // A 'failed' event landed first for this charge — don't resurrect it.
+    // A 'failed' event landed first for this charge. Mobile money rails are
+    // eventually consistent — M-Pesa/e-Mola can report a timeout/error and
+    // still complete the debit moments later, and PayGate then sends a late
+    // 'payment.success' for the same charge. Money already left the user's
+    // account in that case, so refusing to credit here would silently eat a
+    // real deposit (this used to return early with `conflict: true` — that
+    // was the bug). wallet_credit is idempotent per (user_id, reference), so
+    // proceeding is safe regardless of the earlier 'failed' state.
     if (deposit.status === "failed") {
-      console.error("payment.success after failed for deposit", deposit.id);
-      return NextResponse.json({ received: true, conflict: true });
+      console.warn("payment.success arrived after failed for deposit — crediting anyway", deposit.id);
     }
 
     // Credit FIRST — wallet_credit is idempotent per (user_id, reference)
@@ -83,13 +89,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "credit failed" }, { status: 500 });
     }
 
-    // Money is in — now mark success. Conditional flip stays 'pending'-scoped
-    // so concurrent deliveries can't clobber a later state.
+    // Money is in — now mark success. Scoped to "not already success" (not
+    // "still pending") so the late-success-after-failed case above actually
+    // flips the row instead of silently no-op'ing against a stale filter.
     await service
       .from("deposits")
       .update({ status: "success", confirmed_at: new Date().toISOString() })
       .eq("id", deposit.id)
-      .eq("status", "pending");
+      .neq("status", "success");
   } else {
     await service
       .from("deposits")

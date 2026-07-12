@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { SettleMatchRow } from "@/components/admin/settle-match-row";
+import { RefundExpiredBetsButton } from "@/components/admin/refund-expired-bets-button";
 import { getUnsettledMatches } from "@/lib/bets";
 import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
@@ -31,10 +32,13 @@ export default async function AdminMatchesPage() {
             Insere o resultado oficial para pagar o vencedor automaticamente, ou marca o jogo como adiado/abandonado para reembolsar ambos os lados.
           </p>
         </div>
-        <Link href="/admin" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
-          ← Admin
-          <LinkPendingSpinner />
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <RefundExpiredBetsButton />
+          <Link href="/admin" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
+            ← Admin
+            <LinkPendingSpinner />
+          </Link>
+        </div>
       </div>
 
       {unsettled.length === 0 ? (
