@@ -11,7 +11,9 @@ export type AdminAction =
   | "add_match"
   | "edit_match"
   | "delete_match"
-  | "import_fixtures";
+  | "import_fixtures"
+  | "complete_withdrawal"
+  | "reject_withdrawal";
 
 /** Records an admin action against the append-only audit trail. Best-effort:
  *  a logging failure must never block the underlying admin action, which has

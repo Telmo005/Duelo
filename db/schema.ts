@@ -118,6 +118,38 @@ export const deposits = pgTable("deposits", {
 export type Deposit = typeof deposits.$inferSelect;
 
 /**
+ * withdrawals — one row per withdrawal request. Created (and the funds
+ * locked out of available balance) atomically by the withdrawal_request()
+ * Postgres function; flipped to 'completed'/'rejected' exclusively by an
+ * admin via withdrawal_complete()/withdrawal_reject() after they've sent
+ * the payout by hand on PaySuite's own dashboard — there is no automated
+ * payout integration. Never written from the client directly — see
+ * supabase/migrations/0017_withdrawals.sql.
+ */
+export const withdrawals = pgTable("withdrawals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+  method: text("method").notNull(), // 'mpesa' | 'emola'
+  /** Destination for the payout — not necessarily the requester's own
+   *  registered phone (see migration comment for the fraud-review angle). */
+  phone: text("phone").notNull(),
+  recipientName: text("recipient_name").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending' | 'completed' | 'rejected'
+  reference: text("reference").notNull(),
+  adminNote: text("admin_note"),
+  processedBy: uuid("processed_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("withdrawals_reference_uq").on(t.reference),
+  index("withdrawals_user_id_created_at_idx").on(t.userId, t.createdAt),
+  index("withdrawals_status_created_at_idx").on(t.status, t.createdAt),
+]);
+
+export type Withdrawal = typeof withdrawals.$inferSelect;
+
+/**
  * matches — football fixtures available to bet on. Manually seeded for
  * now (see supabase/migrations/0002_bets.sql seed rows); automatic
  * ingestion from a sports-data API (API-Football) is a later phase.
