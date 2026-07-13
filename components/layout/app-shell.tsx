@@ -5,8 +5,10 @@ import { WalletChip } from "@/components/wallet/wallet-chip";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { FeedListener } from "@/components/realtime/feed-listener";
 import { AvatarMenu } from "@/components/layout/avatar-menu";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { MobileTabBar, type TabKey } from "@/components/layout/mobile-tab-bar";
 import { actionButtonVariants } from "@/components/ui/action-button";
+import { getUnreadNotificationCount } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 
 const NAV: { label: string; href: string; icon: LucideIcon; key: TabKey }[] = [
@@ -16,7 +18,7 @@ const NAV: { label: string; href: string; icon: LucideIcon; key: TabKey }[] = [
   { label: "Perfil", href: "/perfil", icon: User, key: "profile" },
 ];
 
-export function AppShell({
+export async function AppShell({
   active,
   displayName,
   availableCents,
@@ -30,6 +32,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const initial = displayName.charAt(0).toUpperCase();
+  const unreadCount = currentUserId ? await getUnreadNotificationCount(currentUserId) : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground lg:flex">
@@ -42,8 +45,9 @@ export function AppShell({
             Duelo
           </Link>
 
-          <div className="mt-5">
+          <div className="mt-5 flex items-center gap-2">
             <WalletChip availableCents={availableCents} />
+            <NotificationBell unreadCount={unreadCount} />
           </div>
 
           <nav className="mt-6 flex flex-col gap-1">
@@ -97,8 +101,9 @@ export function AppShell({
           <Link href="/" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
             Duelo
           </Link>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <WalletChip availableCents={availableCents} compact />
+            <NotificationBell unreadCount={unreadCount} compact />
             <AvatarMenu displayName={displayName} />
           </div>
         </header>
