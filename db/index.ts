@@ -27,12 +27,20 @@ const connectionString = process.env.DATABASE_URL!;
 // not removed for prod.
 const globalForDb = globalThis as unknown as { pgClient?: postgres.Sql };
 
-// max kept low (not the driver's default of 10): each serverless invocation
-// gets its OWN pool, so this multiplies by however many run concurrently.
-// A handful is enough even for routes that run a few queries in parallel
-// (Promise.all) within a single request.
+// Some pages (notably /admin) fire 8+ independent queries via Promise.all
+// in a single request — with a too-small pool, most of them queue behind
+// the few that can run at once instead of executing truly concurrently,
+// which stacks their latencies serially. Measured directly: the same 8
+// admin-dashboard queries took ~3.0s at max:3 vs ~2.4s at max:10, and that
+// gap only widens under the higher Vercel↔Supabase network latency
+// production sees — enough, compounding with query time, to blow past
+// Vercel's serverless function timeout and show as the page just hanging
+// forever. 10 was too conservative a walk-back from the session-pooler
+// scare above: the transaction pooler is specifically built to multiplex
+// many concurrent logical connections cheaply, so there's no longer a
+// reason to starve a single request's own internal parallelism.
 const client =
-  globalForDb.pgClient ?? postgres(connectionString, { prepare: false, max: 3 });
+  globalForDb.pgClient ?? postgres(connectionString, { prepare: false, max: 10 });
 
 if (process.env.NODE_ENV !== "production") {
   globalForDb.pgClient = client;
