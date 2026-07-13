@@ -29,7 +29,7 @@ export function DuelSecondaryActions({
       // Short, self-contained challenge line — the link's own OG preview
       // already carries the match/crests/stake, so this only needs to say
       // *why* the recipient is getting this link, not repeat what's in it.
-      const text = `🔥 ${creatorName} desafiou-te para um duelo na Duelo. Aceita o desafio:`;
+      const text = `${creatorName} desafiou-te para um duelo na Duelo. Aceita o desafio:`;
       if (navigator.share) {
         try {
           await navigator.share({ title: "Duelo", text, url });
