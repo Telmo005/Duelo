@@ -40,7 +40,7 @@ export async function getFinancialSummary() {
   };
 }
 
-export async function getFlaggedBets() {
+export async function getFlaggedBets(limit = 50) {
   const rows = await db
     .select({
       bet: bets,
@@ -50,7 +50,8 @@ export async function getFlaggedBets() {
     .from(bets)
     .innerJoin(matches, eq(matches.id, bets.matchId))
     .where(isNotNull(bets.flaggedReason))
-    .orderBy(desc(bets.flaggedAt));
+    .orderBy(desc(bets.flaggedAt))
+    .limit(limit);
 
   if (rows.length === 0) return [];
 

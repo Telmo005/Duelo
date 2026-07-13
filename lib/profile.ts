@@ -30,12 +30,22 @@ export type UserStats = {
   netCents: number;
 };
 
+/** Caps how many of a user's most recent bets feed the stats card and the
+ *  "Minhas Apostas" list — a display/summary concern, not the ledger of
+ *  record (settlement payouts are computed inside bet_settle_match, wholly
+ *  independent of this). Without a cap these queries grow unbounded with
+ *  each user's lifetime activity; nobody realistically has anywhere near
+ *  this many bets yet, so it's a safety ceiling, not a real limitation. */
+const USER_BETS_LIMIT = 500;
+
 export async function getUserStats(userId: string): Promise<UserStats> {
   const rows = await db
     .select({ bet: bets, match: matches })
     .from(bets)
     .innerJoin(matches, eq(matches.id, bets.matchId))
-    .where(or(eq(bets.creatorId, userId), eq(bets.opponentId, userId)));
+    .where(or(eq(bets.creatorId, userId), eq(bets.opponentId, userId)))
+    .orderBy(desc(bets.createdAt))
+    .limit(USER_BETS_LIMIT);
 
   let wins = 0;
   let losses = 0;
@@ -96,7 +106,8 @@ export async function getUserBets(userId: string): Promise<UserBetRow[]> {
     .from(bets)
     .innerJoin(matches, eq(matches.id, bets.matchId))
     .where(or(eq(bets.creatorId, userId), eq(bets.opponentId, userId)))
-    .orderBy(desc(bets.createdAt));
+    .orderBy(desc(bets.createdAt))
+    .limit(USER_BETS_LIMIT);
 
   if (rows.length === 0) return [];
 
