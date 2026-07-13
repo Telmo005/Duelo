@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { AppShell } from "@/components/layout/app-shell";
 import { getWalletBalance, getWalletLedger, describeLedgerEntry, formatCentsAsMt } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
-import { ArrowDownToLine, Lock, RotateCcw, Trophy, HeartCrack, Plus, ChartColumn, type LucideIcon } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Lock, RotateCcw, Trophy, HeartCrack, Plus, ChartColumn, type LucideIcon } from "lucide-react";
 
 export const metadata: Metadata = { title: "Carteira | Duelo" };
 
@@ -18,6 +18,9 @@ const LEDGER_ICON: Record<string, { Icon: LucideIcon; tint: string }> = {
   release: { Icon: RotateCcw, tint: "#3B82F6" },
   settle_win: { Icon: Trophy, tint: "#34D399" },
   settle_loss: { Icon: HeartCrack, tint: "#F0455B" },
+  withdrawal_hold: { Icon: ArrowUpFromLine, tint: "#9C98F7" },
+  withdrawal_release: { Icon: RotateCcw, tint: "#3B82F6" },
+  withdrawal_complete: { Icon: ArrowUpFromLine, tint: "#94A3B8" },
 };
 
 export default async function DashboardPage() {
@@ -58,7 +61,7 @@ export default async function DashboardPage() {
           </p>
         )}
 
-        <div className="mt-5 flex gap-3">
+        <div className="mt-5 flex flex-wrap gap-3">
           <Link
             href="/wallet/deposit"
             id="cta-deposit"
@@ -66,6 +69,15 @@ export default async function DashboardPage() {
           >
             <Plus className="size-[18px]" strokeWidth={2.6} aria-hidden />
             Depositar
+            <LinkPendingSpinner />
+          </Link>
+          <Link
+            href="/wallet/withdraw"
+            id="cta-withdraw"
+            className="press flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card/70 py-3.5 text-sm font-bold transition-colors hover:bg-accent sm:flex-initial sm:px-8"
+          >
+            <ArrowUpFromLine className="size-[18px]" aria-hidden />
+            Levantar
             <LinkPendingSpinner />
           </Link>
           <Link

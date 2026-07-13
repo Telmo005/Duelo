@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { requireAdmin } from "@/lib/admin";
 import { getFinancialSummary, getFlaggedBets, getRecentBets, getWalletOverview, getStuckDeposits } from "@/lib/adminData";
 import { getRecentAdminActions } from "@/lib/adminAudit";
+import { getPendingWithdrawals } from "@/lib/withdrawals";
 import { formatCentsAsMt, getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { ReconcileDepositsButton } from "@/components/admin/reconcile-deposits-button";
@@ -31,17 +32,20 @@ const ADMIN_ACTION_LABELS: Record<string, string> = {
   reconcile_deposits: "Reconciliação de depósitos",
   add_match: "Jogo adicionado manualmente",
   import_fixtures: "Importação de jogos",
+  complete_withdrawal: "Levantamento concluído",
+  reject_withdrawal: "Levantamento rejeitado",
 };
 
 export default async function AdminPage() {
   const profile = await requireAdmin();
-  const [summary, flagged, recentBets, wallets, adminActions, stuckDeposits, { availableCents }] = await Promise.all([
+  const [summary, flagged, recentBets, wallets, adminActions, stuckDeposits, pendingWithdrawals, { availableCents }] = await Promise.all([
     getFinancialSummary(),
     getFlaggedBets(),
     getRecentBets(),
     getWalletOverview(),
     getRecentAdminActions(),
     getStuckDeposits(),
+    getPendingWithdrawals(),
     getWalletBalance(profile.id),
   ]);
 
@@ -59,6 +63,10 @@ export default async function AdminPage() {
           </Link>
           <Link href="/admin/matches" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
             Liquidar jogos →
+            <LinkPendingSpinner />
+          </Link>
+          <Link href="/admin/withdrawals" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
+            Levantamentos {pendingWithdrawals.length > 0 ? `(${pendingWithdrawals.length}) ` : ""}→
             <LinkPendingSpinner />
           </Link>
         </div>
@@ -143,6 +151,40 @@ export default async function AdminPage() {
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${d.status === "pending" ? "bg-primary-10 text-primary" : "bg-destructive-10 text-destructive"}`}>
                   {d.status === "pending" ? "Pendente" : "Falhado"}
                 </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Pending withdrawals */}
+      <section className="mb-7">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Levantamentos pendentes ({pendingWithdrawals.length})
+          </h2>
+          {pendingWithdrawals.length > 0 && (
+            <Link href="/admin/withdrawals" className="flex items-center gap-1 text-xs font-bold text-primary">
+              Processar →
+              <LinkPendingSpinner className="size-3" />
+            </Link>
+          )}
+        </div>
+        {pendingWithdrawals.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            Nenhum levantamento pendente.
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-primary-30 bg-card">
+            {pendingWithdrawals.map((w) => (
+              <div key={w.id} className="flex items-center justify-between border-b border-border p-3.5 text-sm last:border-b-0">
+                <div>
+                  <p className="font-bold">{w.requesterDisplayName} · {formatCentsAsMt(w.amountCents)} MT</p>
+                  <p className="text-xs text-muted-foreground">
+                    {w.method === "mpesa" ? "M-Pesa" : "e-Mola"} · {w.phone} · {w.reference}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-primary-10 px-2.5 py-1 text-xs font-bold text-primary">Pendente</span>
               </div>
             ))}
           </div>
