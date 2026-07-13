@@ -1,8 +1,9 @@
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { Handshake, X, Lock, Clock } from "lucide-react";
 import { BetActionButton } from "./bet-action-button";
 import { DuelSecondaryActions } from "./duel-secondary-actions";
 import { TeamBadge } from "@/components/match/team-badge";
+import { Spinner } from "@/components/ui/spinner";
 
 export type Duel = {
   id: string;
@@ -155,15 +156,34 @@ function DuelSides({ duel }: { duel: Duel }) {
   );
 }
 
+/** Dims the card and shows a spinner while its navigation is in flight —
+ *  useLinkStatus reads pending state from the nearest enclosing Link. Split
+ *  into its own component because that hook only works for a Link's
+ *  descendants, and CardBody itself needs to stay a plain function so the
+ *  "no real bet" early return below doesn't call a hook conditionally. */
+function CardBodyPendingOverlay() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/60 backdrop-blur-[1px]">
+      <Spinner className="size-6" />
+    </div>
+  );
+}
+
 /** Wraps the non-interactive top section of the card in a link to the full
  *  duel receipt (/d/[reference]) — only for real bets (see comment at the
  *  call site). Falls back to a plain div for the logged-out marketing
- *  preview, which has nothing real to link to. */
+ *  preview, which has nothing real to link to. `press` gives the same
+ *  immediate tap feedback every other pressable element in the app has —
+ *  without it, a tap that hasn't triggered the (network-dependent, and
+ *  often too fast to notice) pending overlay yet looks like it did nothing. */
 function CardBody({ duel, children }: { duel: Duel; children: React.ReactNode }) {
   if (!duel.reference) return <>{children}</>;
   return (
-    <Link href={`/d/${duel.reference}`} className="block">
+    <Link href={`/d/${duel.reference}`} className="press relative block">
       {children}
+      <CardBodyPendingOverlay />
     </Link>
   );
 }
@@ -267,6 +287,13 @@ export function DuelPost({
             Aceitar aposta de {firstName}
           </Link>
         ) : (
+          <DuelSecondaryActions duelId={duel.id} reference={duel.reference} creatorName={duel.a.name} />
+        )}
+        {/* Still open? Let anyone looking at it forward the challenge too —
+         *  not just the creator. Skipped for the logged-out marketing
+         *  preview (no real reference to share) and folded into the single
+         *  DuelSecondaryActions above once the duel is no longer waiting. */}
+        {isWaiting && duel.reference && (
           <DuelSecondaryActions duelId={duel.id} reference={duel.reference} creatorName={duel.a.name} />
         )}
       </div>
