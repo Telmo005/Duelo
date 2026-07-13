@@ -92,17 +92,41 @@ export async function POST(request: Request) {
     // Money is in — now mark success. Scoped to "not already success" (not
     // "still pending") so the late-success-after-failed case above actually
     // flips the row instead of silently no-op'ing against a stale filter.
-    await service
+    // .select() lets us tell whether this delivery actually flipped the
+    // row (vs a near-simultaneous retry losing the race) — only notify once.
+    const { data: flipped } = await service
       .from("deposits")
       .update({ status: "success", confirmed_at: new Date().toISOString() })
       .eq("id", deposit.id)
-      .neq("status", "success");
+      .neq("status", "success")
+      .select("id");
+
+    if (flipped && flipped.length > 0) {
+      await service.rpc("notify", {
+        p_user_id: deposit.user_id,
+        p_type: "deposit_success",
+        p_title: "Depósito confirmado",
+        p_body: `O teu depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"} está disponível na carteira.`,
+        p_link: "/dashboard",
+      });
+    }
   } else {
-    await service
+    const { data: flipped } = await service
       .from("deposits")
       .update({ status: "failed" })
       .eq("id", deposit.id)
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .select("id");
+
+    if (flipped && flipped.length > 0) {
+      await service.rpc("notify", {
+        p_user_id: deposit.user_id,
+        p_type: "deposit_failed",
+        p_title: "Depósito falhou",
+        p_body: "Não foi possível confirmar o pagamento. Tenta novamente.",
+        p_link: "/wallet/deposit",
+      });
+    }
   }
 
   return NextResponse.json({ received: true });

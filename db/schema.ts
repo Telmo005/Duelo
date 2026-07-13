@@ -150,6 +150,32 @@ export const withdrawals = pgTable("withdrawals", {
 export type Withdrawal = typeof withdrawals.$inferSelect;
 
 /**
+ * notifications — one row per event a user or admin needs to know about
+ * (bet accepted/won/lost/refunded, deposit succeeded/failed, withdrawal
+ * completed/rejected, or — for admins — a new withdrawal request). Written
+ * exclusively by the notify() Postgres function, called from inside the
+ * same SECURITY DEFINER functions that perform each event (or directly
+ * from the PayGate webhook for deposit outcomes) — see
+ * supabase/migrations/0018_notifications.sql. Never written from the
+ * client; read-only for its owner via RLS.
+ */
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  /** Where tapping the notification takes the user, e.g. /d/DUE-BET-xxx. */
+  link: text("link"),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("notifications_user_id_created_at_idx").on(t.userId, t.createdAt),
+]);
+
+export type Notification = typeof notifications.$inferSelect;
+
+/**
  * matches — football fixtures available to bet on. Manually seeded for
  * now (see supabase/migrations/0002_bets.sql seed rows); automatic
  * ingestion from a sports-data API (API-Football) is a later phase.
