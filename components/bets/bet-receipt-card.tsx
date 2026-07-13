@@ -31,6 +31,9 @@ export function BetReceiptCard({
 }) {
   const [isPending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
+  // Cancel gives up locked funds and can't be undone — require a second tap
+  // within 3s rather than firing on the first press.
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const isCreator = viewerId === bet.creator.id;
   const status = STATUS_LABEL[bet.status];
   // Short reference, not the raw bet id — a bare UUID in a shared URL reads
@@ -45,9 +48,15 @@ export function BetReceiptCard({
   }
 
   function handleCancel() {
+    if (!confirmCancel) {
+      setConfirmCancel(true);
+      setTimeout(() => setConfirmCancel(false), 3000);
+      return;
+    }
     startTransition(async () => {
       const result = await cancelBetAction(bet.id);
       if (result?.error) toast.error(result.error);
+      setConfirmCancel(false);
     });
   }
 
@@ -163,7 +172,7 @@ export function BetReceiptCard({
         {bet.status === "waiting" && isCreator ? (
           <div className="flex flex-col gap-2.5">
             <ActionButton type="button" variant="danger" size="md" block loading={isPending} icon={<X className="size-4" aria-hidden />} onClick={handleCancel}>
-              Cancelar aposta
+              {confirmCancel ? "Confirmar cancelamento?" : "Cancelar aposta"}
             </ActionButton>
             <p className="text-center text-xs leading-relaxed text-muted-foreground">
               Se ninguém aceitar até o início do jogo, o valor volta automaticamente para a tua carteira.

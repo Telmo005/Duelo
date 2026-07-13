@@ -1,3 +1,5 @@
+"use client";
+
 import Link, { useLinkStatus } from "next/link";
 import { Handshake, X, Lock, Clock } from "lucide-react";
 import { BetActionButton } from "./bet-action-button";
