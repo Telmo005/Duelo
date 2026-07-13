@@ -55,7 +55,7 @@ export function DuelSecondaryActions({
       className="press flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
     >
       {isSharing ? <Spinner className="size-3.5" /> : <Share2 className="size-4" aria-hidden />}
-      {isSharing ? "A partilhar…" : "Partilhar"}
+      {isSharing ? "A desafiar…" : "Desafiar"}
     </button>
   );
 }

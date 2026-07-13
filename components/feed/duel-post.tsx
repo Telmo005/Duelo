@@ -155,6 +155,19 @@ function DuelSides({ duel }: { duel: Duel }) {
   );
 }
 
+/** Wraps the non-interactive top section of the card in a link to the full
+ *  duel receipt (/d/[reference]) — only for real bets (see comment at the
+ *  call site). Falls back to a plain div for the logged-out marketing
+ *  preview, which has nothing real to link to. */
+function CardBody({ duel, children }: { duel: Duel; children: React.ReactNode }) {
+  if (!duel.reference) return <>{children}</>;
+  return (
+    <Link href={`/d/${duel.reference}`} className="block">
+      {children}
+    </Link>
+  );
+}
+
 export function DuelPost({
   duel,
   live = false,
@@ -178,48 +191,56 @@ export function DuelPost({
           : "border-border"
       }`}
     >
-      {/* Post header — who created this bet */}
-      <div className="flex items-start justify-between gap-3 p-4 pb-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <InitialAvatar name={duel.a.name} color={duel.a.avatar} />
-          <div className="min-w-0">
-            <p className="truncate text-[15px] font-semibold leading-tight">
-              {duel.a.name}
-              <span className="font-normal text-muted-foreground"> apostou que </span>
-              <span className="font-semibold">{duel.prediction}</span>
-            </p>
-            <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-              {duel.a.city} · {duel.createdAgo} · {duel.match.league}
-            </p>
+      {/* Everything above the action bar links through to the full duel
+       *  detail/receipt page — only when it's a real bet (duel.reference is
+       *  set), so the logged-out marketing preview (no real row behind it)
+       *  never links to a 404. The action bar stays a separate sibling,
+       *  never nested inside this Link — an <a> containing a <button>/
+       *  another <a> is invalid HTML and breaks click handling. */}
+      <CardBody duel={duel}>
+        {/* Post header — who created this bet */}
+        <div className="flex items-start justify-between gap-3 p-4 pb-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <InitialAvatar name={duel.a.name} color={duel.a.avatar} />
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-semibold leading-tight">
+                {duel.a.name}
+                <span className="font-normal text-muted-foreground"> apostou que </span>
+                <span className="font-semibold">{duel.prediction}</span>
+              </p>
+              <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                {duel.a.city} · {duel.createdAgo} · {duel.match.league}
+              </p>
+            </div>
           </div>
+          <StatusPill status={duel.status} />
         </div>
-        <StatusPill status={duel.status} />
-      </div>
 
-      {/* Match embed — the football pitch with crests + clock/score */}
-      <PitchEmbed duel={duel} />
+        {/* Match embed — the football pitch with crests + clock/score */}
+        <PitchEmbed duel={duel} />
 
-      {/* Opponent line — who's on the other side of this duel */}
-      {duel.b && (
-        <div className="flex items-center gap-2 px-4 pb-2 text-sm">
-          <span className="text-muted-foreground">contra</span>
-          <InitialAvatar name={duel.b.name} color={duel.b.avatar} size={22} />
-          <span className="font-semibold">{duel.b.name}</span>
+        {/* Opponent line — who's on the other side of this duel */}
+        {duel.b && (
+          <div className="flex items-center gap-2 px-4 pb-2 text-sm">
+            <span className="text-muted-foreground">contra</span>
+            <InitialAvatar name={duel.b.name} color={duel.b.avatar} size={22} />
+            <span className="font-semibold">{duel.b.name}</span>
+          </div>
+        )}
+
+        {/* Sides (static info) */}
+        <DuelSides duel={duel} />
+
+        {/* Pot — one clear line of information */}
+        <div className="flex items-center justify-between px-4 pb-3.5">
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Lock className="size-3.5 text-primary" aria-hidden /> Pote em jogo
+          </span>
+          <span className="text-base font-extrabold tabular-nums text-primary">MT {pot.toLocaleString("pt")}</span>
         </div>
-      )}
+      </CardBody>
 
-      {/* Sides (static info) */}
-      <DuelSides duel={duel} />
-
-      {/* Pot — one clear line of information */}
-      <div className="flex items-center justify-between px-4 pb-3.5">
-        <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Lock className="size-3.5 text-primary" aria-hidden /> Pote em jogo
-        </span>
-        <span className="text-base font-extrabold tabular-nums text-primary">MT {pot.toLocaleString("pt")}</span>
-      </div>
-
-      {/* Action bar — the ONLY pressable element in the card */}
+      {/* Action bar — the ONLY pressable element outside CardBody's link */}
       <div className="border-t border-border px-2 py-1.5">
         {isWaiting && isOwnBet ? (
           <BetActionButton

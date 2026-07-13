@@ -194,7 +194,7 @@ export function BetReceiptCard({
           className="press mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent"
         >
           <Share2 className="size-4" aria-hidden />
-          Partilhar
+          Desafiar
         </button>
       </div>
     </div>
