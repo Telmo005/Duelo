@@ -5,8 +5,8 @@ import { DuelPost, type Duel } from "./duel-post";
 
 const FILTERS = [
   { key: "all", label: "Todos" },
-  { key: "open", label: "Abertos" },
   { key: "waiting", label: "Aguardam adversário" },
+  { key: "locked", label: "Trancados" },
   { key: "live", label: "Ao vivo" },
 ] as const;
 

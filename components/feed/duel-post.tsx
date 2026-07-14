@@ -2,10 +2,11 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { Handshake, X, Clock, TrendingUp } from "lucide-react";
-import { BetActionButton } from "./bet-action-button";
+import { CancelBetButton } from "./cancel-bet-button";
 import { DuelSecondaryActions } from "./duel-secondary-actions";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Spinner } from "@/components/ui/spinner";
+import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 
 export type Duel = {
   id: string;
@@ -20,7 +21,12 @@ export type Duel = {
   prediction: string;
   predictionCode: string;
   stake: number;
-  status: "open" | "live" | "waiting" | "closed";
+  /** "locked" = matched, both sides committed, nothing left to accept —
+   *  distinct from "waiting" ("Aguarda adversário", still joinable) so the
+   *  label never implies there's still something to do with it. "closed"
+   *  only ever appears in the logged-out marketing preview's demo data
+   *  (a finished/settled example) — the real feed never produces it. */
+  status: "locked" | "live" | "waiting" | "closed";
   createdAgo: string;
   /** Present when this Duel came from a real bet row — needed to tell
    *  the creator's own "waiting" bet apart so we can offer "Cancelar"
@@ -46,9 +52,9 @@ function InitialAvatar({ name, color, size = 40 }: { name: string; color: string
 function StatusPill({ status }: { status: Duel["status"] }) {
   const map: Record<Duel["status"], { label: string; className: string; dot?: boolean }> = {
     live: { label: "AO VIVO", className: "bg-live-10 text-live", dot: true },
-    open: { label: "Aberto", className: "bg-success-10 text-success" },
+    locked: { label: "Trancado", className: "bg-locked-10 text-locked" },
     waiting: { label: "Aguarda adversário", className: "bg-primary-10 text-primary" },
-    closed: { label: "Fechado", className: "bg-locked-10 text-locked" },
+    closed: { label: "Fechado", className: "bg-muted text-muted-foreground" },
   };
   const s = map[status];
   return (
@@ -202,7 +208,6 @@ export function DuelPost({
 }) {
   const isWaiting = duel.status === "waiting";
   const isOwnBet = live && duel.creatorId === currentUserId;
-  const firstName = duel.a.name.split(" ")[0];
 
   // What accepting actually pays out — the pot doubled minus the 10%
   // platform commission (same formula create-bet-form.tsx uses to show the
@@ -281,28 +286,38 @@ export function DuelPost({
       {/* Action bar — the ONLY pressable element outside CardBody's link */}
       <div className="border-t border-border px-2 py-1.5">
         {isWaiting && isOwnBet ? (
-          <BetActionButton
+          <CancelBetButton
             betId={duel.id}
-            mode="cancel"
             icon={<X className="size-4" aria-hidden />}
             label="Cancelar a minha aposta"
             className="press flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-destructive transition-colors hover:bg-destructive-10 disabled:opacity-60"
           />
         ) : isWaiting && live ? (
-          <BetActionButton
-            betId={duel.id}
-            mode="accept"
-            icon={<Handshake className="size-[18px]" aria-hidden />}
-            label={`Aceitar aposta de ${firstName}`}
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-success py-3 text-sm font-extrabold text-success-foreground shadow-[0_0_20px_rgba(52,211,153,0.35)] transition-colors hover:bg-success-90 disabled:opacity-60"
-          />
-        ) : isWaiting ? (
+          // Goes to the full receipt page instead of accepting straight from
+          // the feed — that page lays out match, previsão, valor and o que
+          // recebes lado a lado antes do botão de confirmar, o que uma
+          // aceitação de um toque só no cartão nunca deixava claro.
           <Link
-            href="/register"
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-success py-3 text-sm font-extrabold text-success-foreground shadow-[0_0_20px_rgba(52,211,153,0.35)] transition-colors hover:bg-success-90"
+            href={`/d/${duel.reference ?? duel.id}`}
+            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90"
           >
             <Handshake className="size-[18px]" aria-hidden />
-            Aceitar aposta de {firstName}
+            Ver e aceitar — MT {duel.stake.toLocaleString("pt")}
+            <LinkPendingSpinner />
+          </Link>
+        ) : isWaiting ? (
+          // Same "review before you commit" idea, but for a logged-out
+          // visitor: shows the full match/stake/payout breakdown first,
+          // and the receipt page itself prompts "Criar conta para aceitar"
+          // once they're actually ready — more convincing than a bare
+          // /register redirect with zero context.
+          <Link
+            href={`/d/${duel.reference ?? duel.id}`}
+            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90"
+          >
+            <Handshake className="size-[18px]" aria-hidden />
+            Ver e aceitar — MT {duel.stake.toLocaleString("pt")}
+            <LinkPendingSpinner />
           </Link>
         ) : (
           <DuelSecondaryActions duelId={duel.id} reference={duel.reference} creatorName={duel.a.name} />

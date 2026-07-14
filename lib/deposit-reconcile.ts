@@ -49,6 +49,18 @@ export async function reconcileStuckDeposits(): Promise<ReconcileResult> {
     }
 
     if (remote.status === "success") {
+      const wasFailed = deposit.status === "failed";
+      if (wasFailed) {
+        // Same "don't leave a contradicting notification behind" cleanup
+        // the webhook does — see app/api/webhooks/paygate/route.ts.
+        await service
+          .from("notifications")
+          .delete()
+          .eq("user_id", deposit.user_id)
+          .eq("type", "deposit_failed")
+          .eq("reference", deposit.reference);
+      }
+
       const { error: creditError } = await service.rpc("wallet_credit", {
         p_user_id: deposit.user_id,
         p_amount_cents: deposit.amount_cents,
@@ -62,14 +74,42 @@ export async function reconcileStuckDeposits(): Promise<ReconcileResult> {
         continue;
       }
 
-      await service
+      const { data: flipped } = await service
         .from("deposits")
         .update({ status: "success", confirmed_at: new Date().toISOString() })
         .eq("id", deposit.id)
-        .neq("status", "success");
+        .neq("status", "success")
+        .select("id");
+
+      if (flipped && flipped.length > 0) {
+        await service.rpc("notify", {
+          p_user_id: deposit.user_id,
+          p_type: "deposit_success",
+          p_title: "Depósito confirmado",
+          p_body: `O teu depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"} está disponível na carteira.`,
+          p_link: "/dashboard",
+          p_reference: deposit.reference,
+        });
+      }
       credited++;
     } else if (remote.status === "failed" && deposit.status === "pending") {
-      await service.from("deposits").update({ status: "failed" }).eq("id", deposit.id).eq("status", "pending");
+      const { data: flipped } = await service
+        .from("deposits")
+        .update({ status: "failed" })
+        .eq("id", deposit.id)
+        .eq("status", "pending")
+        .select("id");
+
+      if (flipped && flipped.length > 0) {
+        await service.rpc("notify", {
+          p_user_id: deposit.user_id,
+          p_type: "deposit_failed",
+          p_title: "Depósito falhou",
+          p_body: "Não foi possível confirmar o pagamento. Tenta novamente.",
+          p_link: "/wallet/deposit",
+          p_reference: deposit.reference,
+        });
+      }
       markedFailed++;
     }
   }

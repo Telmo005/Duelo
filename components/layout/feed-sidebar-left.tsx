@@ -49,7 +49,7 @@ export function FeedSidebarLeft({
           <div className="flex flex-col gap-3 text-sm">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2 text-muted-foreground">
-                <Flame className="size-4" aria-hidden /> Duelos abertos
+                <Flame className="size-4" aria-hidden /> Duelos ativos
               </span>
               <span className="font-bold tabular-nums">{openCount}</span>
             </div>
