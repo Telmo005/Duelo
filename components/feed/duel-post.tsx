@@ -1,7 +1,7 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { Handshake, X, Lock, Clock } from "lucide-react";
+import { Handshake, X, Clock, TrendingUp } from "lucide-react";
 import { BetActionButton } from "./bet-action-button";
 import { DuelSecondaryActions } from "./duel-secondary-actions";
 import { TeamBadge } from "@/components/match/team-badge";
@@ -202,8 +202,15 @@ export function DuelPost({
 }) {
   const isWaiting = duel.status === "waiting";
   const isOwnBet = live && duel.creatorId === currentUserId;
-  const pot = duel.stake * (duel.b ? 2 : 1);
   const firstName = duel.a.name.split(" ")[0];
+
+  // What accepting actually pays out — the pot doubled minus the 10%
+  // platform commission (same formula create-bet-form.tsx uses to show the
+  // creator this before they even post). This is the number that should
+  // sell the tap: "MT 100 in, MT 180 back" reads as an opportunity a lot
+  // more clearly than a flat "pote em jogo" total ever did.
+  const potentialPayout = Math.round(duel.stake * 2 * 0.9);
+  const potentialProfit = potentialPayout - duel.stake;
 
   return (
     <article
@@ -253,12 +260,21 @@ export function DuelPost({
         {/* Sides (static info) */}
         <DuelSides duel={duel} />
 
-        {/* Pot — one clear line of information */}
-        <div className="flex items-center justify-between px-4 pb-3.5">
-          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Lock className="size-3.5 text-primary" aria-hidden /> Pote em jogo
-          </span>
-          <span className="text-base font-extrabold tabular-nums text-primary">MT {pot.toLocaleString("pt")}</span>
+        {/* Stake vs payout — the hook. What you put in next to what you get
+         *  back if you accept and win, side by side so the opportunity reads
+         *  in one glance instead of needing to do the maths. */}
+        <div className="mx-4 mb-3.5 grid grid-cols-2 gap-2.5">
+          <div className="rounded-xl bg-secondary/50 px-3.5 py-2.5">
+            <p className="text-[11px] font-medium text-muted-foreground">Aposta</p>
+            <p className="text-lg font-extrabold tabular-nums">MT {duel.stake.toLocaleString("pt")}</p>
+          </div>
+          <div className="rounded-xl border border-success-25 bg-success-10 px-3.5 py-2.5">
+            <p className="flex items-center gap-1 text-[11px] font-bold text-success">
+              <TrendingUp className="size-3" aria-hidden /> Podes ganhar
+            </p>
+            <p className="text-lg font-extrabold tabular-nums text-success">MT {potentialPayout.toLocaleString("pt")}</p>
+            <p className="text-[10px] font-semibold text-success">+MT {potentialProfit.toLocaleString("pt")} de lucro</p>
+          </div>
         </div>
       </CardBody>
 
@@ -278,12 +294,12 @@ export function DuelPost({
             mode="accept"
             icon={<Handshake className="size-[18px]" aria-hidden />}
             label={`Aceitar aposta de ${firstName}`}
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90 disabled:opacity-60"
+            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-success py-3 text-sm font-extrabold text-success-foreground shadow-[0_0_20px_rgba(52,211,153,0.35)] transition-colors hover:bg-success-90 disabled:opacity-60"
           />
         ) : isWaiting ? (
           <Link
             href="/register"
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90"
+            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-success py-3 text-sm font-extrabold text-success-foreground shadow-[0_0_20px_rgba(52,211,153,0.35)] transition-colors hover:bg-success-90"
           >
             <Handshake className="size-[18px]" aria-hidden />
             Aceitar aposta de {firstName}

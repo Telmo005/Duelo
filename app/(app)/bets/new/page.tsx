@@ -33,6 +33,7 @@ export default async function NewBetPage() {
     kickoffLabel: new Date(m.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
     homeLogoUrl: m.homeLogoUrl,
     awayLogoUrl: m.awayLogoUrl,
+    isElimination: m.isElimination,
   }));
 
   return (

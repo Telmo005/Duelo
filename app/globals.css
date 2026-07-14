@@ -109,6 +109,7 @@
   --success-15: rgba(52, 211, 153, 0.15);
   --success-20: rgba(52, 211, 153, 0.20);
   --success-25: rgba(52, 211, 153, 0.25);
+  --success-90: rgba(52, 211, 153, 0.90);
   --primary-10: rgba(242, 194, 42, 0.10);
   --primary-15: rgba(242, 194, 42, 0.15);
   --primary-20: rgba(242, 194, 42, 0.20);
@@ -159,6 +160,7 @@
   --color-success-15: var(--success-15);
   --color-success-20: var(--success-20);
   --color-success-25: var(--success-25);
+  --color-success-90: var(--success-90);
   --color-primary-10: var(--primary-10);
   --color-primary-15: var(--primary-15);
   --color-primary-20: var(--primary-20);

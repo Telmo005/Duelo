@@ -202,6 +202,12 @@ export const matches = pgTable("matches", {
    *  coloured-shield placeholder in TeamBadge (manually seeded matches). */
   homeLogoUrl: text("home_logo_url"),
   awayLogoUrl: text("away_logo_url"),
+
+  /** Knockout fixture (cup final, CL knockout round, etc.) — extra time and
+   *  penalties always produce a winner, so 'draw' is never a valid
+   *  prediction or a valid settlement result for one. Enforced both in
+   *  bet_create and bet_settle_match (see 0019_elimination_matches.sql). */
+  isElimination: boolean("is_elimination").notNull().default(false),
 });
 
 export type MatchRow = typeof matches.$inferSelect;
