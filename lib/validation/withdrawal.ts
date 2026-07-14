@@ -6,7 +6,7 @@ const phoneRegex = /^\+258\s?8[4-7]\s?\d{3}\s?\d{4}$/;
 // A higher floor than deposits (1 MT): every withdrawal is processed by
 // hand on PaySuite's dashboard, so a very small request costs the admin
 // real time for little reason. Easy to tune if that assumption changes.
-export const WITHDRAWAL_MIN_MT = 50;
+export const WITHDRAWAL_MIN_MT = 5;
 
 export const withdrawalSchema = z.object({
   method: z.enum(["mpesa", "emola"]),
