@@ -165,6 +165,52 @@ export async function deleteMatchAction(matchId: string): Promise<ActionResult> 
   return {};
 }
 
+const liveScoreSchema = z.object({
+  homeGoals: z.coerce.number().int().min(0, "Golos não podem ser negativos").max(50),
+  awayGoals: z.coerce.number().int().min(0, "Golos não podem ser negativos").max(50),
+  minute: z.coerce.number().int().min(0).max(150).optional(),
+});
+
+/**
+ * Updates the DISPLAY-ONLY live score (matches.live_*) as a match
+ * progresses — completely separate from settlement. Liquidar (see
+ * lib/actions/settlement.ts::settleMatchAction) is the only action that
+ * writes result_home/result_away and pays out; this one never touches
+ * either, so an admin can update the score every time a team scores
+ * without triggering any payment, and only run Liquidar once at full time.
+ * The fallback for matches with no automated live-score feed (no
+ * external_id) — API-linked ones already get this from the
+ * update-live-scores cron.
+ */
+export async function updateLiveScoreAction(matchId: string, input: Record<string, unknown>): Promise<ActionResult> {
+  const admin = await requireAdmin();
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!match) return { error: "Jogo não encontrado." };
+  if (match.matchStatus !== "scheduled") {
+    return { error: "Este jogo já foi liquidado/anulado — o placar ao vivo já não é relevante." };
+  }
+
+  const parsed = liveScoreSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  await db
+    .update(matches)
+    .set({
+      liveHome: parsed.data.homeGoals,
+      liveAway: parsed.data.awayGoals,
+      liveMinute: parsed.data.minute ?? null,
+      liveUpdatedAt: new Date(),
+    })
+    .where(eq(matches.id, matchId));
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/");
+  return {};
+}
+
 /** Manual trigger for importUpcomingFixtures() — lets an admin test/force an
  *  import pass (e.g. right after upgrading the API-Football plan) without
  *  waiting for the next cron tick. */
