@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   bigint,
+  integer,
   boolean,
   uniqueIndex,
   index,
@@ -214,6 +215,17 @@ export const matches = pgTable("matches", {
    *  prediction or a valid settlement result for one. Enforced both in
    *  bet_create and bet_settle_match (see 0019_elimination_matches.sql). */
   isElimination: boolean("is_elimination").notNull().default(false),
+
+  /** In-play score + minute (migration 0007) — display-only, deliberately
+   *  separate from result_home/result_away so tracking a live score can
+   *  never accidentally trigger or affect settlement (bet_settle_match
+   *  only reads result_home/result_away, never these). Written by the
+   *  update-live-scores cron for API-linked matches, or manually by an
+   *  admin (updateLiveScoreAction) for matches with no automated feed. */
+  liveHome: integer("live_home"),
+  liveAway: integer("live_away"),
+  liveMinute: integer("live_minute"),
+  liveUpdatedAt: timestamp("live_updated_at", { withTimezone: true }),
 });
 
 export type MatchRow = typeof matches.$inferSelect;

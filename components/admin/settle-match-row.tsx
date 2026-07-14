@@ -2,20 +2,66 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2, Pencil } from "lucide-react";
+import { Trash2, Pencil, Radio } from "lucide-react";
 import { settleMatchAction, voidMatchAction } from "@/lib/actions/settlement";
-import { deleteMatchAction } from "@/lib/actions/matches";
+import { deleteMatchAction, updateLiveScoreAction } from "@/lib/actions/matches";
 import { EditMatchForm } from "@/components/admin/edit-match-form";
 import type { MatchRow } from "@/db/schema";
 import { Spinner } from "@/components/ui/spinner";
 
-type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | null;
+type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | "live" | null;
+
+/** Small "X-Y" pair of number inputs, reused for both the live-score
+ *  tracker and the final settlement score — same shape, different action
+ *  behind them. */
+function ScoreInputs({
+  home,
+  away,
+  onHomeChange,
+  onAwayChange,
+  disabled,
+}: {
+  home: string;
+  away: string;
+  onHomeChange: (v: string) => void;
+  onAwayChange: (v: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <>
+      <input
+        type="number"
+        min={0}
+        max={50}
+        placeholder="0"
+        value={home}
+        onChange={(e) => onHomeChange(e.target.value)}
+        disabled={disabled}
+        className="w-12 rounded-lg border border-border bg-background px-2 py-1.5 text-center text-sm outline-none focus:border-primary disabled:opacity-50"
+      />
+      <span className="text-muted-foreground">—</span>
+      <input
+        type="number"
+        min={0}
+        max={50}
+        placeholder="0"
+        value={away}
+        onChange={(e) => onAwayChange(e.target.value)}
+        disabled={disabled}
+        className="w-12 rounded-lg border border-border bg-background px-2 py-1.5 text-center text-sm outline-none focus:border-primary disabled:opacity-50"
+      />
+    </>
+  );
+}
 
 export function SettleMatchRow({ match }: { match: MatchRow }) {
   const [isPending, startTransition] = useTransition();
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
+  const [liveHome, setLiveHome] = useState(match.liveHome != null ? String(match.liveHome) : "");
+  const [liveAway, setLiveAway] = useState(match.liveAway != null ? String(match.liveAway) : "");
+  const [liveMinute, setLiveMinute] = useState(match.liveMinute != null ? String(match.liveMinute) : "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
 
@@ -48,7 +94,7 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
     startTransition(async () => {
       const result = await settleMatchAction(match.id, Number(home), Number(away));
       if (result?.error) toast.error(result.error);
-      else toast.success("Aposta(s) liquidada(s) com sucesso");
+      else toast.success("Aposta(s) liquidada(s) com sucesso — pagamentos processados");
       setActiveAction(null);
     });
   }
@@ -63,8 +109,23 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
     });
   }
 
+  function handleUpdateLiveScore() {
+    if (liveHome === "" || liveAway === "") return;
+    setActiveAction("live");
+    startTransition(async () => {
+      const result = await updateLiveScoreAction(match.id, {
+        homeGoals: liveHome,
+        awayGoals: liveAway,
+        minute: liveMinute || undefined,
+      });
+      if (result?.error) toast.error(result.error);
+      else toast.success("Placar ao vivo atualizado");
+      setActiveAction(null);
+    });
+  }
+
   return (
-    <div className="flex flex-col gap-3 border-b border-border p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-b border-border p-4 last:border-b-0">
       <div>
         <p className="text-sm font-bold">
           {match.home} <span className="font-normal text-muted-foreground">vs</span> {match.away}
@@ -76,33 +137,55 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           {match.league} · {new Date(match.kickoffAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
           {match.externalId ? ` · API #${match.externalId}` : " · sem ligação à API"}
         </p>
-        {blockedByElimination && (
-          <p className="mt-1 text-xs font-semibold text-destructive">
-            Jogo de eliminação não pode terminar empatado — indica o resultado decisivo (ex: após penáltis).
-          </p>
+      </div>
+
+      {/* Placar ao vivo — display-only, updates as goals happen, never pays
+       *  anyone. Kept visually and functionally separate from Liquidar
+       *  below, which is the one action that actually settles bets and
+       *  pays out. */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary/40 px-3 py-2.5">
+        <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+          <Radio className="size-3.5" aria-hidden /> Placar ao vivo
+        </span>
+        <ScoreInputs home={liveHome} away={liveAway} onHomeChange={setLiveHome} onAwayChange={setLiveAway} disabled={isPending} />
+        <input
+          type="number"
+          min={0}
+          max={150}
+          placeholder="min"
+          value={liveMinute}
+          onChange={(e) => setLiveMinute(e.target.value)}
+          disabled={isPending}
+          className="w-14 rounded-lg border border-border bg-background px-2 py-1.5 text-center text-xs outline-none focus:border-primary disabled:opacity-50"
+        />
+        <button
+          type="button"
+          onClick={handleUpdateLiveScore}
+          disabled={isPending || liveHome === "" || liveAway === ""}
+          className="press inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {activeAction === "live" && <Spinner className="size-3" />}
+          {activeAction === "live" ? "A atualizar…" : "Atualizar"}
+        </button>
+        {match.liveUpdatedAt && (
+          <span className="text-[11px] text-muted-foreground">
+            Última atualização: {new Date(match.liveUpdatedAt).toLocaleTimeString("pt", { hour: "2-digit", minute: "2-digit" })}
+          </span>
         )}
       </div>
 
+      {blockedByElimination && (
+        <p className="text-xs font-semibold text-destructive">
+          Jogo de eliminação não pode terminar empatado — indica o resultado decisivo (ex: após penáltis).
+        </p>
+      )}
+
+      {/* Liquidar — the ONE action that pays out. Separate score inputs on
+       *  purpose: this is the final, official result, entered once at full
+       *  time, not the same value being nudged up throughout the match. */}
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="number"
-          min={0}
-          max={20}
-          placeholder="0"
-          value={home}
-          onChange={(e) => setHome(e.target.value)}
-          className="w-14 rounded-lg border border-border bg-background px-2 py-1.5 text-center text-sm outline-none focus:border-primary"
-        />
-        <span className="text-muted-foreground">—</span>
-        <input
-          type="number"
-          min={0}
-          max={20}
-          placeholder="0"
-          value={away}
-          onChange={(e) => setAway(e.target.value)}
-          className="w-14 rounded-lg border border-border bg-background px-2 py-1.5 text-center text-sm outline-none focus:border-primary"
-        />
+        <span className="text-xs font-bold text-muted-foreground">Resultado final</span>
+        <ScoreInputs home={home} away={away} onHomeChange={setHome} onAwayChange={setAway} disabled={isPending} />
         <button
           type="button"
           onClick={handleSettle}
@@ -110,7 +193,7 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           className="press inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           {activeAction === "settle" && <Spinner className="size-3" />}
-          {activeAction === "settle" ? "A liquidar…" : "Liquidar"}
+          {activeAction === "settle" ? "A liquidar…" : "Liquidar e pagar"}
         </button>
         <button
           type="button"
