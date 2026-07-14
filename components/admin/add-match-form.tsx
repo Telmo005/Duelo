@@ -24,6 +24,7 @@ export function AddMatchForm() {
         kickoffAt: fd.get("kickoffAt"),
         homeLogoUrl: fd.get("homeLogoUrl"),
         awayLogoUrl: fd.get("awayLogoUrl"),
+        isElimination: fd.get("isElimination"),
       });
       if (result?.error) toast.error(result.error);
       else {
@@ -64,6 +65,11 @@ export function AddMatchForm() {
           Adicionar jogo
         </ActionButton>
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-2 lg:col-span-5">
+        <input id="isElimination" name="isElimination" type="checkbox" disabled={isPending} className="size-4 accent-primary" />
+        Jogo de eliminação (final, mata-mata — sem opção de empate)
+      </label>
     </form>
   );
 }

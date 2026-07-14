@@ -39,8 +39,11 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
     });
   }
 
+  const isDrawEntered = home !== "" && away !== "" && home === away;
+  const blockedByElimination = match.isElimination && isDrawEntered;
+
   function handleSettle() {
-    if (home === "" || away === "") return;
+    if (home === "" || away === "" || blockedByElimination) return;
     setActiveAction("settle");
     startTransition(async () => {
       const result = await settleMatchAction(match.id, Number(home), Number(away));
@@ -65,11 +68,19 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
       <div>
         <p className="text-sm font-bold">
           {match.home} <span className="font-normal text-muted-foreground">vs</span> {match.away}
+          {match.isElimination && (
+            <span className="ml-2 rounded-full bg-locked-10 px-2 py-0.5 text-[10px] font-bold text-locked">ELIMINAÇÃO</span>
+          )}
         </p>
         <p className="text-xs text-muted-foreground">
           {match.league} · {new Date(match.kickoffAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
           {match.externalId ? ` · API #${match.externalId}` : " · sem ligação à API"}
         </p>
+        {blockedByElimination && (
+          <p className="mt-1 text-xs font-semibold text-destructive">
+            Jogo de eliminação não pode terminar empatado — indica o resultado decisivo (ex: após penáltis).
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -95,7 +106,7 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
         <button
           type="button"
           onClick={handleSettle}
-          disabled={isPending || home === "" || away === ""}
+          disabled={isPending || home === "" || away === "" || blockedByElimination}
           className="press inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           {activeAction === "settle" && <Spinner className="size-3" />}

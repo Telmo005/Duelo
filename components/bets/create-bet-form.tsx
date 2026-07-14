@@ -17,6 +17,9 @@ export type MatchOption = {
   kickoffLabel: string;
   homeLogoUrl?: string | null;
   awayLogoUrl?: string | null;
+  /** Knockout fixture — extra time/penalties always produce a winner, so
+   *  "Empate" is never offered as a prediction for one. */
+  isElimination: boolean;
 };
 
 const PREDICTIONS = [
@@ -43,6 +46,14 @@ export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
   const selectedMatch = matches.find((m) => m.id === matchId);
   const stakeNum = Number(stake) || 0;
   const canSubmit = !!matchId && !!prediction && stakeNum > 0;
+
+  // Knockout fixtures always produce a winner (extra time/penalties), so
+  // "Empate" is never a valid prediction for one — filtered out entirely
+  // rather than shown-but-disabled, since an option nobody can ever win is
+  // worse than no option at all.
+  const availablePredictions = selectedMatch?.isElimination
+    ? PREDICTIONS.filter((p) => p.key !== "draw")
+    : PREDICTIONS;
 
   // Winner receives the full pot minus the platform's 10% commission.
   const pot = stakeNum * 2;
@@ -88,7 +99,10 @@ export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
                 <p className="truncate text-sm font-bold">
                   {m.home} <span className="text-muted-foreground">vs</span> {m.away}
                 </p>
-                <p className="truncate text-xs text-muted-foreground">{m.league} · {m.kickoffLabel}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {m.league} · {m.kickoffLabel}
+                  {m.isElimination && <span className="ml-1.5 font-semibold text-locked">· Eliminação</span>}
+                </p>
               </div>
             </OptionCard>
           ))}
@@ -99,8 +113,13 @@ export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
       {selectedMatch && (
         <section>
           <SectionLabel step={2}>A tua previsão</SectionLabel>
-          <div className="grid grid-cols-3 gap-2.5">
-            {PREDICTIONS.map((p) => (
+          {selectedMatch.isElimination && (
+            <p className="mb-2.5 -mt-1 text-xs font-medium text-muted-foreground">
+              Jogo de eliminação — não há opção de empate, há sempre um vencedor.
+            </p>
+          )}
+          <div className={`grid gap-2.5 ${availablePredictions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+            {availablePredictions.map((p) => (
               <OptionCard
                 key={p.key}
                 selected={prediction === p.key}

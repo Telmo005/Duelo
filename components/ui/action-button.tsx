@@ -19,6 +19,12 @@ export const actionButtonVariants = cva(
       variant: {
         primary:
           "bg-primary text-primary-foreground shadow-[var(--shadow-elevated)] hover:bg-primary-90 disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none",
+        // Reserved for "aceitar" — the one action that turns a bet into
+        // real money in play for the person tapping it. Gold stays the
+        // brand/neutral commit colour (Depositar, Criar aposta); green is
+        // specifically "yes, take this bet" so it reads as its own signal.
+        success:
+          "bg-success text-success-foreground shadow-[0_0_20px_rgba(52,211,153,0.35)] hover:bg-success-90 disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none",
         secondary:
           "border border-border bg-card text-foreground hover:bg-accent disabled:opacity-60",
         ghost: "text-muted-foreground hover:bg-accent hover:text-foreground",

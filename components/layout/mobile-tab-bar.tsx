@@ -1,6 +1,9 @@
-import Link from "next/link";
+"use client";
+
+import Link, { useLinkStatus } from "next/link";
 import { House, Swords, Plus, Wallet, User, type LucideIcon } from "lucide-react";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 export type TabKey = "feed" | "bets" | "wallet" | "profile";
@@ -61,6 +64,15 @@ function Tab({
   );
 }
 
+/** Swaps the "+" for a spinner while the navigation it triggers is in
+ *  flight — this is the app's single most-tapped button, so "did that even
+ *  register?" is exactly the wrong feeling to leave someone with here. */
+function CreateTabIcon() {
+  const { pending } = useLinkStatus();
+  if (pending) return <Spinner className="size-5 text-primary-foreground" />;
+  return <Plus className="size-6" strokeWidth={2.6} aria-hidden />;
+}
+
 /** The center "create bet" affordance — an elevated gold pill that pops above
  *  the bar, the app's single most important action. */
 function CreateTab({ href }: { href: string }) {
@@ -71,7 +83,7 @@ function CreateTab({ href }: { href: string }) {
       className="press flex flex-1 flex-col items-center justify-start"
     >
       <span className="-mt-4 flex size-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-elevated)] ring-4 ring-background">
-        <Plus className="size-6" strokeWidth={2.6} aria-hidden />
+        <CreateTabIcon />
       </span>
       <span className="mt-0.5 text-[10px] font-bold text-primary">Criar</span>
     </Link>

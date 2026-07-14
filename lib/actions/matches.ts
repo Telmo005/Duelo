@@ -22,6 +22,9 @@ const addMatchSchema = z.object({
   // exact crest for the exact team they chose.
   homeLogoUrl: z.string().url().optional().or(z.literal("")),
   awayLogoUrl: z.string().url().optional().or(z.literal("")),
+  // Checkbox inputs only appear in FormData when checked — fd.get() returns
+  // "on" then, or null when unchecked (never a "true"/"false" string).
+  isElimination: z.union([z.literal("on"), z.boolean()]).nullish().transform((v) => v === "on" || v === true),
 });
 
 /** Search-as-you-type backing the "pesquisar equipa" picker in the add-match
@@ -62,13 +65,14 @@ export async function addMatchAction(input: Record<string, unknown>): Promise<Ac
     kickoffAt: parsed.data.kickoffAt,
     homeLogoUrl: homeLogoUrl || null,
     awayLogoUrl: awayLogoUrl || null,
+    isElimination: parsed.data.isElimination,
   });
 
   await logAdminAction(
     admin.id,
     "add_match",
     null,
-    `Jogo adicionado manualmente: ${parsed.data.home} vs ${parsed.data.away} (${parsed.data.league})`
+    `Jogo adicionado manualmente: ${parsed.data.home} vs ${parsed.data.away} (${parsed.data.league})${parsed.data.isElimination ? " — eliminação" : ""}`
   );
 
   revalidatePath("/admin/matches");
@@ -114,6 +118,7 @@ export async function updateMatchAction(matchId: string, input: Record<string, u
       kickoffAt: parsed.data.kickoffAt,
       homeLogoUrl: homeLogoUrl || null,
       awayLogoUrl: awayLogoUrl || null,
+      isElimination: parsed.data.isElimination,
     })
     .where(eq(matches.id, matchId));
 

@@ -179,7 +179,7 @@ export function BetReceiptCard({
             </p>
           </div>
         ) : bet.status === "waiting" && loggedIn ? (
-          <ActionButton type="button" size="lg" block loading={isPending} icon={<Handshake className="size-[18px]" aria-hidden />} onClick={handleAccept}>
+          <ActionButton type="button" variant="success" size="lg" block loading={isPending} icon={<Handshake className="size-[18px]" aria-hidden />} onClick={handleAccept}>
             Aceitar aposta
           </ActionButton>
         ) : bet.status === "waiting" ? (
