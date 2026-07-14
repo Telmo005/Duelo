@@ -43,7 +43,7 @@ export default async function LandingPage() {
   const availableCents = profileAndWallet?.[1]?.availableCents;
 
   const totalInPlay = duels.reduce((s, d) => s + d.stake * (d.b ? 2 : 1), 0);
-  const openCount = duels.filter((d) => d.status === "open" || d.status === "waiting").length;
+  const openCount = duels.filter((d) => d.status === "locked" || d.status === "waiting").length;
 
   return (
     <div className="min-h-screen bg-background">

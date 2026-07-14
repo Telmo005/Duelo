@@ -34,6 +34,10 @@ export function BetReceiptCard({
   // Cancel gives up locked funds and can't be undone — require a second tap
   // within 3s rather than firing on the first press.
   const [confirmCancel, setConfirmCancel] = useState(false);
+  // Accepting is the same kind of one-way, money-locking commitment — same
+  // second-tap pattern, on top of this page already laying out match/
+  // previsão/valor/o-que-recebes before the button is even reachable.
+  const [confirmAccept, setConfirmAccept] = useState(false);
   const isCreator = viewerId === bet.creator.id;
   const status = STATUS_LABEL[bet.status];
   // Short reference, not the raw bet id — a bare UUID in a shared URL reads
@@ -41,9 +45,15 @@ export function BetReceiptCard({
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/d/${bet.reference}` : "";
 
   function handleAccept() {
+    if (!confirmAccept) {
+      setConfirmAccept(true);
+      setTimeout(() => setConfirmAccept(false), 3000);
+      return;
+    }
     startTransition(async () => {
       const result = await acceptBetAction(bet.id);
       if (result?.error) toast.error(result.error);
+      setConfirmAccept(false);
     });
   }
 
@@ -179,9 +189,14 @@ export function BetReceiptCard({
             </p>
           </div>
         ) : bet.status === "waiting" && loggedIn ? (
-          <ActionButton type="button" variant="success" size="lg" block loading={isPending} icon={<Handshake className="size-[18px]" aria-hidden />} onClick={handleAccept}>
-            Aceitar aposta
-          </ActionButton>
+          <div className="flex flex-col gap-2.5">
+            <ActionButton type="button" size="lg" block loading={isPending} icon={<Handshake className="size-[18px]" aria-hidden />} onClick={handleAccept}>
+              {confirmAccept ? "Confirmar? Vai bloquear o valor" : `Aceitar — bloqueia ${formatCentsAsMt(bet.stakeCents)} MT`}
+            </ActionButton>
+            <p className="text-center text-xs leading-relaxed text-muted-foreground">
+              Toca duas vezes para confirmar. O valor fica bloqueado até o jogo terminar.
+            </p>
+          </div>
         ) : bet.status === "waiting" ? (
           <Link href="/register" className="press flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90">
             <Lock className="size-[18px]" aria-hidden />

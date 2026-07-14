@@ -67,8 +67,20 @@ export async function POST(request: Request) {
     // real deposit (this used to return early with `conflict: true` — that
     // was the bug). wallet_credit is idempotent per (user_id, reference), so
     // proceeding is safe regardless of the earlier 'failed' state.
-    if (deposit.status === "failed") {
+    const wasFailed = deposit.status === "failed";
+    if (wasFailed) {
       console.warn("payment.success arrived after failed for deposit — crediting anyway", deposit.id);
+      // Remove the "Depósito falhou" notification the earlier delivery
+      // created — a late success supersedes it, and leaving both up reads
+      // as the app contradicting itself (reported by users: "one says
+      // success, one says error"). Scoped to this exact deposit's own
+      // reference so it can never touch a different deposit's notification.
+      await service
+        .from("notifications")
+        .delete()
+        .eq("user_id", deposit.user_id)
+        .eq("type", "deposit_failed")
+        .eq("reference", deposit.reference);
     }
 
     // Credit FIRST — wallet_credit is idempotent per (user_id, reference)
@@ -106,8 +118,11 @@ export async function POST(request: Request) {
         p_user_id: deposit.user_id,
         p_type: "deposit_success",
         p_title: "Depósito confirmado",
-        p_body: `O teu depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"} está disponível na carteira.`,
+        p_body: wasFailed
+          ? `Afinal confirmou-se — o teu depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"} está disponível na carteira.`
+          : `O teu depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"} está disponível na carteira.`,
         p_link: "/dashboard",
+        p_reference: deposit.reference,
       });
     }
   } else {
@@ -125,6 +140,7 @@ export async function POST(request: Request) {
         p_title: "Depósito falhou",
         p_body: "Não foi possível confirmar o pagamento. Tenta novamente.",
         p_link: "/wallet/deposit",
+        p_reference: deposit.reference,
       });
     }
   }

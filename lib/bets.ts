@@ -225,7 +225,10 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
       const opponent = bet.opponentId ? profileById.get(bet.opponentId) : null;
 
       // A matched bet on a match the poller has fresh live data for shows the
-      // live scoreboard; otherwise it's a normal "open" (accepted) duel.
+      // live scoreboard; otherwise it's "locked" (both sides committed,
+      // nothing left to accept — not "open", which reads as "still
+      // available to join" and confused people into thinking there was
+      // something left to do with it).
       const live = liveById.get(match.id);
       const showLive = bet.status === "matched" && !!live;
 
@@ -246,7 +249,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         prediction: predictionText,
         predictionCode: pred.code,
         stake: bet.stakeCents / 100,
-        status: bet.status === "matched" ? (showLive ? "live" : "open") : "waiting",
+        status: bet.status === "matched" ? (showLive ? "live" : "locked") : "waiting",
         createdAgo: new Date(bet.createdAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
         score: showLive && live!.live_home != null && live!.live_away != null ? { home: live!.live_home, away: live!.live_away } : undefined,
         minute: showLive && live!.live_minute != null ? `${live!.live_minute}'` : undefined,

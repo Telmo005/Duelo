@@ -167,6 +167,12 @@ export const notifications = pgTable("notifications", {
   body: text("body").notNull(),
   /** Where tapping the notification takes the user, e.g. /d/DUE-BET-xxx. */
   link: text("link"),
+  /** The underlying thing's own reference (DUE-DEP-xxx, DUE-BET-xxx, ...),
+   *  when there is one — lets a later event about the same thing (e.g. a
+   *  deposit that first reported 'failed', then a late 'payment.success'
+   *  arrived) find and remove the now-superseded notification instead of
+   *  leaving two contradictory ones sitting side by side. */
+  reference: text("reference"),
   readAt: timestamp("read_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
