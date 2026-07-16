@@ -209,6 +209,26 @@
   100% { background-position: 200% 0; }
 }
 
+/* Ticker for the "vencedores recentes" strip — the track holds the winner
+   list twice back-to-back and scrolls exactly half its own width, so the
+   loop point is invisible as long as both halves stay identical. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: marquee linear infinite;
+  animation-duration: var(--marquee-duration, 24s);
+}
+.marquee-track:hover,
+.marquee-track:focus-within {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+
 .animate-fade-up {
   animation: fade-up 0.4s ease forwards;
 }
