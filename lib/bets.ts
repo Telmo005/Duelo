@@ -109,10 +109,13 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
   };
 }
 
-/** A live score is only treated as "live" if the poller refreshed it within
- *  this window — stops a stale "67'" lingering if the cron stops or the match
- *  ended but hasn't been settled yet. */
-const LIVE_FRESHNESS_MS = 20 * 60 * 1000;
+/** A live score is only treated as "live" if the poller (or an admin's
+ *  manual entry — see updateLiveScoreAction, the only source for matches
+ *  with no external_id to auto-poll) refreshed it within this window —
+ *  stops a stale "67'" lingering if updates stop or the match ended but
+ *  hasn't been settled yet. 90 minutes covers a full match without a
+ *  score update in between going stale mid-game. */
+const LIVE_FRESHNESS_MS = 90 * 60 * 1000;
 
 type LiveRow = {
   id: string;
@@ -224,13 +227,14 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
 
       const opponent = bet.opponentId ? profileById.get(bet.opponentId) : null;
 
-      // A matched bet on a match the poller has fresh live data for shows the
-      // live scoreboard; otherwise it's "locked" (both sides committed,
-      // nothing left to accept — not "open", which reads as "still
-      // available to join" and confused people into thinking there was
-      // something left to do with it).
+      // Liveness is a property of the MATCH, not of the bet's acceptance
+      // state — a duel shows the live scoreboard whenever the poller has
+      // fresh live data for its match, whether or not an opponent ever
+      // joined. Only when the match ISN'T live does bet.status decide
+      // "locked" (both sides committed, nothing left to accept — not
+      // "open", which reads as "still available to join") vs "waiting".
       const live = liveById.get(match.id);
-      const showLive = bet.status === "matched" && !!live;
+      const isLive = !!live;
 
       return {
         id: bet.id,
@@ -249,11 +253,79 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         prediction: predictionText,
         predictionCode: pred.code,
         stake: bet.stakeCents / 100,
-        status: bet.status === "matched" ? (showLive ? "live" : "locked") : "waiting",
+        status: isLive ? "live" : bet.status === "matched" ? "locked" : "waiting",
         createdAgo: new Date(bet.createdAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
-        score: showLive && live!.live_home != null && live!.live_away != null ? { home: live!.live_home, away: live!.live_away } : undefined,
-        minute: showLive && live!.live_minute != null ? `${live!.live_minute}'` : undefined,
+        score: isLive && live!.live_home != null && live!.live_away != null ? { home: live!.live_home, away: live!.live_away } : undefined,
+        minute: isLive && live!.live_minute != null ? `${live!.live_minute}'` : undefined,
       };
     })
     .filter((d): d is Duel => d !== null);
+}
+
+export type RecentWinner = {
+  /** Bet id — used as the React key only, nothing links to it yet. */
+  id: string;
+  name: string;
+  avatar: string;
+  payoutCents: number;
+  match: { home: string; away: string; resultHome: number; resultAway: number };
+  settledAt: Date;
+};
+
+/** Most recently settled bets, one entry per winner, for the "vencedores
+ *  recentes" strip at the top of the feed — social proof that payouts are
+ *  real and automatic. Never fabricated: returns an empty list (hidden by
+ *  the component) rather than mock winners when nothing has settled yet. */
+export async function getRecentWinners(limit = 12): Promise<RecentWinner[]> {
+  // Settled bets are rare relative to open ones at this stage, so a modest
+  // pool re-sorted by actual match settlement time (not bet creation time)
+  // is enough to find the true N most recent winners.
+  const pool = await db
+    .select()
+    .from(bets)
+    .where(eq(bets.status, "settled"))
+    .orderBy(desc(bets.createdAt))
+    .limit(Math.max(limit * 5, 30));
+
+  if (pool.length === 0) return [];
+
+  const matchIds = [...new Set(pool.map((r) => r.matchId))];
+  const matchRows = await db.select().from(matches).where(inArray(matches.id, matchIds));
+  const matchById = new Map(matchRows.map((m) => [m.id, m]));
+
+  const resolved = pool
+    .map((bet) => {
+      const match = matchById.get(bet.matchId);
+      if (!match || match.resultHome == null || match.resultAway == null || !match.settledAt) return null;
+      const actual = match.resultHome > match.resultAway ? "home" : match.resultHome < match.resultAway ? "away" : "draw";
+      const winnerId = bet.prediction === actual ? bet.creatorId : bet.opponentId;
+      if (!winnerId) return null;
+      const potCents = bet.stakeCents * 2;
+      const payoutCents = potCents - Math.round(potCents * 0.1);
+      return { betId: bet.id, winnerId, payoutCents, match, settledAt: match.settledAt };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.settledAt.getTime() - a.settledAt.getTime())
+    .slice(0, limit);
+
+  if (resolved.length === 0) return [];
+
+  const winnerIds = [...new Set(resolved.map((r) => r.winnerId))];
+  const profileRows = await db.select().from(profiles).where(inArray(profiles.id, winnerIds));
+  const profileById = new Map(profileRows.map((p) => [p.id, p]));
+
+  return resolved
+    .map((r): RecentWinner | null => {
+      const profile = profileById.get(r.winnerId);
+      if (!profile) return null;
+      return {
+        id: r.betId,
+        name: profile.displayName,
+        avatar: colorFor(profile.id),
+        payoutCents: r.payoutCents,
+        match: { home: r.match.home, away: r.match.away, resultHome: r.match.resultHome!, resultAway: r.match.resultAway! },
+        settledAt: r.settledAt,
+      };
+    })
+    .filter((r): r is RecentWinner => r !== null);
 }

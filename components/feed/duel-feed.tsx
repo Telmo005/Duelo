@@ -1,13 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { CheckCheck, LayoutGrid } from "lucide-react";
 import { DuelPost, type Duel } from "./duel-post";
 
+/** Icon-first, one-word filters — the earlier "Aguardam adversário" /
+ *  "Trancados" text pills plus a decorative dot-strip underneath were pure
+ *  clutter. Each icon echoes the same status glyph used on the row itself
+ *  (see StatusIndicator in duel-post.tsx), so the filter reads as "show me
+ *  rows with this dot" rather than introducing a second vocabulary. */
 const FILTERS = [
-  { key: "all", label: "Todos" },
-  { key: "waiting", label: "Aguardam adversário" },
-  { key: "locked", label: "Trancados" },
-  { key: "live", label: "Ao vivo" },
+  { key: "all", label: "Todos", icon: LayoutGrid },
+  { key: "waiting", label: "Abertos", dotClassName: "bg-primary" },
+  { key: "locked", label: "Trancados", icon: CheckCheck },
+  { key: "live", label: "Ao vivo", dotClassName: "bg-live animate-[pulse-dot_1.2s_ease-in-out_infinite]" },
 ] as const;
 
 type FilterKey = (typeof FILTERS)[number]["key"];
@@ -19,36 +25,32 @@ export function DuelFeed({ duels, live = false, currentUserId }: { duels: Duel[]
   const activeLabel = FILTERS.find((f) => f.key === filter)?.label ?? "";
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
         {FILTERS.map((f) => {
           const isActive = filter === f.key;
+          const Icon = "icon" in f ? f.icon : null;
           return (
             <button
               key={f.key}
               type="button"
               onClick={() => setFilter(f.key)}
               aria-pressed={isActive}
-              className={`press shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`press flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                 isActive
                   ? "bg-primary text-primary-foreground shadow-[0_0_16px_rgba(242,194,42,0.45)]"
                   : "border border-border bg-card text-muted-foreground hover:bg-accent"
               }`}
             >
+              {Icon ? (
+                <Icon className="size-3.5" aria-hidden />
+              ) : (
+                <span className={`size-2 rounded-full ${"dotClassName" in f ? f.dotClassName : ""}`} aria-hidden />
+              )}
               {f.label}
             </button>
           );
         })}
-      </div>
-      <div className="-mt-2 flex justify-center gap-1.5" aria-hidden>
-        {FILTERS.map((f) => (
-          <span
-            key={f.key}
-            className={`h-1.5 rounded-full transition-all ${
-              filter === f.key ? "w-4 bg-primary" : "w-1.5 bg-border"
-            }`}
-          />
-        ))}
       </div>
 
       {filtered.length === 0 ? (
@@ -56,7 +58,11 @@ export function DuelFeed({ duels, live = false, currentUserId }: { duels: Duel[]
           Nenhum duelo &ldquo;{activeLabel.toLowerCase()}&rdquo; neste momento.
         </div>
       ) : (
-        filtered.map((duel) => <DuelPost key={duel.id} duel={duel} live={live} currentUserId={currentUserId} />)
+        <div className="flex flex-col gap-1.5">
+          {filtered.map((duel) => (
+            <DuelPost key={duel.id} duel={duel} live={live} currentUserId={currentUserId} />
+          ))}
+        </div>
       )}
     </div>
   );

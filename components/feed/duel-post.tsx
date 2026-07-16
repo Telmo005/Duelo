@@ -1,12 +1,10 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { Handshake, X, Clock, TrendingUp } from "lucide-react";
+import { X, TrendingUp } from "lucide-react";
 import { CancelBetButton } from "./cancel-bet-button";
-import { DuelSecondaryActions } from "./duel-secondary-actions";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Spinner } from "@/components/ui/spinner";
-import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 
 export type Duel = {
   id: string;
@@ -38,133 +36,7 @@ export type Duel = {
   minute?: string;
 };
 
-function InitialAvatar({ name, color, size = 40 }: { name: string; color: string; size?: number }) {
-  return (
-    <div
-      className="flex shrink-0 items-center justify-center rounded-full font-bold text-white ring-2 ring-white/10"
-      style={{ width: size, height: size, background: color, fontSize: size * 0.4 }}
-    >
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
-}
-
-function StatusPill({ status }: { status: Duel["status"] }) {
-  const map: Record<Duel["status"], { label: string; className: string; dot?: boolean }> = {
-    live: { label: "AO VIVO", className: "bg-live-10 text-live", dot: true },
-    locked: { label: "Trancado", className: "bg-locked-10 text-locked" },
-    waiting: { label: "Aguarda adversário", className: "bg-primary-10 text-primary" },
-    closed: { label: "Fechado", className: "bg-muted text-muted-foreground" },
-  };
-  const s = map[status];
-  return (
-    <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${s.className}`}>
-      {s.dot && <span className="inline-block size-1.5 animate-[pulse-dot_1.5s_ease-in-out_infinite] rounded-full bg-live" />}
-      {s.label}
-    </span>
-  );
-}
-
-/** The match "stadium" — a top-down football pitch with mowing stripes and
- *  white markings, the two club crests floating on it, and a status overlay:
- *  kickoff time for upcoming games, or live score + minute once it starts. */
-function PitchEmbed({ duel }: { duel: Duel }) {
-  const isLive = duel.status === "live";
-  const hasScore = isLive && !!duel.score;
-
-  return (
-    <div className="relative mx-4 mb-3 h-[124px] overflow-hidden rounded-xl border border-success-20">
-      {/* Turf */}
-      <div
-        className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 130% 100% at 50% 25%, #22935C 0%, #0E3D28 82%)" }}
-        aria-hidden
-      />
-      {/* Mowing stripes */}
-      <div
-        className="absolute inset-0 opacity-40"
-        style={{ background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 34px, transparent 34px 68px)" }}
-        aria-hidden
-      />
-      {/* White markings */}
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 320 124" fill="none" preserveAspectRatio="none" aria-hidden>
-        <g stroke="rgba(255,255,255,0.30)" strokeWidth="1.3">
-          <rect x="6" y="8" width="308" height="108" rx="2" />
-          <line x1="160" y1="8" x2="160" y2="116" />
-          <circle cx="160" cy="62" r="24" />
-          <rect x="6" y="34" width="36" height="56" />
-          <rect x="278" y="34" width="36" height="56" />
-        </g>
-        <circle cx="160" cy="62" r="2" fill="rgba(255,255,255,0.45)" />
-      </svg>
-      {/* Vignette for depth */}
-      <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 44px rgba(0,0,0,0.55)" }} aria-hidden />
-
-      {/* Top overlay: league + clock / live minute */}
-      <div className="absolute inset-x-0 top-0 flex items-center justify-between px-3 pt-2.5">
-        <span className="rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur-sm">
-          {duel.match.league}
-        </span>
-        {isLive ? (
-          <span className="flex items-center gap-1.5 rounded-full bg-live px-2 py-0.5 text-[11px] font-bold text-white">
-            <span className="size-1.5 animate-[pulse-dot_1.5s_ease-in-out_infinite] rounded-full bg-white" />
-            {duel.minute ?? "AO VIVO"}
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur-sm">
-            <Clock className="size-3" aria-hidden /> {duel.match.time}
-          </span>
-        )}
-      </div>
-
-      {/* Crests + centre (score when live, prediction code otherwise) */}
-      <div className="absolute inset-x-0 top-7 bottom-9 flex items-center justify-between px-5">
-        <TeamBadge name={duel.match.home} logoUrl={duel.match.homeLogoUrl} size={46} />
-        {hasScore ? (
-          <p className="text-2xl font-extrabold tabular-nums text-white [text-shadow:0_2px_6px_rgba(0,0,0,0.6)]">
-            {duel.score!.home} <span className="text-white/40">-</span> {duel.score!.away}
-          </p>
-        ) : (
-          <span
-            className="rounded-md bg-primary px-2 py-1 text-xs font-extrabold text-primary-foreground"
-            style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.4)" }}
-          >
-            {duel.predictionCode}
-          </span>
-        )}
-        <TeamBadge name={duel.match.away} logoUrl={duel.match.awayLogoUrl} size={46} />
-      </div>
-
-      {/* Bottom matchup label */}
-      <div className="absolute inset-x-0 bottom-0 px-3 pb-2.5">
-        <p className="truncate text-[13px] font-bold text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.7)]">
-          {duel.match.home} <span className="font-normal text-white/60">vs</span> {duel.match.away}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/** The two sides of the duel, rendered as clearly STATIC information (flat,
- *  no border-box, no hover) so it can never be confused with the single action
- *  button below. Before, these were button-shaped boxes that did nothing —
- *  the #1 source of "which thing do I press?" confusion. */
-function DuelSides({ duel }: { duel: Duel }) {
-  return (
-    <div className="mx-4 mb-3 grid grid-cols-2 divide-x divide-border overflow-hidden rounded-lg bg-secondary/40">
-      <div className="min-w-0 px-3.5 py-2.5">
-        <p className="text-[11px] font-medium text-muted-foreground">Previsão</p>
-        <p className="truncate text-sm font-bold">{duel.prediction}</p>
-      </div>
-      <div className="min-w-0 px-3.5 py-2.5">
-        <p className="text-[11px] font-medium text-muted-foreground">{duel.b ? "Contra" : "Lado em aberto"}</p>
-        <p className="truncate text-sm font-bold">Resultado contrário</p>
-      </div>
-    </div>
-  );
-}
-
-/** Dims the card and shows a spinner while its navigation is in flight —
+/** Dims the row and shows a spinner while its navigation is in flight —
  *  useLinkStatus reads pending state from the nearest enclosing Link. Split
  *  into its own component because that hook only works for a Link's
  *  descendants, and CardBody itself needs to stay a plain function so the
@@ -173,29 +45,84 @@ function CardBodyPendingOverlay() {
   const { pending } = useLinkStatus();
   if (!pending) return null;
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/60 backdrop-blur-[1px]">
-      <Spinner className="size-6" />
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
+      <Spinner className="size-5" />
     </div>
   );
 }
 
-/** Wraps the non-interactive top section of the card in a link to the full
- *  duel receipt (/d/[reference]) — only for real bets (see comment at the
- *  call site). Falls back to a plain div for the logged-out marketing
+/** Wraps the row in a link to the full duel receipt (/d/[reference]) — only
+ *  for real bets. Falls back to a plain div for the logged-out marketing
  *  preview, which has nothing real to link to. `press` gives the same
- *  immediate tap feedback every other pressable element in the app has —
- *  without it, a tap that hasn't triggered the (network-dependent, and
- *  often too fast to notice) pending overlay yet looks like it did nothing. */
-function CardBody({ duel, children }: { duel: Duel; children: React.ReactNode }) {
-  if (!duel.reference) return <>{children}</>;
+ *  immediate tap feedback every other pressable element in the app has. */
+function CardBody({ duel, className, children }: { duel: Duel; className: string; children: React.ReactNode }) {
+  if (!duel.reference) return <div className={className}>{children}</div>;
   return (
-    <Link href={`/d/${duel.reference}`} className="press relative block">
+    <Link href={`/d/${duel.reference}`} className={`press relative ${className}`}>
       {children}
       <CardBodyPendingOverlay />
     </Link>
   );
 }
 
+/** The middle "when" slot — always occupies the same spot and width whether
+ *  the match hasn't kicked off yet (date/time) or is live right now (score +
+ *  minute). Both states lead with the same device — a small status dot —
+ *  so the eye reads one consistent column down the whole feed: red +
+ *  pulsing = live, amber = still open, grey = matched and waiting on
+ *  kickoff. */
+function TimeSlot({ duel }: { duel: Duel }) {
+  const isLive = duel.status === "live" && !!duel.score;
+
+  if (isLive) {
+    return (
+      <div className="flex w-14 shrink-0 flex-col items-center justify-center leading-none">
+        <span className="flex items-center gap-1 text-sm font-extrabold tabular-nums text-live">
+          <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
+          {duel.score!.home}-{duel.score!.away}
+        </span>
+        <span className="mt-0.5 text-[9px] font-semibold text-live/80">{duel.minute}</span>
+      </div>
+    );
+  }
+
+  const [datePart, timePart] = duel.match.time.split(", ");
+  const dotClassName = duel.status === "waiting" ? "bg-primary" : "bg-muted-foreground";
+  return (
+    <div className="flex w-14 shrink-0 flex-col items-center justify-center leading-none text-muted-foreground">
+      <span className="flex items-center gap-1 text-[9px] font-medium">
+        <span className={`size-1.5 shrink-0 rounded-full ${dotClassName}`} aria-hidden />
+        {datePart}
+      </span>
+      <span className="mt-0.5 text-[13px] font-bold tabular-nums text-foreground">{timePart ?? duel.match.time}</span>
+    </div>
+  );
+}
+
+/** The right-hand "why should I care" slot — always the stake next to what
+ *  it turns into, because seeing cash on the line (and growing) is what
+ *  actually pulls someone in. Shown the same way for every duel — open,
+ *  matched, or live — status is already carried by the dot in TimeSlot, so
+ *  this column stays pure money. */
+function MoneySlot({ duel }: { duel: Duel }) {
+  const payout = Math.round(duel.stake * 2 * 0.9);
+
+  return (
+    <div className="flex w-[76px] shrink-0 flex-col items-end leading-tight">
+      <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{duel.stake.toLocaleString("pt")} MT</span>
+      <span className="flex items-center gap-1 text-[15px] font-bold tabular-nums text-success">
+        <TrendingUp className="size-3.5 shrink-0" aria-hidden />+{payout.toLocaleString("pt") }
+      </span>
+    </div>
+  );
+}
+
+/** A single duel, rendered as a compact scoreboard row split into three
+ *  fixed zones — match (left, flexible), when (middle, fixed), money (right,
+ *  fixed) — so every row in the feed lines up the same way no matter its
+ *  state. No "DESAFIAR" button, no avatar: the entire row is the tap target,
+ *  and taps through to the full receipt page for waiting duels
+ *  (match/previsão/valor laid out before the confirm). */
 export function DuelPost({
   duel,
   live = false,
@@ -209,127 +136,47 @@ export function DuelPost({
   const isWaiting = duel.status === "waiting";
   const isOwnBet = live && duel.creatorId === currentUserId;
 
-  // What accepting actually pays out — the pot doubled minus the 10%
-  // platform commission (same formula create-bet-form.tsx uses to show the
-  // creator this before they even post). This is the number that should
-  // sell the tap: "MT 100 in, MT 180 back" reads as an opportunity a lot
-  // more clearly than a flat "pote em jogo" total ever did.
-  const potentialPayout = Math.round(duel.stake * 2 * 0.9);
-  const potentialProfit = potentialPayout - duel.stake;
+  const info = (
+    <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 items-center gap-1 text-[13.5px] font-bold leading-tight">
+        <span className="truncate">{duel.match.home}</span>
+        <TeamBadge name={duel.match.home} logoUrl={duel.match.homeLogoUrl} size={16} />
+        <span className="shrink-0 font-normal text-muted-foreground">vs</span>
+        <TeamBadge name={duel.match.away} logoUrl={duel.match.awayLogoUrl} size={16} />
+        <span className="truncate">{duel.match.away}</span>
+      </div>
+      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+        {duel.a.name} · {duel.prediction}
+      </p>
+    </div>
+  );
 
   return (
     <article
-      className={`overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-card)] transition-shadow ${
-        isWaiting
-          ? "border-primary-30 shadow-[0_0_24px_rgba(242,194,42,0.12)] hover:shadow-[0_0_32px_rgba(242,194,42,0.22)]"
-          : "border-border"
+      className={`flex items-center gap-2 overflow-hidden rounded-lg border bg-card px-2.5 py-2 shadow-[var(--shadow-card)] transition-colors ${
+        isWaiting ? "border-primary-30" : "border-border"
       }`}
     >
-      {/* Everything above the action bar links through to the full duel
-       *  detail/receipt page — only when it's a real bet (duel.reference is
-       *  set), so the logged-out marketing preview (no real row behind it)
-       *  never links to a 404. The action bar stays a separate sibling,
-       *  never nested inside this Link — an <a> containing a <button>/
-       *  another <a> is invalid HTML and breaks click handling. */}
-      <CardBody duel={duel}>
-        {/* Post header — who created this bet */}
-        <div className="flex items-start justify-between gap-3 p-4 pb-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <InitialAvatar name={duel.a.name} color={duel.a.avatar} />
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-semibold leading-tight">
-                {duel.a.name}
-                <span className="font-normal text-muted-foreground"> apostou que </span>
-                <span className="font-semibold">{duel.prediction}</span>
-              </p>
-              <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                {duel.a.city} · {duel.createdAgo} · {duel.match.league}
-              </p>
-            </div>
-          </div>
-          <StatusPill status={duel.status} />
-        </div>
-
-        {/* Match embed — the football pitch with crests + clock/score */}
-        <PitchEmbed duel={duel} />
-
-        {/* Opponent line — who's on the other side of this duel */}
-        {duel.b && (
-          <div className="flex items-center gap-2 px-4 pb-2 text-sm">
-            <span className="text-muted-foreground">contra</span>
-            <InitialAvatar name={duel.b.name} color={duel.b.avatar} size={22} />
-            <span className="font-semibold">{duel.b.name}</span>
-          </div>
-        )}
-
-        {/* Sides (static info) */}
-        <DuelSides duel={duel} />
-
-        {/* Stake vs payout — the hook. What you put in next to what you get
-         *  back if you accept and win, side by side so the opportunity reads
-         *  in one glance instead of needing to do the maths. */}
-        <div className="mx-4 mb-3.5 grid grid-cols-2 gap-2.5">
-          <div className="rounded-xl bg-secondary/50 px-3.5 py-2.5">
-            <p className="text-[11px] font-medium text-muted-foreground">Aposta</p>
-            <p className="text-lg font-extrabold tabular-nums">MT {duel.stake.toLocaleString("pt")}</p>
-          </div>
-          <div className="rounded-xl border border-success-25 bg-success-10 px-3.5 py-2.5">
-            <p className="flex items-center gap-1 text-[11px] font-bold text-success">
-              <TrendingUp className="size-3" aria-hidden /> Podes ganhar
-            </p>
-            <p className="text-lg font-extrabold tabular-nums text-success">MT {potentialPayout.toLocaleString("pt")}</p>
-            <p className="text-[10px] font-semibold text-success">+MT {potentialProfit.toLocaleString("pt")} de lucro</p>
-          </div>
-        </div>
-      </CardBody>
-
-      {/* Action bar — the ONLY pressable element outside CardBody's link */}
-      <div className="border-t border-border px-2 py-1.5">
-        {isWaiting && isOwnBet ? (
+      {isWaiting && isOwnBet ? (
+        <>
+          <CardBody duel={duel} className="flex min-w-0 flex-1 items-center gap-2">
+            {info}
+            <TimeSlot duel={duel} />
+          </CardBody>
           <CancelBetButton
             betId={duel.id}
-            icon={<X className="size-4" aria-hidden />}
-            label="Cancelar a minha aposta"
-            className="press flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-destructive transition-colors hover:bg-destructive-10 disabled:opacity-60"
+            icon={<X className="size-3.5" aria-hidden />}
+            label="Cancelar"
+            className="press flex shrink-0 items-center gap-1 rounded-lg border border-destructive-30 px-2.5 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive-10 disabled:opacity-60"
           />
-        ) : isWaiting && live ? (
-          // Goes to the full receipt page instead of accepting straight from
-          // the feed — that page lays out match, previsão, valor and o que
-          // recebes lado a lado antes do botão de confirmar, o que uma
-          // aceitação de um toque só no cartão nunca deixava claro.
-          <Link
-            href={`/d/${duel.reference ?? duel.id}`}
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90"
-          >
-            <Handshake className="size-[18px]" aria-hidden />
-            Ver e aceitar — MT {duel.stake.toLocaleString("pt")}
-            <LinkPendingSpinner />
-          </Link>
-        ) : isWaiting ? (
-          // Same "review before you commit" idea, but for a logged-out
-          // visitor: shows the full match/stake/payout breakdown first,
-          // and the receipt page itself prompts "Criar conta para aceitar"
-          // once they're actually ready — more convincing than a bare
-          // /register redirect with zero context.
-          <Link
-            href={`/d/${duel.reference ?? duel.id}`}
-            className="press flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90"
-          >
-            <Handshake className="size-[18px]" aria-hidden />
-            Ver e aceitar — MT {duel.stake.toLocaleString("pt")}
-            <LinkPendingSpinner />
-          </Link>
-        ) : (
-          <DuelSecondaryActions duelId={duel.id} reference={duel.reference} creatorName={duel.a.name} />
-        )}
-        {/* Still open? Let anyone looking at it forward the challenge too —
-         *  not just the creator. Skipped for the logged-out marketing
-         *  preview (no real reference to share) and folded into the single
-         *  DuelSecondaryActions above once the duel is no longer waiting. */}
-        {isWaiting && duel.reference && (
-          <DuelSecondaryActions duelId={duel.id} reference={duel.reference} creatorName={duel.a.name} />
-        )}
-      </div>
+        </>
+      ) : (
+        <CardBody duel={duel} className="flex min-w-0 flex-1 items-center gap-2">
+          {info}
+          <TimeSlot duel={duel} />
+          <MoneySlot duel={duel} />
+        </CardBody>
+      )}
     </article>
   );
 }
