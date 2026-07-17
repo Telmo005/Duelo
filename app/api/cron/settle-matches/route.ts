@@ -5,6 +5,7 @@ import { and, eq, isNotNull, lt } from "drizzle-orm";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fetchFixtureResult } from "@/lib/sportsData";
 import { broadcastFeedEvent } from "@/lib/realtime";
+import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 const GRACE_WINDOW_MS = 72 * 60 * 60 * 1000; // SETL-04: void if no result 72h after kickoff
 
@@ -16,8 +17,7 @@ const GRACE_WINDOW_MS = 72 * 60 * 60 * 1000; // SETL-04: void if no result 72h a
  * way as /api/cron/refund-expired-bets.
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

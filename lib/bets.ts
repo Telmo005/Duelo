@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { db } from "@/db";
 import { matches, bets, profiles, type MatchRow } from "@/db/schema";
 import { eq, ne, desc, inArray, gt, and, sql } from "drizzle-orm";
@@ -190,13 +191,28 @@ async function fetchLiveByMatch(matchIds: string[]): Promise<Map<string, LiveRow
  *  just as importantly, never selects one an admin already marked
  *  postponed/abandoned (its kickoff time can still be in the future even
  *  though there's nothing left to bet on). */
-export async function getUpcomingMatches(): Promise<MatchRow[]> {
-  return db
-    .select()
-    .from(matches)
-    .where(and(gt(matches.kickoffAt, new Date()), eq(matches.matchStatus, "scheduled")))
-    .orderBy(matches.kickoffAt);
-}
+/** Cached for 60s: this list is the same for every visitor and previously
+ *  re-ran from scratch on every /bets/new request. A newly added/edited
+ *  match can take up to 60s to show up here — acceptable (nobody's
+ *  expecting a just-added fixture to appear instantly) — and a match whose
+ *  kickoff just passed can stay listed for up to 60s too, which bet_create
+ *  still rejects server-side regardless, so nothing exploitable slips
+ *  through the staleness window. Next's newer revalidateTag() needs a cache
+ *  "profile" argument this codebase doesn't otherwise use, so this relies
+ *  on the plain time-based expiry rather than tag-based invalidation on
+ *  write — simpler, and the staleness window is short enough not to
+ *  matter here. */
+export const getUpcomingMatches = unstable_cache(
+  async (): Promise<MatchRow[]> => {
+    return db
+      .select()
+      .from(matches)
+      .where(and(gt(matches.kickoffAt, new Date()), eq(matches.matchStatus, "scheduled")))
+      .orderBy(matches.kickoffAt);
+  },
+  ["upcoming-matches"],
+  { tags: ["upcoming-matches"], revalidate: 60 }
+);
 
 /** Matches still awaiting a result — the manual settlement tool's worklist. */
 export async function getUnsettledMatches(): Promise<MatchRow[]> {
@@ -311,8 +327,17 @@ export type RecentWinner = {
 /** Most recently settled bets, one entry per winner, for the "vencedores
  *  recentes" strip at the top of the feed — social proof that payouts are
  *  real and automatic. Never fabricated: returns an empty list (hidden by
- *  the component) rather than mock winners when nothing has settled yet. */
-export async function getRecentWinners(limit = 12): Promise<RecentWinner[]> {
+ *  the component) rather than mock winners when nothing has settled yet.
+ *
+ *  Cached for 30s: every visitor on the landing page was re-running this (a
+ *  bets scan + 2 follow-up queries) on every request for a list that's the
+ *  same for everyone and only changes when a match gets settled. A winner
+ *  showing up to 30s late in this ticker is a non-issue (unlike stale money
+ *  data, which this never is — the wallet/receipt pages read straight from
+ *  the DB, uncached). Time-based rather than tag-based invalidation for the
+ *  same reason as getUpcomingMatches above. */
+export const getRecentWinners = unstable_cache(
+  async (limit = 12): Promise<RecentWinner[]> => {
   // Settled bets are rare relative to open ones at this stage, so a modest
   // pool re-sorted by actual match settlement time (not bet creation time)
   // is enough to find the true N most recent winners.
@@ -364,4 +389,7 @@ export async function getRecentWinners(limit = 12): Promise<RecentWinner[]> {
       };
     })
     .filter((r): r is RecentWinner => r !== null);
-}
+  },
+  ["recent-winners"],
+  { tags: ["recent-winners"], revalidate: 30 }
+);

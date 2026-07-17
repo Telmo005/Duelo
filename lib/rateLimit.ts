@@ -48,5 +48,35 @@ export async function checkLoginRateLimit(phone: string, ip: string | null): Pro
 /** Records the outcome of a login attempt — call after every signIn call,
  *  success or failure, so the window above reflects reality. */
 export async function recordLoginAttempt(phone: string, ip: string | null, success: boolean): Promise<void> {
-  await db.insert(authAttempts).values({ phone, ip, success });
+  await db.insert(authAttempts).values({ phone, ip, success, kind: "login" });
+}
+
+/** Registration attempts per IP within the window before lockout — looser
+ *  than login's per-phone ceiling since every registration is inherently a
+ *  new phone number (nothing to key a per-phone count off), but still
+ *  catches a script mass-creating accounts from one machine/network. */
+const MAX_REGISTRATIONS_PER_IP = 5;
+
+export async function checkRegisterRateLimit(ip: string | null): Promise<RateLimitResult> {
+  if (!ip) return { allowed: true };
+
+  const since = new Date(Date.now() - WINDOW_MS);
+  const [byIp] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(authAttempts)
+    .where(and(eq(authAttempts.ip, ip), eq(authAttempts.kind, "register"), gt(authAttempts.createdAt, since)));
+
+  if (Number(byIp?.count ?? 0) >= MAX_REGISTRATIONS_PER_IP) {
+    return { allowed: false, message: "Demasiadas contas criadas a partir desta rede. Tenta novamente mais tarde." };
+  }
+
+  return { allowed: true };
+}
+
+/** Records a registration attempt — call after every registerUser call,
+ *  success or failure (an account that failed to fully create still counts
+ *  towards the ceiling, since the expensive part — Supabase Auth user
+ *  creation — already happened). */
+export async function recordRegisterAttempt(phone: string, ip: string | null, success: boolean): Promise<void> {
+  await db.insert(authAttempts).values({ phone, ip, success, kind: "register" });
 }

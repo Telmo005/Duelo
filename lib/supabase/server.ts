@@ -44,9 +44,14 @@ export async function createClient() {
  * NEVER expose this to the client; use only in server actions and route handlers.
  */
 export function createServiceClient() {
-  return createSupabaseJsClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Fail loudly here rather than handing supabase-js an "undefined" key —
+  // that would just surface later as a confusing auth/network error from
+  // deep inside whichever RPC call happened to run first.
+  if (!url || !serviceRoleKey) {
+    throw new Error("createServiceClient: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must both be set");
+  }
+
+  return createSupabaseJsClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 }

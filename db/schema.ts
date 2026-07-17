@@ -303,6 +303,10 @@ export const authAttempts = pgTable("auth_attempts", {
   phone: text("phone").notNull(),
   ip: text("ip"),
   success: boolean("success").notNull(),
+  /** 'login' | 'register' — kept in the same table (both are phone/IP-keyed
+   *  auth events) but counted separately, so a burst of one never locks out
+   *  the other. */
+  kind: text("kind").notNull().default("login"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

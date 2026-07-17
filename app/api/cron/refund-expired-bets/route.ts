@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { broadcastFeedEvent } from "@/lib/realtime";
+import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 /**
  * Refunds any 'waiting' bet whose match has already kicked off with no
@@ -13,8 +14,7 @@ import { broadcastFeedEvent } from "@/lib/realtime";
  * (e.g. `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/refund-expired-bets`).
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
