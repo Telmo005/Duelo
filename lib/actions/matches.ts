@@ -7,7 +7,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { db } from "@/db";
 import { matches, bets } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { fetchTeamLogo, searchTeams, type TeamSearchResult } from "@/lib/sportsData";
+import { fetchTeamLogo, searchTeams, searchFixturesByDate, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 
 type ActionResult = { error?: string };
@@ -34,6 +34,98 @@ const addMatchSchema = z.object({
 export async function searchTeamsAction(query: string): Promise<TeamSearchResult[]> {
   await requireAdmin();
   return searchTeams(query);
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Backs the "Procurar jogo real" picker in the add-match form — see
+ *  searchFixturesByDate for why this only works ~3 days out on the Free
+ *  plan. Admin-gated for the same reason searchTeamsAction is: keeps quota
+ *  usage (100 req/day) restricted to trusted callers. */
+export async function searchFixturesAction(date: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
+  await requireAdmin();
+  if (!DATE_RE.test(date)) return { fixtures: [], error: "Data inválida" };
+  return searchFixturesByDate(date);
+}
+
+const bulkFixtureSchema = z.object({
+  externalId: z.string().trim().min(1),
+  home: z.string().trim().min(1).max(100),
+  away: z.string().trim().min(1).max(100),
+  league: z.string().trim().min(1).max(100),
+  kickoffAtIso: z.coerce.date(),
+  homeLogoUrl: z.string().url().nullable().optional(),
+  awayLogoUrl: z.string().url().nullable().optional(),
+  // Derived from the API round name (searchFixturesByDate) — true only for
+  // rounds that always produce a decisive result (a final), never guessed
+  // for two-legged rounds. Defaults to false so an older client payload
+  // missing the field never silently blocks a legitimate draw.
+  isElimination: z.boolean().optional().default(false),
+});
+
+const MAX_BULK_FIXTURES = 100;
+
+/**
+ * Bulk version of addMatchAction, backing the multi-select "Procurar jogo
+ * real" picker (components/admin/fixture-search-picker.tsx) — an admin
+ * ticks N fixtures from a day's list and adds them all in one request
+ * instead of one form submission per match. Every row keeps its
+ * `externalId`, which is the whole point: matches added this way (unlike
+ * hand-typed ones) become eligible for the existing automatic live-score
+ * and settlement crons (see lib/sportsData.ts fetchFixtureLive/
+ * fetchFixtureResult, both keyed by externalId). Idempotent via
+ * onConflictDoNothing on externalId, so re-adding an already-picked fixture
+ * (e.g. the admin re-runs a search overlapping a previous one) is a no-op,
+ * not a duplicate or a clobber of settlement state already recorded against
+ * it.
+ */
+export async function addFixturesBulkAction(input: unknown[]): Promise<{ added: number; skipped: number; error?: string }> {
+  const admin = await requireAdmin();
+
+  if (!Array.isArray(input) || input.length === 0) {
+    return { added: 0, skipped: 0, error: "Nenhum jogo selecionado" };
+  }
+  if (input.length > MAX_BULK_FIXTURES) {
+    return { added: 0, skipped: 0, error: `Seleciona no máximo ${MAX_BULK_FIXTURES} jogos de cada vez` };
+  }
+
+  const valid = input
+    .map((item) => bulkFixtureSchema.safeParse(item))
+    .filter((r) => r.success && r.data.kickoffAtIso.getTime() > Date.now())
+    .map((r) => (r as { success: true; data: z.infer<typeof bulkFixtureSchema> }).data);
+
+  if (valid.length === 0) {
+    return { added: 0, skipped: input.length, error: "Nenhum jogo válido para adicionar" };
+  }
+
+  const rows = valid.map((fx) => ({
+    externalId: fx.externalId,
+    home: fx.home,
+    away: fx.away,
+    league: fx.league,
+    kickoffAt: fx.kickoffAtIso,
+    homeLogoUrl: fx.homeLogoUrl || null,
+    awayLogoUrl: fx.awayLogoUrl || null,
+    isElimination: fx.isElimination,
+  }));
+
+  const inserted = await db.insert(matches).values(rows).onConflictDoNothing({ target: matches.externalId }).returning({ id: matches.id });
+
+  const skipped = input.length - inserted.length;
+
+  if (inserted.length > 0) {
+    await logAdminAction(
+      admin.id,
+      "add_match",
+      null,
+      `${inserted.length} jogo(s) importados em lote via seleção manual${skipped > 0 ? ` (${skipped} ignorado(s) — já existentes ou inválidos)` : ""}`
+    );
+    revalidatePath("/admin/matches");
+    revalidatePath("/bets/new");
+    revalidatePath("/");
+  }
+
+  return { added: inserted.length, skipped };
 }
 
 /**

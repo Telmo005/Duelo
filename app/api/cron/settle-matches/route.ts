@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { matches } from "@/db/schema";
-import { and, eq, isNotNull, lt } from "drizzle-orm";
+import { matches, bets } from "@/db/schema";
+import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fetchFixtureResult } from "@/lib/sportsData";
 import { broadcastFeedEvent } from "@/lib/realtime";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 const GRACE_WINDOW_MS = 72 * 60 * 60 * 1000; // SETL-04: void if no result 72h after kickoff
+
+// A football match is over well before this, but 90 min from kickoff is the
+// same "has this match's live window ended" line the feed itself uses (see
+// LIVE_FRESHNESS_MS in lib/bets.ts) — reusing it here means a manually-typed
+// fixture (no external_id) only becomes a close candidate once nobody would
+// reasonably expect it to still be in progress.
+const NO_BETS_GRACE_MS = 90 * 60 * 1000;
 
 /**
  * Fetches the official result for every scheduled, API-linked match past
@@ -65,6 +72,35 @@ export async function GET(request: Request) {
       }
     } catch (err) {
       results.push({ matchId: match.id, action: "error", detail: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  // Manually-typed fixtures (no external_id — the SETL-01 fallback for
+  // leagues with no automated feed, e.g. Moçambola) never go through the
+  // loop above, so they'd otherwise sit in the admin's "Por liquidar"
+  // worklist forever even when literally nobody bet on them. Nothing to
+  // settle in that case — close it automatically. One that DID get a bet
+  // still needs a human to type in the real result, exactly as before.
+  const emptyCandidates = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(
+      and(
+        eq(matches.matchStatus, "scheduled"),
+        isNull(matches.externalId),
+        lt(matches.kickoffAt, new Date(Date.now() - NO_BETS_GRACE_MS))
+      )
+    );
+
+  for (const match of emptyCandidates) {
+    const [existingBet] = await db.select({ id: bets.id }).from(bets).where(eq(bets.matchId, match.id)).limit(1);
+    if (existingBet) continue;
+
+    const { data: closed, error } = await service.rpc("match_close_if_empty", { p_match_id: match.id });
+    if (error) {
+      results.push({ matchId: match.id, action: "error", detail: error.message });
+    } else if (closed) {
+      results.push({ matchId: match.id, action: "closed_no_bets" });
     }
   }
 

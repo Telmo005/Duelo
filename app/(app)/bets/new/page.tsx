@@ -13,7 +13,8 @@ import { CalendarX } from "lucide-react";
 
 export const metadata: Metadata = { title: "Nova aposta | Duelo" };
 
-export default async function NewBetPage() {
+export default async function NewBetPage({ searchParams }: { searchParams: Promise<{ matchId?: string }> }) {
+  const { matchId } = await searchParams;
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) redirect("/login");
@@ -31,6 +32,7 @@ export default async function NewBetPage() {
     away: m.away,
     league: m.league,
     kickoffLabel: new Date(m.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+    kickoffAtIso: new Date(m.kickoffAt).toISOString(),
     homeLogoUrl: m.homeLogoUrl,
     awayLogoUrl: m.awayLogoUrl,
     isElimination: m.isElimination,
@@ -57,7 +59,7 @@ export default async function NewBetPage() {
             </p>
           </div>
         ) : (
-          <CreateBetForm matches={matchOptions} />
+          <CreateBetForm matches={matchOptions} initialMatchId={matchId} />
         )}
       </div>
     </AppShell>

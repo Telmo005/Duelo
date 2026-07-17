@@ -86,16 +86,29 @@ function CardBody({ duel, className, children }: { duel: Duel; className: string
  *  pulsing = live, amber = still open, grey = matched and waiting on
  *  kickoff. */
 function TimeSlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
-  const isLive = duel.status === "live" && !!duel.score;
+  const isLive = duel.status === "live";
 
   if (isLive) {
+    // Live kicks in from the match's scheduled kickoff time alone (see
+    // isLive in lib/bets.ts) — actual goals/minute only show up once the
+    // poller (or an admin) has entered them, so "no score yet" still reads
+    // as live, just without digits, instead of falling back to a stale
+    // pre-kickoff date/time.
+    const hasScore = !!duel.score;
     return (
       <div className="flex w-14 shrink-0 flex-col items-center justify-center leading-none">
-        <span className="flex items-center gap-1 text-sm font-extrabold tabular-nums text-live">
-          <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
-          {duel.score!.home}-{duel.score!.away}
-        </span>
-        <span className="mt-0.5 text-[9px] font-semibold text-live/80">{duel.minute}</span>
+        {hasScore ? (
+          <span className="flex items-center gap-1 text-sm font-extrabold tabular-nums text-live">
+            <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
+            {duel.score!.home}-{duel.score!.away}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-[10px] font-extrabold text-live">
+            <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
+            AO VIVO
+          </span>
+        )}
+        {duel.minute && <span className="mt-0.5 text-[9px] font-semibold text-live/80">{duel.minute}</span>}
       </div>
     );
   }
