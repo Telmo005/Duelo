@@ -17,11 +17,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // "venha aceitar o meu desafio", so the link preview itself should read
   // that way instead of a neutral match-result statement. Once matched/
   // settled/etc. there's nothing left to accept, so it reverts to plain
-  // match info.
+  // match info. Leads with the brand name and drops the lone "⚔️ desafiou-
+  // te!" urgency framing — personalized-but-calm reads as a real app on
+  // WhatsApp; personalized-and-urgent reads as a scam link.
   const title =
     bet.status === "waiting"
-      ? `${bet.creator.name} desafiou-te para um duelo! ⚔️`
-      : `${bet.match.home} vs ${bet.match.away} — ${bet.predictionLabel}`;
+      ? `Duelo — ${bet.creator.name} desafia-te: ${bet.predictionLabel}`
+      : `Duelo — ${bet.match.home} vs ${bet.match.away} — ${bet.predictionLabel}`;
   const description =
     bet.status === "waiting"
       ? `Aposta em ${bet.predictionLabel} · ${formatCentsAsMt(bet.stakeCents)} MT em jogo · ${bet.match.league}. Aceita o desafio na Duelo.`
@@ -31,10 +33,23 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // by the sibling opengraph-image.tsx file convention — no need to point at
   // it manually here (and doing so risks a stale URL missing Next's cache-
   // busting hash). Only title/description/card type belong in this object.
+  //
+  // A page-level `openGraph`/`twitter` object here REPLACES the root
+  // layout's (Next doesn't deep-merge nested metadata objects), so
+  // siteName/locale/url have to be repeated — otherwise WhatsApp's preview
+  // for this specific page loses the "Duelo" branding the root layout
+  // already sets for every other page.
   return {
     title,
     description,
-    openGraph: { title, description, type: "website" },
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      siteName: "Duelo",
+      locale: "pt_MZ",
+      url: `/d/${bet.reference}`,
+    },
     twitter: { card: "summary_large_image", title, description },
   };
 }

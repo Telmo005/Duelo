@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { bets, matches, profiles, type Bet, type MatchRow } from "@/db/schema";
-import { eq, or, desc } from "drizzle-orm";
+import { eq, or, and, desc, lt, inArray } from "drizzle-orm";
 
 /** 1X2 outcome implied by a final score — mirrors bet_settle_match's SQL rule exactly. */
 function actualResult(match: MatchRow): "home" | "draw" | "away" | null {
@@ -98,26 +98,64 @@ export type UserBetRow = Bet & {
   isCreator: boolean;
 };
 
+export type UserBetsTab = "all" | "waiting" | "matched" | "done";
+export type UserBetsPage = { items: UserBetRow[]; nextCursor: string | null };
+
+const DONE_STATUSES = ["settled", "cancelled", "refunded"] as const;
+
+function tabStatusFilter(tab: UserBetsTab) {
+  if (tab === "waiting") return eq(bets.status, "waiting");
+  if (tab === "matched") return eq(bets.status, "matched");
+  if (tab === "done") return inArray(bets.status, DONE_STATUSES);
+  return undefined;
+}
+
+/** Same (createdAt, id) composite cursor scheme as getWalletLedger. */
+function encodeBetCursor(bet: Bet): string {
+  return Buffer.from(`${bet.createdAt.toISOString()}|${bet.id}`).toString("base64url");
+}
+function decodeBetCursor(cursor: string): { createdAt: Date; id: string } {
+  const [iso, id] = Buffer.from(cursor, "base64url").toString("utf8").split("|");
+  return { createdAt: new Date(iso), id };
+}
+
 /** All bets `userId` is party to (creator or opponent), newest first —
- *  the data source for the "Minhas Apostas" hub. */
-export async function getUserBets(userId: string): Promise<UserBetRow[]> {
+ *  the data source for the "Minhas Apostas" hub. Cursor-paginated per tab
+ *  (Todas/Aguardam/Em curso/Concluídas) — each tab is its own filtered,
+ *  paginated query server-side, not a client-side `.filter()` over one big
+ *  preloaded array, so switching tabs never silently misses older bets
+ *  that fell outside whatever was already fetched. */
+export async function getUserBets(userId: string, opts: { tab?: UserBetsTab; cursor?: string; limit?: number } = {}): Promise<UserBetsPage> {
+  const { tab = "all", cursor, limit = 20 } = opts;
+
+  const conditions = [or(eq(bets.creatorId, userId), eq(bets.opponentId, userId))!];
+  const statusFilter = tabStatusFilter(tab);
+  if (statusFilter) conditions.push(statusFilter);
+  if (cursor) {
+    const { createdAt, id } = decodeBetCursor(cursor);
+    conditions.push(or(lt(bets.createdAt, createdAt), and(eq(bets.createdAt, createdAt), lt(bets.id, id))!)!);
+  }
+
   const rows = await db
     .select({ bet: bets, match: matches })
     .from(bets)
     .innerJoin(matches, eq(matches.id, bets.matchId))
-    .where(or(eq(bets.creatorId, userId), eq(bets.opponentId, userId)))
-    .orderBy(desc(bets.createdAt))
-    .limit(USER_BETS_LIMIT);
+    .where(and(...conditions))
+    .orderBy(desc(bets.createdAt), desc(bets.id))
+    .limit(limit + 1);
 
-  if (rows.length === 0) return [];
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
-  const opponentIds = [...new Set(rows.map((r) => (r.bet.creatorId === userId ? r.bet.opponentId : r.bet.creatorId)).filter((x): x is string => !!x))];
+  if (pageRows.length === 0) return { items: [], nextCursor: null };
+
+  const opponentIds = [...new Set(pageRows.map((r) => (r.bet.creatorId === userId ? r.bet.opponentId : r.bet.creatorId)).filter((x): x is string => !!x))];
   const opponentProfiles = opponentIds.length > 0
     ? await db.select().from(profiles).where(or(...opponentIds.map((id) => eq(profiles.id, id))))
     : [];
   const nameById = new Map(opponentProfiles.map((p) => [p.id, p.displayName]));
 
-  return rows.map(({ bet, match }) => {
+  const items = pageRows.map(({ bet, match }) => {
     const opponentId = bet.creatorId === userId ? bet.opponentId : bet.creatorId;
     return {
       ...bet,
@@ -130,4 +168,6 @@ export async function getUserBets(userId: string): Promise<UserBetRow[]> {
       isCreator: bet.creatorId === userId,
     };
   });
+
+  return { items, nextCursor: hasMore ? encodeBetCursor(pageRows[pageRows.length - 1].bet) : null };
 }

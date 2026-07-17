@@ -31,7 +31,10 @@ export default async function ProfilePage() {
   ]);
 
   const memberSince = new Date(profile.createdAt).toLocaleDateString("pt", { month: "long", year: "numeric" });
-  const isPositive = stats.netCents >= 0;
+  // Never show a negative "how much have you won" number — a net loss
+  // reads as 0, not red, since the point of this stat is bragging rights,
+  // not a full accounting ledger (that's what the wallet/carteira is for).
+  const netWinningsCents = Math.max(0, stats.netCents);
 
   return (
     <AppShell active="profile" displayName={profile.displayName} availableCents={availableCents} currentUserId={user.id}>
@@ -49,29 +52,15 @@ export default async function ProfilePage() {
       {/* Stats grid */}
       <section className="mb-7">
         <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Estatísticas</h2>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[
-            { label: "Apostas totais", value: stats.totalBets },
-            { label: "Vitórias", value: stats.wins },
-            { label: "Derrotas", value: stats.losses },
-            { label: "Taxa de vitória", value: `${stats.winRatePct}%` },
-          ].map((s) => (
-            <div key={s.label} className="rounded-2xl border border-border bg-card p-4">
-              <p className="mb-1 text-xs text-muted-foreground">{s.label}</p>
-              <p className="text-xl font-extrabold tabular-nums">{s.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="mb-1 text-xs text-muted-foreground">Total apostado</p>
-            <p className="text-lg font-extrabold tabular-nums">{formatCentsAsMt(stats.totalWageredCents)} <span className="text-sm font-semibold text-muted-foreground">MT</span></p>
+            <p className="mb-1 text-xs text-muted-foreground">Taxa de vitória</p>
+            <p className="text-xl font-extrabold tabular-nums">{stats.winRatePct}%</p>
           </div>
           <div className="rounded-2xl border border-border bg-card p-4">
             <p className="mb-1 text-xs text-muted-foreground">Saldo líquido</p>
-            <p className={`text-lg font-extrabold tabular-nums ${isPositive ? "text-success" : "text-destructive"}`}>
-              {isPositive ? "+" : ""}{formatCentsAsMt(stats.netCents)} <span className="text-sm font-semibold text-muted-foreground">MT</span>
+            <p className="text-xl font-extrabold tabular-nums text-success">
+              {formatCentsAsMt(netWinningsCents)} <span className="text-sm font-semibold text-muted-foreground">MT</span>
             </p>
           </div>
         </div>

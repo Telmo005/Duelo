@@ -282,6 +282,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
           away: match.away,
           league: match.league,
           time: new Date(match.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+          kickoffAtIso: new Date(match.kickoffAt).toISOString(),
           homeLogoUrl: match.homeLogoUrl,
           awayLogoUrl: match.awayLogoUrl,
         },

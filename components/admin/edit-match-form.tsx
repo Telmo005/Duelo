@@ -8,14 +8,8 @@ import { TeamSearchPicker } from "@/components/admin/team-search-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ActionButton } from "@/components/ui/action-button";
+import { KickoffField, toDatetimeLocal } from "@/components/admin/kickoff-field";
 import type { MatchRow } from "@/db/schema";
-
-/** "YYYY-MM-DDTHH:mm" in LOCAL time — what <input type="datetime-local">
- *  needs, as opposed to the UTC-based toISOString(). */
-function toDatetimeLocal(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 /** Inline "corrigir jogo" form — swapped in for SettleMatchRow's normal
  *  display+actions row while editing. Covers the "enganei-me na hora" case
@@ -76,17 +70,7 @@ export function EditMatchForm({ match, onDone }: { match: MatchRow; onDone: () =
         <Label htmlFor={`league-${match.id}`}>Liga / competição</Label>
         <Input id={`league-${match.id}`} name="league" required disabled={isPending} maxLength={100} defaultValue={match.league} />
       </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`kickoff-${match.id}`}>Data e hora</Label>
-        <Input
-          id={`kickoff-${match.id}`}
-          name="kickoffAt"
-          type="datetime-local"
-          required
-          disabled={isPending}
-          defaultValue={toDatetimeLocal(new Date(match.kickoffAt))}
-        />
-      </div>
+      <KickoffField id={`kickoff-${match.id}`} disabled={isPending} defaultValue={toDatetimeLocal(new Date(match.kickoffAt))} />
       <div className="flex items-end gap-2">
         <ActionButton type="submit" size="md" loading={isPending} icon={<Check className="size-4" aria-hidden />}>
           Guardar

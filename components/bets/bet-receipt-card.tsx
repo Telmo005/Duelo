@@ -71,9 +71,6 @@ export function BetReceiptCard({
 }) {
   const [isPending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
-  // Cancel gives up locked funds and can't be undone — require a second tap
-  // within 3s rather than firing on the first press.
-  const [confirmCancel, setConfirmCancel] = useState(false);
   const isCreator = viewerId === bet.creator.id;
   const status = STATUS_LABEL[bet.status];
   // Short reference, not the raw bet id — a bare UUID in a shared URL reads
@@ -105,15 +102,9 @@ export function BetReceiptCard({
   }
 
   function handleCancel() {
-    if (!confirmCancel) {
-      setConfirmCancel(true);
-      setTimeout(() => setConfirmCancel(false), 3000);
-      return;
-    }
     startTransition(async () => {
       const result = await cancelBetAction(bet.id);
       if (result?.error) toast.error(result.error);
-      setConfirmCancel(false);
     });
   }
 
@@ -148,7 +139,15 @@ export function BetReceiptCard({
     }
   }
 
-  const canAcceptHere = bet.status === "waiting" && !isCreator && loggedIn;
+  // bet.status alone lags reality — it only stops being "waiting" once
+  // someone accepts or the bet_auto_refund_expired cron next runs (not
+  // instant), so a bet can still read "waiting" for a match that's already
+  // kicked off. The server (bet_accept) already rejects this; gating it
+  // here too means the button never invites a tap that's just going to
+  // fail with an error afterwards.
+  const hasKickedOff = bet.match.kickoffAt.getTime() <= Date.now();
+  const canAcceptHere = bet.status === "waiting" && !isCreator && loggedIn && !hasKickedOff;
+  const isStaleWaiting = bet.status === "waiting" && hasKickedOff;
 
   // A real invoice gets a stamp once it's resolved — reuse that instead of
   // another status pill. Only stamped once there's a real outcome; "em
@@ -363,7 +362,7 @@ export function BetReceiptCard({
         {bet.status === "waiting" && isCreator ? (
           <div className="flex flex-col gap-2.5">
             <ActionButton type="button" variant="danger" size="md" block loading={isPending} icon={<X className="size-4" aria-hidden />} onClick={handleCancel}>
-              {confirmCancel ? "Confirmar cancelamento?" : "Cancelar aposta"}
+              Cancelar aposta
             </ActionButton>
             <p className="text-center text-xs leading-relaxed text-muted-foreground">
               Quem aceitar escolhe um resultado diferente do teu. Se ninguém aceitar até o início do jogo, o valor volta automaticamente para a tua carteira.
@@ -387,6 +386,10 @@ export function BetReceiptCard({
               O valor fica bloqueado até o jogo terminar.
             </p>
           </div>
+        ) : isStaleWaiting ? (
+          <p className="flex items-center justify-center gap-2 rounded-xl bg-locked-10 py-3 text-sm font-semibold text-locked">
+            <Clock className="size-4" aria-hidden /> Este jogo já começou — a aguardar reembolso automático
+          </p>
         ) : bet.status === "waiting" ? (
           <Link href="/register" className="press flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-extrabold text-primary-foreground shadow-[var(--shadow-elevated)] transition-colors hover:bg-primary-90">
             <Lock className="size-[18px]" aria-hidden />
@@ -408,7 +411,7 @@ export function BetReceiptCard({
           className="press mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent"
         >
           <Share2 className="size-4" aria-hidden />
-          Desafiar
+          Partilhar
         </button>
       </div>
 
