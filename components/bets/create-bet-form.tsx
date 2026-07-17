@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Lock, Handshake } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Lock, Handshake, CalendarX } from "lucide-react";
 import { createBetAction } from "@/lib/actions/bets";
 import { TeamBadge } from "@/components/match/team-badge";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -15,6 +15,13 @@ export type MatchOption = {
   away: string;
   league: string;
   kickoffLabel: string;
+  /** Raw kickoff instant (ISO) — lets this list drop a match the moment its
+   *  kickoff passes even if the page has been open a while (the server list
+   *  is also filtered, but is cached up to 60s — see getUpcomingMatches in
+   *  lib/bets.ts). bet_create rejects an already-started match regardless,
+   *  so this is purely about never dangling a choice the server would just
+   *  reject. */
+  kickoffAtIso: string;
   homeLogoUrl?: string | null;
   awayLogoUrl?: string | null;
   /** Knockout fixture — extra time/penalties always produce a winner, so
@@ -36,14 +43,39 @@ function fmt(n: number) {
   return n.toLocaleString("pt", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
-export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
+export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOption[]; initialMatchId?: string }) {
   const [isPending, startTransition] = useTransition();
-  const [matchId, setMatchId] = useState<string>(matches[0]?.id ?? "");
+
+  // Re-checked every 30s so a match that kicks off while this form is just
+  // sitting open (user still deciding) actually drops out of the picker,
+  // instead of staying selectable until the server rejects it on submit.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const openMatches = useMemo(() => matches.filter((m) => new Date(m.kickoffAtIso).getTime() > now), [matches, now]);
+
+  // Coming from the feed's "Jogos" tab, the match is already chosen — only
+  // fall back to the first fixture in the list when there's no valid
+  // preselection (direct /bets/new visit, or a stale/removed matchId).
+  const preselected = initialMatchId && openMatches.some((m) => m.id === initialMatchId) ? initialMatchId : openMatches[0]?.id ?? "";
+  const [matchId, setMatchId] = useState<string>(preselected);
   const [prediction, setPrediction] = useState<PredictionKey | null>(null);
   const [stake, setStake] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const selectedMatch = matches.find((m) => m.id === matchId);
+  // If the selected match ages out (its kickoff passes while this form is
+  // open) fall back to the next available one instead of leaving a phantom,
+  // server-rejectable selection in place.
+  useEffect(() => {
+    if (matchId && !openMatches.some((m) => m.id === matchId)) {
+      setMatchId(openMatches[0]?.id ?? "");
+      setPrediction(null);
+    }
+  }, [openMatches, matchId]);
+
+  const selectedMatch = openMatches.find((m) => m.id === matchId);
   const stakeNum = Number(stake) || 0;
   const canSubmit = !!matchId && !!prediction && stakeNum > 0;
 
@@ -82,8 +114,14 @@ export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
       {/* ── Step 1: pick the match ─────────────────────────────── */}
       <section>
         <SectionLabel step={1}>Escolhe o jogo</SectionLabel>
+        {openMatches.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-5 py-8 text-center">
+            <CalendarX className="size-6 text-muted-foreground" aria-hidden />
+            <p className="text-sm text-muted-foreground">Os jogos disponíveis já começaram entretanto. Volta à lista e escolhe outro.</p>
+          </div>
+        ) : (
         <div className="flex flex-col gap-2.5">
-          {matches.map((m) => (
+          {openMatches.map((m) => (
             <OptionCard
               key={m.id}
               selected={matchId === m.id}
@@ -107,6 +145,7 @@ export function CreateBetForm({ matches }: { matches: MatchOption[] }) {
             </OptionCard>
           ))}
         </div>
+        )}
       </section>
 
       {/* ── Step 2: prediction ─────────────────────────────────── */}

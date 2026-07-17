@@ -11,6 +11,7 @@ const STATUS_LABEL: Record<string, string> = {
   postponed: "Adiado",
   abandoned: "Abandonado",
   finished: "Liquidado",
+  closed: "Fechado (sem apostas)",
 };
 
 /** A match no longer 'scheduled' (postponed/abandoned/finished) — nothing

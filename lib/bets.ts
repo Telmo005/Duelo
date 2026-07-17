@@ -278,14 +278,20 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
 
       const opponent = bet.opponentId ? profileById.get(bet.opponentId) : null;
 
-      // Liveness is a property of the MATCH, not of the bet's acceptance
-      // state — a duel shows the live scoreboard whenever the poller has
-      // fresh live data for its match, whether or not an opponent ever
-      // joined. Only when the match ISN'T live does bet.status decide
-      // "locked" (both sides committed, nothing left to accept — not
-      // "open", which reads as "still available to join") vs "waiting".
+      // Liveness is a property of the MATCH, not of something an admin (or
+      // the API poller) has to notice and flip — a matched duel (both sides
+      // committed, real money on both stakes) is live the moment its
+      // scheduled kickoff arrives, for the same 90-minute window the feed
+      // already treats live score data as fresh (LIVE_FRESHNESS_MS above).
+      // Actual score data, when present, is layered on top; its absence
+      // just means "live, score not in yet" rather than "not live". A
+      // "waiting" bet (nobody matched it) never shows as live regardless —
+      // there's no real duel in progress to show, and Phase B's kickoff
+      // check already closes it to new acceptances once kickoff passes.
       const live = liveById.get(match.id);
-      const isLive = !!live;
+      const kickoffMs = match.kickoffAt.getTime();
+      const withinLiveWindow = Date.now() >= kickoffMs && Date.now() < kickoffMs + LIVE_FRESHNESS_MS;
+      const isLive = bet.status === "matched" && (withinLiveWindow || !!live);
 
       return {
         id: bet.id,

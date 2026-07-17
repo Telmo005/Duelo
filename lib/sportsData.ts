@@ -100,6 +100,113 @@ export async function fetchFixtureLive(externalId: string): Promise<FixtureLive>
   return { state: "live", homeGoals, awayGoals, minute, short };
 }
 
+export type FixtureSearchResult = {
+  externalId: string;
+  home: string;
+  away: string;
+  homeLogoUrl: string | null;
+  awayLogoUrl: string | null;
+  league: string;
+  leagueId: number;
+  /** ISO instant — kept raw so the caller decides how to localize/display it
+   *  (matches the pattern the rest of the admin match forms already use). */
+  kickoffAtIso: string;
+  /** Derived from the API's round name (see isEliminationRound below) — true
+   *  only for rounds that are always a single decisive match (a final),
+   *  never for multi-leg knockout rounds (Round of 16, Quarter/Semi-finals
+   *  in club competitions genuinely can and do draw leg-by-leg). Admins can
+   *  still correct this by hand after adding (Editar), same as any manually
+   *  typed match. */
+  isElimination: boolean;
+};
+
+type RawFixture = {
+  fixture?: { id?: number; date?: string };
+  teams?: { home?: { name?: string; logo?: string }; away?: { name?: string; logo?: string } };
+  league?: { id?: number; name?: string; round?: string };
+};
+
+/** Round names API-Football uses that are ALWAYS a single, decisive match
+ *  (extra time + penalties if needed, never left drawn) — as opposed to
+ *  "Round of 16"/"Quarter-finals"/"Semi-finals" in two-legged club
+ *  competitions, where an individual leg frequently DOES end in a draw
+ *  (the tie is decided on aggregate, not that match alone). Getting this
+ *  wrong in the other direction would be worse than not flagging it at all:
+ *  bet_settle_match rejects entering a tied score for an elimination match
+ *  (supabase/migrations/0003_settlement.sql), so wrongly marking a
+ *  two-legged fixture as elimination would block the admin from recording a
+ *  perfectly legitimate 1-1 result. Scoped deliberately narrow —
+ *  false negatives just fall back to the existing manual checkbox, which is
+ *  always available regardless. */
+const ELIMINATION_ROUND_NAMES = new Set(["final", "3rd place final", "final round"]);
+
+function isEliminationRound(round: string | undefined): boolean {
+  if (!round) return false;
+  return ELIMINATION_ROUND_NAMES.has(round.trim().toLowerCase());
+}
+
+/**
+ * Lists every real fixture on a single date, across every league
+ * API-Football covers. The Free plan blocks fixture queries filtered by
+ * `league`+`season` (see lib/fixtures-import.ts's importUpcomingFixtures —
+ * that's why automated import is a no-op today), but a bare `date` query
+ * IS allowed, within roughly a 3-day rolling window around today — the API
+ * itself reports the exact allowed range if you ask outside it, which we
+ * surface as `error` rather than guessing a window client-side.
+ *
+ * Powers the "Procurar jogo real" admin picker: a manual pick-and-autofill
+ * flow, not automated import, so it's usable on the Free plan today. Since
+ * the API won't let us filter by league without `season`, filtering down to
+ * the leagues this product covers happens here, client-of-the-vendor-API
+ * side, against `league.id` in the (unfiltered) response.
+ */
+export async function searchFixturesByDate(date: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
+  const apiKey = process.env.API_FOOTBALL_KEY;
+  if (!apiKey) return { fixtures: [], error: "API_FOOTBALL_KEY não está configurada" };
+
+  try {
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${encodeURIComponent(date)}`, {
+      headers: { "x-apisports-key": apiKey },
+      cache: "no-store",
+    });
+    if (!res.ok) return { fixtures: [], error: `Pedido falhou (HTTP ${res.status})` };
+
+    const body = await res.json();
+    if (body.errors && Object.keys(body.errors).length > 0) {
+      const messages = Object.values(body.errors as Record<string, string>);
+      return { fixtures: [], error: messages.join(" ") || "A API rejeitou o pedido" };
+    }
+
+    const raw: RawFixture[] = body.response ?? [];
+    const fixtures = raw
+      .map((fx): FixtureSearchResult | null => {
+        const externalId = fx.fixture?.id != null ? String(fx.fixture.id) : null;
+        const home = fx.teams?.home?.name;
+        const away = fx.teams?.away?.name;
+        const kickoffAtIso = fx.fixture?.date;
+        const leagueId = fx.league?.id;
+        const league = fx.league?.name;
+        if (!externalId || !home || !away || !kickoffAtIso || leagueId == null || !league) return null;
+        return {
+          externalId,
+          home,
+          away,
+          league,
+          leagueId,
+          kickoffAtIso,
+          homeLogoUrl: fx.teams?.home?.logo ?? null,
+          awayLogoUrl: fx.teams?.away?.logo ?? null,
+          isElimination: isEliminationRound(fx.league?.round),
+        };
+      })
+      .filter((fx): fx is FixtureSearchResult => fx !== null);
+
+    return { fixtures };
+  } catch (err) {
+    return { fixtures: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /**
  * Looks up a team's crest URL by name (API-Football team search). Used to
  * backfill matches.home_logo_url/away_logo_url — manually seeded matches

@@ -9,11 +9,11 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { FeedSidebarLeft } from "@/components/layout/feed-sidebar-left";
 import { FeedSidebarRight } from "@/components/layout/feed-sidebar-right";
-import { DuelFeed } from "@/components/feed/duel-feed";
+import { FeedTabs } from "@/components/feed/feed-tabs";
 import { RecentWinners } from "@/components/feed/recent-winners";
 import { FeedListener } from "@/components/realtime/feed-listener";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
-import { getFeedDuels, getRecentWinners } from "@/lib/bets";
+import { getFeedDuels, getRecentWinners, getUpcomingMatches } from "@/lib/bets";
 import { getWalletBalance } from "@/lib/wallet";
 
 export const metadata: Metadata = {
@@ -29,9 +29,10 @@ export default async function LandingPage() {
   // The feed is real for everyone. getFeedDuels() is a public read of open
   // duels (waiting/matched) — no mock data, ever. Logged-out visitors see the
   // same real activity; only the action buttons differ (accept vs. register).
-  const [duels, winners, profileAndWallet] = await Promise.all([
+  const [duels, winners, upcomingMatches, profileAndWallet] = await Promise.all([
     getFeedDuels(),
     getRecentWinners(),
+    getUpcomingMatches(),
     user
       ? Promise.all([
           db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1).then((r) => r[0]),
@@ -46,6 +47,18 @@ export default async function LandingPage() {
   const totalInPlay = duels.reduce((s, d) => s + d.stake * (d.b ? 2 : 1), 0);
   const openCount = duels.filter((d) => d.status === "locked" || d.status === "waiting").length;
 
+  const catalogMatches = upcomingMatches.map((m) => ({
+    id: m.id,
+    home: m.home,
+    away: m.away,
+    league: m.league,
+    kickoffLabel: new Date(m.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+    kickoffAtIso: new Date(m.kickoffAt).toISOString(),
+    homeLogoUrl: m.homeLogoUrl,
+    awayLogoUrl: m.awayLogoUrl,
+    isElimination: m.isElimination,
+  }));
+
   return (
     <div className="min-h-screen bg-background">
       {loggedIn && <FeedListener currentUserId={user?.id} />}
@@ -56,11 +69,13 @@ export default async function LandingPage() {
 
         <main id="feed" className="flex min-w-0 flex-col gap-4 pb-24 lg:pb-0">
           <RecentWinners winners={winners} />
-          {duels.length === 0 ? (
-            <EmptyFeed loggedIn={loggedIn} />
-          ) : (
-            <DuelFeed duels={duels} live={loggedIn} currentUserId={user?.id} />
-          )}
+          <FeedTabs
+            duels={duels}
+            matches={catalogMatches}
+            live={loggedIn}
+            currentUserId={user?.id}
+            emptyFeed={<EmptyFeed loggedIn={loggedIn} />}
+          />
         </main>
 
         <FeedSidebarRight loggedIn={loggedIn} />
