@@ -69,6 +69,10 @@ export default async function AdminPage() {
             Levantamentos {pendingWithdrawals.length > 0 ? `(${pendingWithdrawals.length}) ` : ""}→
             <LinkPendingSpinner />
           </Link>
+          <Link href="/admin/errors" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
+            Erros →
+            <LinkPendingSpinner />
+          </Link>
         </div>
       </div>
 

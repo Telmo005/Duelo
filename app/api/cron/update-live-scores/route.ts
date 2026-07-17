@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { matches } from "@/db/schema";
 import { fetchFixtureLive } from "@/lib/sportsData";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
+import { logError } from "@/lib/errorLog";
 
 /**
  * Polls API-Football for the live score + minute of every in-play,
@@ -28,6 +29,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    return await updateLiveScores();
+  } catch (err) {
+    // Per-fixture fetch failures are expected/transient (API hiccups) and
+    // already surfaced in the response body below without needing a durable
+    // record for every one — this only catches the whole cron dying (e.g.
+    // the initial matches query itself failing).
+    await logError("cron_update_live_scores", err, { stage: "top_level" });
+    return NextResponse.json({ error: "internal error" }, { status: 500 });
+  }
+}
+
+async function updateLiveScores() {
   const candidates = await db
     .select({ id: matches.id, externalId: matches.externalId })
     .from(matches)

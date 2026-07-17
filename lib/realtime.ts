@@ -5,18 +5,16 @@
  * handlers). Sent AFTER the underlying wallet/bet transaction has already
  * committed, per the project's realtime pattern: Broadcast is a signal
  * that something happened, never the source of truth for whether it did.
+ *
+ * Server-only (imports lib/errorLog.ts, which pulls in the `postgres`
+ * driver) — the client subscriber imports the shared constants/type from
+ * lib/realtimeShared.ts instead, never from this file.
  */
 
-export const FEED_TOPIC = "duelo:feed";
-export const FEED_BROADCAST_EVENT = "feed_update";
+import { logError } from "@/lib/errorLog";
+import { FEED_TOPIC, FEED_BROADCAST_EVENT, type FeedEvent } from "@/lib/realtimeShared";
 
-export type FeedEvent =
-  | { type: "bet_created"; matchId: string }
-  | { type: "bet_accepted"; betId: string; matchId: string; creatorId: string }
-  | { type: "bet_cancelled"; betId: string; matchId: string }
-  | { type: "bets_settled"; matchId: string }
-  | { type: "bets_voided"; matchId: string }
-  | { type: "bets_refunded" };
+export { FEED_TOPIC, FEED_BROADCAST_EVENT, type FeedEvent };
 
 /** Best-effort: a missed broadcast just means open clients rely on their
  *  next manual refresh/navigation. It must never throw into — or block —
@@ -40,5 +38,6 @@ export async function broadcastFeedEvent(event: FeedEvent): Promise<void> {
     });
   } catch (err) {
     console.error("broadcastFeedEvent failed", { event, err });
+    await logError("realtime_broadcast", err, { event });
   }
 }

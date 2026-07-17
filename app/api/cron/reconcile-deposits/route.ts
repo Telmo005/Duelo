@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { reconcileStuckDeposits } from "@/lib/deposit-reconcile";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
+import { logError } from "@/lib/errorLog";
 
 /**
  * Reconciliation safety net for the deposit webhook — see
@@ -17,6 +18,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await reconcileStuckDeposits();
-  return NextResponse.json(result);
+  try {
+    const result = await reconcileStuckDeposits();
+    return NextResponse.json(result);
+  } catch (err) {
+    // reconcileStuckDeposits already logs its own per-item failures — this
+    // only catches something escaping the function entirely (e.g. the
+    // initial deposits query itself throwing instead of returning `error`).
+    await logError("cron_reconcile_deposits", err, { stage: "top_level" });
+    return NextResponse.json({ error: "internal error" }, { status: 500 });
+  }
 }

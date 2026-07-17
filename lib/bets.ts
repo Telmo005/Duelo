@@ -311,6 +311,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         prediction: predictionText,
         predictionCode: pred.code,
         stake: bet.stakeCents / 100,
+        stakeCents: bet.stakeCents,
         status: isLive ? "live" : bet.status === "matched" ? "locked" : "waiting",
         createdAgo: new Date(bet.createdAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
         score: isLive && live!.live_home != null && live!.live_away != null ? { home: live!.live_home, away: live!.live_away } : undefined,

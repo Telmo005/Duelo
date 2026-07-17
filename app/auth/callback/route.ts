@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { logError } from "@/lib/errorLog";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
           }).onConflictDoNothing();
         } catch (err) {
           console.error("auth/callback: failed to create profile for", user.id, err);
+          await logError("auth_callback", err, { userId: user.id });
           return NextResponse.redirect(new URL("/login?error=profile", request.url));
         }
       }

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { FEED_TOPIC, FEED_BROADCAST_EVENT, type FeedEvent } from "@/lib/realtime";
+import { FEED_TOPIC, FEED_BROADCAST_EVENT, type FeedEvent } from "@/lib/realtimeShared";
 
 /**
  * Subscribes to the shared feed broadcast channel and refreshes the current

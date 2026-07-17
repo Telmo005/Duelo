@@ -5,7 +5,6 @@ import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getBetReceipt } from "@/lib/bets";
 import { BetReceiptCard } from "@/components/bets/bet-receipt-card";
-import { formatCentsAsMt } from "@/lib/format";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -20,14 +19,22 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // match info. Leads with the brand name and drops the lone "⚔️ desafiou-
   // te!" urgency framing — personalized-but-calm reads as a real app on
   // WhatsApp; personalized-and-urgent reads as a scam link.
+  //
+  // The description deliberately does NOT lead with a currency amount — a
+  // raw "1000 MT" as the first thing someone reads in a WhatsApp preview is
+  // exactly what a scam/prize-notification link looks like. It explains
+  // what Duelo actually is instead (1x1 between two people, not a betting
+  // house), which is context a stranger receiving the link doesn't have
+  // yet — the stake amount is right there once they open it, no need to
+  // shout it in the preview.
   const title =
     bet.status === "waiting"
       ? `Duelo — ${bet.creator.name} desafia-te: ${bet.predictionLabel}`
       : `Duelo — ${bet.match.home} vs ${bet.match.away} — ${bet.predictionLabel}`;
   const description =
     bet.status === "waiting"
-      ? `Aposta em ${bet.predictionLabel} · ${formatCentsAsMt(bet.stakeCents)} MT em jogo · ${bet.match.league}. Aceita o desafio na Duelo.`
-      : `${formatCentsAsMt(bet.stakeCents)} MT em jogo · ${bet.match.league} · Referência ${bet.reference}. Entra no duelo na Duelo.`;
+      ? `Duelo — apostas 1x1 entre amigos, sem casa a ganhar. ${bet.creator.name} desafiou-te em ${bet.match.league}: ${bet.predictionLabel}. Aceita o desafio.`
+      : `Duelo — apostas 1x1 entre amigos, sem casa a ganhar. ${bet.match.home} vs ${bet.match.away} · ${bet.match.league}.`;
 
   // The og:image / twitter:image tags themselves are generated automatically
   // by the sibling opengraph-image.tsx file convention — no need to point at

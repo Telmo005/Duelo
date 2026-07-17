@@ -43,7 +43,7 @@ export default function RegisterPage() {
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="displayName">Nome</Label>
+          <Label htmlFor="displayName">Nome/Nickname</Label>
           <Input
             id="displayName" name="displayName" type="text" placeholder="Como te chamam?"
             required disabled={isPending} maxLength={50}
@@ -57,7 +57,7 @@ export default function RegisterPage() {
             id="phone" name="phone" defaultValue="+258 "
             required disabled={isPending}
           />
-          <p className="text-[11px] text-muted-foreground">M-Pesa (84/85) ou e-Mola (86/87)</p>
+          <p className="text-[11px] text-muted-foreground">Vamos usar este número para entrares na tua conta.</p>
         </div>
 
         <div className="flex flex-col gap-1.5">

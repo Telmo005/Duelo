@@ -13,6 +13,7 @@ import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { EditableDisplayName } from "@/components/profile/editable-display-name";
 import { ChangePasswordForm } from "@/components/profile/change-password-form";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from "@/lib/support";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Wallet, Swords, MessageCircle } from "lucide-react";
 
 export const metadata: Metadata = { title: "Perfil | Duelo" };
@@ -45,7 +46,9 @@ export default async function ProfilePage() {
         </div>
         <div className="min-w-0">
           <EditableDisplayName initialName={profile.displayName} />
-          <p className="text-sm text-muted-foreground">Membro desde {memberSince}</p>
+          <p className="text-sm text-muted-foreground">
+            {profile.phone ? `${profile.phone} · ` : ""}Membro desde {memberSince}
+          </p>
         </div>
       </div>
 
@@ -102,6 +105,12 @@ export default async function ProfilePage() {
             <p className="text-xs text-muted-foreground">{stats.totalBets} no total</p>
           </div>
         </Link>
+      </section>
+
+      {/* Appearance */}
+      <section className="mb-7 flex flex-col gap-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aparência</h2>
+        <ThemeToggle />
       </section>
 
       {/* Security + support */}

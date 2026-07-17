@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { PayGateClient } from "@/lib/paygate-client";
+import { logError } from "@/lib/errorLog";
 
 export type ReconcileResult = { checked: number; credited: number; markedFailed: number };
 
@@ -33,6 +34,7 @@ export async function reconcileStuckDeposits(): Promise<ReconcileResult> {
 
   if (error) {
     console.error("reconcileStuckDeposits: failed to list deposits", error);
+    await logError("cron_reconcile_deposits", error, { stage: "list_deposits" });
     return { checked: 0, credited: 0, markedFailed: 0 };
   }
 
@@ -45,6 +47,7 @@ export async function reconcileStuckDeposits(): Promise<ReconcileResult> {
       remote = await client.getCharge(deposit.gateway_payment_id);
     } catch (err) {
       console.error("reconcileStuckDeposits: getCharge failed for", deposit.id, err);
+      await logError("cron_reconcile_deposits", err, { stage: "get_charge", depositId: deposit.id });
       continue;
     }
 
@@ -71,6 +74,7 @@ export async function reconcileStuckDeposits(): Promise<ReconcileResult> {
 
       if (creditError) {
         console.error("reconcileStuckDeposits: wallet_credit failed for", deposit.id, creditError);
+        await logError("cron_reconcile_deposits", creditError, { stage: "wallet_credit", depositId: deposit.id, userId: deposit.user_id });
         continue;
       }
 

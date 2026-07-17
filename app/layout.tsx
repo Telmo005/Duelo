@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "@/app/globals.css";
 import { Toaster } from "sonner";
+import { ThemeScript } from "@/components/theme/theme-script";
 
 const jakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin", "latin-ext"],
@@ -55,6 +56,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt" className={jakartaSans.variable} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body>
         {children}
         <Toaster
