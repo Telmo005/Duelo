@@ -248,6 +248,12 @@ export const bets = pgTable("bets", {
   opponentId: uuid("opponent_id"),
   /** 'home' | 'draw' | 'away' — the creator's prediction (1X2) */
   prediction: text("prediction").notNull(),
+  /** 'home' | 'draw' | 'away' — the opponent's own prediction, picked at
+   *  accept time from whichever outcomes the creator didn't call. Null
+   *  until matched. Always differs from `prediction` (enforced in
+   *  bet_accept and by a DB check constraint) — if the actual result
+   *  matches neither, bet_settle_match refunds both sides. */
+  opponentPrediction: text("opponent_prediction"),
   stakeCents: bigint("stake_cents", { mode: "number" }).notNull(),
   status: text("status").notNull().default("waiting"),
   /** Short human-readable code (DUE-BET-XXXXXXXX) shown on the receipt and

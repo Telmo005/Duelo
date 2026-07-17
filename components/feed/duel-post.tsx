@@ -15,7 +15,21 @@ export type Duel = {
   reference?: string;
   a: { name: string; avatar: string; city: string };
   b: { name: string; avatar: string; city: string } | null;
-  match: { home: string; away: string; league: string; time: string; homeLogoUrl?: string | null; awayLogoUrl?: string | null };
+  match: {
+    home: string;
+    away: string;
+    league: string;
+    time: string;
+    /** Raw kickoff instant (ISO) — used to tell whether a "waiting" bet is
+     *  still genuinely joinable. `bet.status` alone lags reality: it only
+     *  flips off "waiting" once someone accepts, or once the
+     *  bet_auto_refund_expired cron next runs — neither is instant, so a
+     *  bet can sit "waiting" for a match that's already kicked off (or
+     *  live) with nothing to stop the UI still inviting a tap to accept. */
+    kickoffAtIso: string;
+    homeLogoUrl?: string | null;
+    awayLogoUrl?: string | null;
+  };
   prediction: string;
   predictionCode: string;
   stake: number;
@@ -71,7 +85,7 @@ function CardBody({ duel, className, children }: { duel: Duel; className: string
  *  so the eye reads one consistent column down the whole feed: red +
  *  pulsing = live, amber = still open, grey = matched and waiting on
  *  kickoff. */
-function TimeSlot({ duel }: { duel: Duel }) {
+function TimeSlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
   const isLive = duel.status === "live" && !!duel.score;
 
   if (isLive) {
@@ -87,7 +101,7 @@ function TimeSlot({ duel }: { duel: Duel }) {
   }
 
   const [datePart, timePart] = duel.match.time.split(", ");
-  const dotClassName = duel.status === "waiting" ? "bg-primary" : "bg-muted-foreground";
+  const dotClassName = canJoin ? "bg-primary" : "bg-muted-foreground";
   return (
     <div className="flex w-14 shrink-0 flex-col items-center justify-center leading-none text-muted-foreground">
       <span className="flex items-center gap-1 text-[9px] font-medium">
@@ -104,8 +118,19 @@ function TimeSlot({ duel }: { duel: Duel }) {
  *  actually pulls someone in. Shown the same way for every duel — open,
  *  matched, or live — status is already carried by the dot in TimeSlot, so
  *  this column stays pure money. */
-function MoneySlot({ duel }: { duel: Duel }) {
+function MoneySlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
   const payout = Math.round(duel.stake * 2 * 0.9);
+
+  // Not joinable (already matched/live, or waiting on a match that already
+  // kicked off) — no more "why should I care" hook to sell, just the stake
+  // that was on the table, plain.
+  if (!canJoin) {
+    return (
+      <div className="flex w-[76px] shrink-0 items-center justify-end">
+        <span className="text-[13px] font-semibold tabular-nums text-muted-foreground">{duel.stake.toLocaleString("pt")} MT</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-[76px] shrink-0 flex-col items-end leading-tight">
@@ -135,33 +160,37 @@ export function DuelPost({
 }) {
   const isWaiting = duel.status === "waiting";
   const isOwnBet = live && duel.creatorId === currentUserId;
+  const hasKickedOff = new Date(duel.match.kickoffAtIso).getTime() <= Date.now();
+  const canJoin = isWaiting && !hasKickedOff;
 
   const info = (
-    <div className="min-w-0 flex-1">
-      <div className="flex min-w-0 items-center gap-1 text-[13.5px] font-bold leading-tight">
-        <span className="truncate">{duel.match.home}</span>
-        <TeamBadge name={duel.match.home} logoUrl={duel.match.homeLogoUrl} size={16} />
-        <span className="shrink-0 font-normal text-muted-foreground">vs</span>
-        <TeamBadge name={duel.match.away} logoUrl={duel.match.awayLogoUrl} size={16} />
-        <span className="truncate">{duel.match.away}</span>
+    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1">
+        <TeamBadge name={duel.match.home} logoUrl={duel.match.homeLogoUrl} size={18} />
+        <TeamBadge name={duel.match.away} logoUrl={duel.match.awayLogoUrl} size={18} />
       </div>
-      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-        {duel.a.name} · {duel.prediction}
-      </p>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-bold leading-tight">
+          {duel.match.home} <span className="font-normal text-muted-foreground">vs</span> {duel.match.away}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          {duel.a.name} · {duel.prediction}
+        </p>
+      </div>
     </div>
   );
 
   return (
     <article
       className={`flex items-center gap-2 overflow-hidden rounded-lg border bg-card px-2.5 py-2 shadow-[var(--shadow-card)] transition-colors ${
-        isWaiting ? "border-primary-30" : "border-border"
+        canJoin ? "border-primary-30" : "border-border"
       }`}
     >
       {isWaiting && isOwnBet ? (
         <>
           <CardBody duel={duel} className="flex min-w-0 flex-1 items-center gap-2">
             {info}
-            <TimeSlot duel={duel} />
+            <TimeSlot duel={duel} canJoin={canJoin} />
           </CardBody>
           <CancelBetButton
             betId={duel.id}
@@ -173,8 +202,8 @@ export function DuelPost({
       ) : (
         <CardBody duel={duel} className="flex min-w-0 flex-1 items-center gap-2">
           {info}
-          <TimeSlot duel={duel} />
-          <MoneySlot duel={duel} />
+          <TimeSlot duel={duel} canJoin={canJoin} />
+          <MoneySlot duel={duel} canJoin={canJoin} />
         </CardBody>
       )}
     </article>

@@ -6,22 +6,12 @@ import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { AppShell } from "@/components/layout/app-shell";
-import { getWalletBalance, getWalletLedger, describeLedgerEntry, formatCentsAsMt } from "@/lib/wallet";
+import { getWalletBalance, getWalletLedger, formatCentsAsMt } from "@/lib/wallet";
+import { WalletLedgerList } from "@/components/wallet/wallet-ledger-list";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
-import { ArrowDownToLine, ArrowUpFromLine, Lock, RotateCcw, Trophy, HeartCrack, Plus, ChartColumn, type LucideIcon } from "lucide-react";
+import { ArrowUpFromLine, Lock, Plus, ChartColumn } from "lucide-react";
 
 export const metadata: Metadata = { title: "Carteira | Duelo" };
-
-const LEDGER_ICON: Record<string, { Icon: LucideIcon; tint: string }> = {
-  deposit: { Icon: ArrowDownToLine, tint: "#34D399" },
-  hold: { Icon: Lock, tint: "#94A3B8" },
-  release: { Icon: RotateCcw, tint: "#3B82F6" },
-  settle_win: { Icon: Trophy, tint: "#34D399" },
-  settle_loss: { Icon: HeartCrack, tint: "#F0455B" },
-  withdrawal_hold: { Icon: ArrowUpFromLine, tint: "#9C98F7" },
-  withdrawal_release: { Icon: RotateCcw, tint: "#3B82F6" },
-  withdrawal_complete: { Icon: ArrowUpFromLine, tint: "#94A3B8" },
-};
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -31,7 +21,7 @@ export default async function DashboardPage() {
   const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1);
   if (!profile) redirect("/login");
 
-  const [{ availableCents, lockedCents }, ledger] = await Promise.all([
+  const [{ availableCents, lockedCents }, ledgerPage] = await Promise.all([
     getWalletBalance(user.id),
     getWalletLedger(user.id),
   ]);
@@ -96,7 +86,7 @@ export default async function DashboardPage() {
           Últimas transações
         </h2>
 
-        {ledger.length === 0 ? (
+        {ledgerPage.items.length === 0 ? (
           <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-5 py-8 text-center">
             <div className="mb-4 flex size-13 items-center justify-center rounded-2xl bg-muted text-muted-foreground" aria-hidden>
               <ChartColumn className="size-6" />
@@ -111,39 +101,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
-            {ledger.map((entry, i) => {
-              const { label, netCents } = describeLedgerEntry(entry);
-              const isPositive = netCents > 0;
-              const meta = LEDGER_ICON[entry.type] ?? { Icon: ChartColumn, tint: "#94A3B8" };
-              const Icon = meta.Icon;
-              return (
-                <div
-                  key={entry.id}
-                  className={`flex items-center gap-3 px-5 py-4 ${i > 0 ? "border-t border-border" : ""}`}
-                >
-                  <span
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full"
-                    style={{ background: `${meta.tint}22`, color: meta.tint }}
-                    aria-hidden
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">{label}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {new Date(entry.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
-                      {entry.description ? ` · ${entry.description}` : ""}
-                    </p>
-                  </div>
-                  <p className={`shrink-0 text-sm font-extrabold tabular-nums ${isPositive ? "text-success" : "text-muted-foreground"}`}>
-                    {isPositive ? "+" : ""}
-                    {formatCentsAsMt(netCents)} MT
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+          <WalletLedgerList initialItems={ledgerPage.items} initialNextCursor={ledgerPage.nextCursor} />
         )}
       </section>
     </AppShell>

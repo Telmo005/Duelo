@@ -35,6 +35,12 @@ function friendlyBetError(message: string): string {
   if (message.includes("cannot accept your own bet")) {
     return "Não podes aceitar a tua própria aposta.";
   }
+  if (message.includes("must differ from the creator")) {
+    return "Escolhe um resultado diferente do que o criador previu.";
+  }
+  if (message.includes("cannot be predicted as a draw")) {
+    return "Este jogo é de eliminação — não há opção de empate.";
+  }
   if (message.includes("only the creator can cancel")) {
     return "Só quem criou a aposta a pode cancelar.";
   }
@@ -80,7 +86,16 @@ export async function createBetAction(input: Record<string, unknown>): Promise<A
   redirect(`/d/${data!.reference}`);
 }
 
-export async function acceptBetAction(betId: string): Promise<ActionResult> {
+const acceptBetSchema = z.object({
+  opponentPrediction: z.enum(["home", "draw", "away"]),
+});
+
+export async function acceptBetAction(betId: string, input: Record<string, unknown>): Promise<ActionResult> {
+  const parsed = acceptBetSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Escolhe o resultado em que estás a apostar." };
+  }
+
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) redirect("/login");
@@ -90,6 +105,7 @@ export async function acceptBetAction(betId: string): Promise<ActionResult> {
   const { error } = await service.rpc("bet_accept", {
     p_bet_id: betId,
     p_opponent_id: user.id,
+    p_opponent_prediction: parsed.data.opponentPrediction,
     p_opponent_ip: ip,
     p_opponent_device_id: deviceId,
   });

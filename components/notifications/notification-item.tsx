@@ -1,8 +1,10 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
 import { Handshake, Trophy, HeartCrack, RotateCcw, ArrowUpFromLine, ArrowDownToLine, Bell, type LucideIcon } from "lucide-react";
 import { markNotificationReadAction } from "@/lib/actions/notifications";
+import { Spinner } from "@/components/ui/spinner";
 import type { Notification } from "@/db/schema";
 
 const TYPE_ICON: Record<string, { Icon: LucideIcon; tint: string }> = {
@@ -21,9 +23,10 @@ export function NotificationItem({ notification }: { notification: Notification 
   const isUnread = !notification.readAt;
   const meta = TYPE_ICON[notification.type] ?? { Icon: Bell, tint: "#94A3B8" };
   const Icon = meta.Icon;
+  const [isPending, startTransition] = useTransition();
 
   function handleClick() {
-    if (isUnread) markNotificationReadAction(notification.id);
+    if (isUnread) startTransition(async () => { await markNotificationReadAction(notification.id); });
   }
 
   const content = (
@@ -42,7 +45,7 @@ export function NotificationItem({ notification }: { notification: Notification 
           {new Date(notification.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
         </p>
       </div>
-      {isUnread && <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden />}
+      {isUnread && (isPending ? <Spinner className="size-3 shrink-0" /> : <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden />)}
     </>
   );
 

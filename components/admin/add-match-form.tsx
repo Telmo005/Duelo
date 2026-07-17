@@ -8,6 +8,7 @@ import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TeamSearchPicker } from "@/components/admin/team-search-picker";
+import { KickoffField } from "@/components/admin/kickoff-field";
 
 export function AddMatchForm() {
   const [isPending, startTransition] = useTransition();
@@ -56,10 +57,7 @@ export function AddMatchForm() {
         <Label htmlFor="league">Liga / competição</Label>
         <Input id="league" name="league" placeholder="Moçambola" required disabled={isPending} maxLength={100} />
       </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="kickoffAt">Data e hora</Label>
-        <Input id="kickoffAt" name="kickoffAt" type="datetime-local" required disabled={isPending} />
-      </div>
+      <KickoffField id="kickoffAt" disabled={isPending} />
       <div className="flex items-end">
         <ActionButton type="submit" block loading={isPending} icon={<Plus className="size-4" aria-hidden />}>
           Adicionar jogo

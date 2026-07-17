@@ -10,6 +10,10 @@ export type BetReceipt = {
   prediction: "home" | "draw" | "away";
   predictionLabel: string;
   predictionCode: string;
+  /** The opponent's own prediction (see db/schema.ts comment) — null until
+   *  matched. Always one of the two outcomes the creator DIDN'T predict. */
+  opponentPrediction: "home" | "draw" | "away" | null;
+  opponentPredictionLabel: string | null;
   stakeCents: number;
   potCents: number;
   commissionCents: number;
@@ -24,11 +28,18 @@ export type BetReceipt = {
     awayLogoUrl: string | null;
     resultHome: number | null;
     resultAway: number | null;
+    /** Knockout fixture — no draw outcome, so accepting never offers it. */
+    isElimination: boolean;
   };
   creator: { id: string; name: string };
   opponent: { id: string; name: string } | null;
   /** Only meaningful once status === 'settled'. */
   winnerId: string | null;
+  /** Only meaningful once status === 'refunded' — the three ways a bet ends
+   *  up refunded read very differently to the person looking at this page,
+   *  so the UI shouldn't show one blanket "sem adversário" message for all
+   *  of them. */
+  refundReason: "no_opponent" | "match_voided" | "no_correct_prediction" | null;
 };
 
 /** A single bet, shaped for the public receipt/share page (/d/[id]). Reads
@@ -63,6 +74,14 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
   const pred = PREDICTION_LABEL[bet.prediction];
   const predictionLabel = bet.prediction === "away" ? pred.awayLabel(match.away) : pred.homeLabel(match.home);
 
+  const opponentPrediction = bet.opponentPrediction as BetReceipt["opponentPrediction"];
+  const opponentPredictionLabel = opponentPrediction
+    ? (() => {
+        const p = PREDICTION_LABEL[opponentPrediction];
+        return opponentPrediction === "away" ? p.awayLabel(match.away) : p.homeLabel(match.home);
+      })()
+    : null;
+
   // While waiting, nobody has matched yet (opponent_id is always null here),
   // but the breakdown should still preview what happens once someone does —
   // same projection create-bet-form shows before the bet even exists. Once
@@ -81,6 +100,18 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
     winnerId = bet.prediction === actual ? bet.creatorId : bet.opponentId;
   }
 
+  // Three different stories behind "refunded" — no adversary ever showed up,
+  // the fixture itself got voided, or (new, three-way market) both sides
+  // guessed wrong and the result belonged to neither. Derived rather than
+  // stored: match_status/opponent_id/result already carry enough to tell
+  // them apart without a new column.
+  let refundReason: BetReceipt["refundReason"] = null;
+  if (bet.status === "refunded") {
+    if (!bet.opponentId) refundReason = "no_opponent";
+    else if (match.matchStatus === "postponed" || match.matchStatus === "abandoned") refundReason = "match_voided";
+    else refundReason = "no_correct_prediction";
+  }
+
   return {
     id: bet.id,
     reference: bet.reference,
@@ -88,6 +119,8 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
     prediction: bet.prediction as BetReceipt["prediction"],
     predictionLabel,
     predictionCode: pred.code,
+    opponentPrediction,
+    opponentPredictionLabel,
     stakeCents: bet.stakeCents,
     potCents,
     commissionCents,
@@ -102,10 +135,12 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
       awayLogoUrl: match.awayLogoUrl,
       resultHome: match.resultHome,
       resultAway: match.resultAway,
+      isElimination: match.isElimination,
     },
     creator: { id: creator.id, name: creator.displayName },
     opponent: opponent ? { id: opponent.id, name: opponent.displayName } : null,
     winnerId,
+    refundReason,
   };
 }
 
@@ -247,6 +282,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
           away: match.away,
           league: match.league,
           time: new Date(match.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+          kickoffAtIso: new Date(match.kickoffAt).toISOString(),
           homeLogoUrl: match.homeLogoUrl,
           awayLogoUrl: match.awayLogoUrl,
         },

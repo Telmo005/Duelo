@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { displayNameSchema } from "@/lib/validation/auth";
+import { getUserBets, type UserBetsPage, type UserBetsTab } from "@/lib/profile";
 
 type ActionResult = { error?: string };
 
@@ -30,4 +31,15 @@ export async function updateDisplayName(input: unknown): Promise<ActionResult> {
   // caller across the app (sidebar, mobile top bar, admin pages, etc.).
   revalidatePath("/", "layout");
   return {};
+}
+
+/** Fetches a page of the caller's OWN bets (a tab switch or "carregar
+ *  mais") — userId always comes from the authenticated session, never the
+ *  client, same reasoning as getMoreWalletLedgerAction. */
+export async function getUserBetsPageAction(tab: UserBetsTab, cursor?: string): Promise<UserBetsPage> {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return { items: [], nextCursor: null };
+
+  return getUserBets(user.id, { tab, cursor });
 }

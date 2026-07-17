@@ -22,7 +22,7 @@ export default async function BetsPage() {
   const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1);
   if (!profile) redirect("/login");
 
-  const [bets, { availableCents }] = await Promise.all([
+  const [betsPage, { availableCents }] = await Promise.all([
     getUserBets(user.id),
     getWalletBalance(user.id),
   ]);
@@ -44,7 +44,7 @@ export default async function BetsPage() {
         </Link>
       </div>
 
-      {bets.length === 0 ? (
+      {betsPage.items.length === 0 ? (
         <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-5 py-12 text-center">
           <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary-10 text-primary" aria-hidden>
             <Swords className="size-7" />
@@ -60,7 +60,7 @@ export default async function BetsPage() {
           </Link>
         </div>
       ) : (
-        <BetsList bets={bets} />
+        <BetsList initialItems={betsPage.items} initialNextCursor={betsPage.nextCursor} />
       )}
     </AppShell>
   );

@@ -130,16 +130,32 @@ export async function signIn(
   const phone = normalizePhone(parsed.data.phone);
   const { ip } = await getRequestFingerprint();
 
-  const rateLimit = await checkLoginRateLimit(phone, ip);
-  if (!rateLimit.allowed) {
-    return { error: rateLimit.message };
+  // Fail OPEN: this check is an extra layer against brute-forcing, not the
+  // actual credential check (that's supabase.auth.signInWithPassword below,
+  // which never gets skipped). If the DB hiccups here, a real user with the
+  // right password should still be able to log in — the alternative is
+  // every login on the app going down whenever this one query has trouble.
+  try {
+    const rateLimit = await checkLoginRateLimit(phone, ip);
+    if (!rateLimit.allowed) {
+      return { error: rateLimit.message };
+    }
+  } catch (err) {
+    console.error("checkLoginRateLimit failed, allowing attempt through:", err);
   }
 
   const syntheticEmail = phoneToSyntheticEmail(phone);
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password: parsed.data.password });
 
-  await recordLoginAttempt(phone, ip, !error);
+  // Best-effort only — the login itself already succeeded or failed above;
+  // failing to record the attempt shouldn't turn a successful login into an
+  // error page.
+  try {
+    await recordLoginAttempt(phone, ip, !error);
+  } catch (err) {
+    console.error("recordLoginAttempt failed:", err);
+  }
 
   if (error) {
     return {
