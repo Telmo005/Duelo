@@ -239,3 +239,42 @@
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-md);
 }
+
+/* ── Receipt ticket edges ──────────────────────────────────────
+   Punches a row of semicircular "holes" along the top/bottom of the bet
+   receipt so it reads as a torn-off till slip, not a generic card. The
+   punched dots are genuinely transparent (not colour-matched to the page),
+   so this works correctly over any background — solid, gradient, whatever
+   the page behind it happens to be. */
+.ticket-edge-top,
+.ticket-edge-bottom {
+  height: 14px;
+  background-repeat: repeat-x;
+  background-size: 20px 28px;
+}
+.ticket-edge-top {
+  background-image: radial-gradient(circle at 10px 0, transparent 9px, var(--card) 9.5px);
+  background-position: top;
+}
+.ticket-edge-bottom {
+  background-image: radial-gradient(circle at 10px 28px, transparent 9px, var(--card) 9.5px);
+  background-position: bottom;
+}
+
+/* Decorative barcode stripe — random-width bars, purely visual (encodes
+   nothing), just borrows the "till receipt" vocabulary. */
+.barcode-stripes {
+  height: 32px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    currentColor 0, currentColor 2px,
+    transparent 2px, transparent 5px,
+    currentColor 5px, currentColor 7px,
+    transparent 7px, transparent 9px,
+    currentColor 9px, currentColor 12px,
+    transparent 12px, transparent 15px,
+    currentColor 15px, currentColor 16px,
+    transparent 16px, transparent 20px
+  );
+  background-repeat: repeat-x;
+}
