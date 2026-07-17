@@ -192,6 +192,19 @@ export const matches = pgTable("matches", {
   home: text("home").notNull(),
   away: text("away").notNull(),
   league: text("league").notNull(),
+  /** API-Football's numeric league ID — null for manually seeded matches
+   *  (no vendor league to key off of). `league` is a display NAME, and
+   *  different countries' leagues can share the exact same name (England's
+   *  "Premier League" and Kazakhstan's, for instance) — grouping/matching
+   *  by name alone silently merges them into one section. This is the real
+   *  identity; `league`/`country` are what a human reads. */
+  leagueId: integer("league_id"),
+  /** API-Football's country name for the league (e.g. "England",
+   *  "Kazakhstan") — null for manually seeded matches. Only used to
+   *  disambiguate a `league` name that collides with a different
+   *  leagueId's (see lib/leagueTiers.ts groupByLeague) — never shown on
+   *  its own. */
+  country: text("country"),
   kickoffAt: timestamp("kickoff_at", { withTimezone: true }).notNull(),
   /** API-Football fixture ID — null for manually seeded matches, which
    *  the settlement cron skips (nothing to look up). Set this to enable

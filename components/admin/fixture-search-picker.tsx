@@ -71,7 +71,7 @@ export function FixtureSearchPicker() {
   const sorted = useMemo(
     () =>
       [...filtered].sort((a, b) => {
-        const r = leagueRank(a.league) - leagueRank(b.league);
+        const r = leagueRank(a.league, a.country) - leagueRank(b.league, b.country);
         return r !== 0 ? r : a.kickoffAtIso.localeCompare(b.kickoffAtIso);
       }),
     [filtered]

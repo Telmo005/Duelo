@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CheckCheck, LayoutGrid } from "lucide-react";
 import { DuelPost, type Duel } from "./duel-post";
 import { SectionLabel } from "@/components/ui/section-label";
-import { leagueRank } from "@/lib/leagueTiers";
+import { groupByLeague } from "@/lib/leagueTiers";
 
 /** Icon-first, one-word filters — the earlier "Aguardam adversário" /
  *  "Trancados" text pills plus a decorative dot-strip underneath were pure
@@ -33,15 +33,13 @@ export function DuelFeed({ duels, live = false, currentUserId }: { duels: Duel[]
   // most recent bet — recency only breaks ties within that ranking
   // (Array.sort is stable, and a Map preserves insertion order, so
   // unranked/tied leagues keep the recency order they arrived in).
-  const groups = useMemo(() => {
-    const byLeague = new Map<string, Duel[]>();
-    for (const duel of filtered) {
-      const league = duel.match.league;
-      if (!byLeague.has(league)) byLeague.set(league, []);
-      byLeague.get(league)!.push(duel);
-    }
-    return [...byLeague.entries()].sort(([a], [b]) => leagueRank(a) - leagueRank(b));
-  }, [filtered]);
+  // groupByLeague also tells apart two different leagues that happen to
+  // share a display name (e.g. England's and Kazakhstan's "Premier
+  // League") instead of merging their duels into one section.
+  const groups = useMemo(
+    () => groupByLeague(filtered, (d) => ({ league: d.match.league, leagueId: d.match.leagueId, country: d.match.country })),
+    [filtered]
+  );
 
   return (
     <div className="flex flex-col gap-3">

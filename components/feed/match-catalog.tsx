@@ -7,13 +7,19 @@ import { TeamBadge } from "@/components/match/team-badge";
 import { Input } from "@/components/ui/input";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Spinner } from "@/components/ui/spinner";
-import { leagueRank } from "@/lib/leagueTiers";
+import { groupByLeague } from "@/lib/leagueTiers";
 
 export type CatalogMatch = {
   id: string;
   home: string;
   away: string;
   league: string;
+  /** API-Football league identity — null for manually-seeded matches. Two
+   *  different countries can have identically-named leagues, so
+   *  grouping/ranking uses this instead of the bare name string (see
+   *  lib/leagueTiers.ts groupByLeague). */
+  leagueId?: number | null;
+  country?: string | null;
   kickoffLabel: string;
   /** Raw kickoff instant (ISO) — lets the catalogue drop a match the moment
    *  its kickoff passes, even if the server list (getUpcomingMatches, cached
@@ -65,14 +71,10 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
   const needle = query.trim().toLowerCase();
   const filtered = needle ? open.filter((m) => `${m.home} ${m.away} ${m.league}`.toLowerCase().includes(needle)) : open;
 
-  const groups = useMemo(() => {
-    const byLeague = new Map<string, CatalogMatch[]>();
-    for (const m of filtered) {
-      if (!byLeague.has(m.league)) byLeague.set(m.league, []);
-      byLeague.get(m.league)!.push(m);
-    }
-    return [...byLeague.entries()].sort(([a], [b]) => leagueRank(a) - leagueRank(b));
-  }, [filtered]);
+  const groups = useMemo(
+    () => groupByLeague(filtered, (m) => ({ league: m.league, leagueId: m.leagueId, country: m.country })),
+    [filtered]
+  );
 
   return (
     <div className="flex flex-col gap-3">

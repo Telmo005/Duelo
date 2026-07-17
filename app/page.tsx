@@ -52,6 +52,8 @@ export default async function LandingPage() {
     home: m.home,
     away: m.away,
     league: m.league,
+    leagueId: m.leagueId,
+    country: m.country,
     kickoffLabel: new Date(m.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
     kickoffAtIso: new Date(m.kickoffAt).toISOString(),
     homeLogoUrl: m.homeLogoUrl,

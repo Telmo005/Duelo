@@ -108,6 +108,12 @@ export type FixtureSearchResult = {
   awayLogoUrl: string | null;
   league: string;
   leagueId: number;
+  /** API-Football's country name for the league (e.g. "England",
+   *  "Kazakhstan") — different countries can have identically-named
+   *  leagues, so this is what disambiguates them when grouping/displaying
+   *  (see lib/leagueTiers.ts groupByLeague). Null on the rare fixture where
+   *  the API omits it (e.g. some international/club-friendly entries). */
+  country: string | null;
   /** ISO instant — kept raw so the caller decides how to localize/display it
    *  (matches the pattern the rest of the admin match forms already use). */
   kickoffAtIso: string;
@@ -123,7 +129,7 @@ export type FixtureSearchResult = {
 type RawFixture = {
   fixture?: { id?: number; date?: string };
   teams?: { home?: { name?: string; logo?: string }; away?: { name?: string; logo?: string } };
-  league?: { id?: number; name?: string; round?: string };
+  league?: { id?: number; name?: string; round?: string; country?: string };
 };
 
 /** Round names API-Football uses that are ALWAYS a single, decisive match
@@ -193,6 +199,7 @@ export async function searchFixturesByDate(date: string): Promise<{ fixtures: Fi
           away,
           league,
           leagueId,
+          country: fx.league?.country ?? null,
           kickoffAtIso,
           homeLogoUrl: fx.teams?.home?.logo ?? null,
           awayLogoUrl: fx.teams?.away?.logo ?? null,
