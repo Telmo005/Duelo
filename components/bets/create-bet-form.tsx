@@ -9,13 +9,19 @@ import { OptionCard } from "@/components/ui/option-card";
 import { InfoRow } from "@/components/ui/info-row";
 import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
-import { leagueRank } from "@/lib/leagueTiers";
+import { groupByLeague } from "@/lib/leagueTiers";
 
 export type MatchOption = {
   id: string;
   home: string;
   away: string;
   league: string;
+  /** API-Football league identity — null for manually-seeded matches. Two
+   *  different countries can have identically-named leagues, so
+   *  grouping/ranking uses this instead of the bare name string (see
+   *  lib/leagueTiers.ts groupByLeague). */
+  leagueId?: number | null;
+  country?: string | null;
   kickoffLabel: string;
   /** Raw kickoff instant (ISO) — lets this list drop a match the moment its
    *  kickoff passes even if the page has been open a while (the server list
@@ -120,14 +126,10 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
   const searchedMatches = matchNeedle
     ? openMatches.filter((m) => `${m.home} ${m.away} ${m.league}`.toLowerCase().includes(matchNeedle))
     : openMatches;
-  const matchGroups = useMemo(() => {
-    const byLeague = new Map<string, MatchOption[]>();
-    for (const m of searchedMatches) {
-      if (!byLeague.has(m.league)) byLeague.set(m.league, []);
-      byLeague.get(m.league)!.push(m);
-    }
-    return [...byLeague.entries()].sort(([a], [b]) => leagueRank(a) - leagueRank(b));
-  }, [searchedMatches]);
+  const matchGroups = useMemo(
+    () => groupByLeague(searchedMatches, (m) => ({ league: m.league, leagueId: m.leagueId, country: m.country })),
+    [searchedMatches]
+  );
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
