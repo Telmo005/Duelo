@@ -328,3 +328,26 @@ export const adminAuditLog = pgTable("admin_audit_log", {
 });
 
 export type AdminAuditLogEntry = typeof adminAuditLog.$inferSelect;
+
+/**
+ * error_log — append-only trail of server-side failures (webhook credit
+ * failures, cron crashes, rate-limit DB hiccups, client render errors).
+ * Before this, every error path only reached `console.error`, which on
+ * Vercel means ephemeral function logs nobody is watching — an error at
+ * 3am (a stuck deposit, a cron that silently failed) left zero durable
+ * trace. Written via lib/errorLog.ts, read by /admin/errors.
+ */
+export const errorLog = pgTable("error_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Where it came from — e.g. "webhook_paygate", "cron_settle_matches",
+   *  "client_error_boundary" — lets /admin/errors filter/scan by origin. */
+  source: text("source").notNull(),
+  message: text("message").notNull(),
+  /** JSON-stringified extra context (stack trace, relevant IDs) — kept as
+   *  plain text rather than jsonb since this is read by a human, not
+   *  queried by field. */
+  detail: text("detail"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ErrorLogEntry = typeof errorLog.$inferSelect;

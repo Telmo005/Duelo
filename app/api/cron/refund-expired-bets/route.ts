@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { broadcastFeedEvent } from "@/lib/realtime";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
+import { logError } from "@/lib/errorLog";
 
 /**
  * Refunds any 'waiting' bet whose match has already kicked off with no
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase.rpc("bet_auto_refund_expired");
 
   if (error) {
+    await logError("cron_refund_expired_bets", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

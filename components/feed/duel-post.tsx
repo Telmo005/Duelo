@@ -5,6 +5,7 @@ import { X, TrendingUp } from "lucide-react";
 import { CancelBetButton } from "./cancel-bet-button";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Spinner } from "@/components/ui/spinner";
+import { formatCentsAsMt } from "@/lib/format";
 
 export type Duel = {
   id: string;
@@ -33,6 +34,12 @@ export type Duel = {
   prediction: string;
   predictionCode: string;
   stake: number;
+  /** Raw integer cents — lets the payout preview below match the server's
+   *  own math exactly (see MoneySlot) instead of re-deriving it from the
+   *  already-divided `stake` float and rounding to a whole MT, which can
+   *  show a fabricated number that doesn't match what anyone would actually
+   *  be paid. */
+  stakeCents: number;
   /** "locked" = matched, both sides committed, nothing left to accept —
    *  distinct from "waiting" ("Aguarda adversário", still joinable) so the
    *  label never implies there's still something to do with it. "closed"
@@ -140,7 +147,17 @@ function TimeSlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
  *  matched, or live — status is already carried by the dot in TimeSlot, so
  *  this column stays pure money. */
 function MoneySlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
-  const payout = Math.round(duel.stake * 2 * 0.9);
+  // Cents-exact, matching bet_settle_match's own math (supabase/migrations
+  // 0003_settlement.sql: pot = stake*2, commission = round(pot*0.10),
+  // payout = pot - commission) — NOT a whole-MT rounding of the display
+  // value. A stake of 12,50 MT has a real payout of 22,50 MT, and rounding
+  // that to "23" in the feed would show a number nobody's actually going to
+  // receive.
+  const potCents = duel.stakeCents * 2;
+  const commissionCents = Math.round(potCents * 0.1);
+  const payoutCents = potCents - commissionCents;
+  const stakeLabel = formatCentsAsMt(duel.stakeCents);
+  const payoutLabel = formatCentsAsMt(payoutCents);
 
   // Not joinable (already matched/live, or waiting on a match that already
   // kicked off) — no more "why should I care" hook to sell, just the stake
@@ -148,16 +165,16 @@ function MoneySlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
   if (!canJoin) {
     return (
       <div className="flex w-[76px] shrink-0 items-center justify-end">
-        <span className="text-[13px] font-semibold tabular-nums text-muted-foreground">{duel.stake.toLocaleString("pt")} MT</span>
+        <span className="text-[13px] font-semibold tabular-nums text-muted-foreground">{stakeLabel} MT</span>
       </div>
     );
   }
 
   return (
     <div className="flex w-[76px] shrink-0 flex-col items-end leading-tight">
-      <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{duel.stake.toLocaleString("pt")} MT</span>
+      <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{stakeLabel} MT</span>
       <span className="flex items-center gap-1 text-[15px] font-bold tabular-nums text-success">
-        <TrendingUp className="size-3.5 shrink-0" aria-hidden />+{payout.toLocaleString("pt") }
+        <TrendingUp className="size-3.5 shrink-0" aria-hidden />+{payoutLabel}
       </span>
     </div>
   );

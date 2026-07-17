@@ -8,6 +8,7 @@ import { registerSchema, signInSchema, changePasswordSchema } from "@/lib/valida
 import { normalizePhone } from "@/lib/phone";
 import { getRequestFingerprint } from "@/lib/requestInfo";
 import { checkLoginRateLimit, recordLoginAttempt, checkRegisterRateLimit, recordRegisterAttempt } from "@/lib/rateLimit";
+import { logError } from "@/lib/errorLog";
 
 type ActionResult = { error?: string };
 
@@ -60,6 +61,7 @@ export async function registerUser(
     }
   } catch (err) {
     console.error("checkRegisterRateLimit failed, allowing attempt through:", err);
+    await logError("auth_rate_limit", err, { stage: "check_register", phone });
   }
 
   // 3. Create Supabase Auth user (owns credential hashing — never hand-rolled).
@@ -80,6 +82,7 @@ export async function registerUser(
     await recordRegisterAttempt(phone, ip, !authError);
   } catch (err) {
     console.error("recordRegisterAttempt failed:", err);
+    await logError("auth_rate_limit", err, { stage: "record_register", phone });
   }
 
   if (authError) {
@@ -165,6 +168,7 @@ export async function signIn(
     }
   } catch (err) {
     console.error("checkLoginRateLimit failed, allowing attempt through:", err);
+    await logError("auth_rate_limit", err, { stage: "check_login", phone });
   }
 
   const syntheticEmail = phoneToSyntheticEmail(phone);
@@ -178,6 +182,7 @@ export async function signIn(
     await recordLoginAttempt(phone, ip, !error);
   } catch (err) {
     console.error("recordLoginAttempt failed:", err);
+    await logError("auth_rate_limit", err, { stage: "record_login", phone });
   }
 
   if (error) {
@@ -191,10 +196,22 @@ export async function signIn(
 
 /**
  * signOut — invalidates the session and redirects to the landing page.
+ * Fails open: if the remote Supabase signOut call itself errors (network
+ * blip, session already stale), the user's own intent — "get me out of
+ * this account" — still matters more than that one call succeeding. Their
+ * local session cookie is cleared by the Supabase SSR client either way,
+ * and any page they land on re-checks auth on its own, so redirecting
+ * regardless is safe and matches what tapping "Terminar sessão" should
+ * always visibly do.
  */
 export async function signOut(): Promise<void> {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  try {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+  } catch (err) {
+    console.error("signOut: supabase.auth.signOut() failed, redirecting anyway", err);
+    await logError("auth_sign_out", err);
+  }
   redirect("/");
 }
 

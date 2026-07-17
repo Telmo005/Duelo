@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { adminAuditLog, profiles } from "@/db/schema";
 import { desc, sql } from "drizzle-orm";
+import { logError } from "@/lib/errorLog";
 
 export type AdminAction =
   | "password_reset"
@@ -28,6 +29,7 @@ export async function logAdminAction(
     await db.insert(adminAuditLog).values({ adminId, action, targetUserId, detail });
   } catch (err) {
     console.error("logAdminAction failed", { adminId, action, targetUserId, err });
+    await logError("admin_audit_log", err, { adminId, action, targetUserId });
   }
 }
 

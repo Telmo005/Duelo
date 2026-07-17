@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { ActionButton } from "@/components/ui/action-button";
+import { logClientError } from "@/lib/actions/errors";
 
 /**
  * Catches any uncaught error thrown while rendering a page under the root
@@ -18,6 +19,7 @@ import { ActionButton } from "@/components/ui/action-button";
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("Unhandled page error:", error);
+    logClientError(error.message, error.stack ?? null, typeof window !== "undefined" ? window.location.href : undefined).catch(() => {});
   }, [error]);
 
   return (

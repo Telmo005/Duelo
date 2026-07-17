@@ -1,7 +1,11 @@
 import { z } from "zod";
 
-// Mozambique phone number — M-Pesa (+258 84/85) and e-Mola (+258 86/87)
-const phoneRegex = /^\+258\s?8[4-7]\s?\d{3}\s?\d{4}$/;
+// Mozambique mobile number — this is only ever used as a login identifier
+// (the synthetic-email trick in lib/actions/auth.ts), never to infer a
+// mobile money wallet, so every real network prefix is accepted: Mcel
+// (82/83), Vodacom/M-Pesa (84/85), Movitel/e-Mola (86/87). Which wallet
+// someone actually pays with is chosen separately at deposit time.
+const phoneRegex = /^\+258\s?8[2-7]\s?\d{3}\s?\d{4}$/;
 
 export const displayNameSchema = z
   .string()
@@ -11,7 +15,7 @@ export const displayNameSchema = z
 
 export const passwordSchema = z
   .string()
-  .min(8, "Password deve ter pelo menos 8 caracteres")
+  .min(4, "Password deve ter pelo menos 4 caracteres")
   .max(72, "Password demasiado longa");
 
 export const registerSchema = z.object({

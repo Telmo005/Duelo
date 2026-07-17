@@ -128,6 +128,82 @@
   --live-10: rgba(240, 69, 91, 0.10);
 }
 
+/* ── Light theme ────────────────────────────────────────────
+   Opted into via [data-theme="light"] on <html> (see components/theme/
+   theme-toggle.tsx + the inline script in app/layout.tsx that applies it
+   before first paint, avoiding a dark-then-light flash). The brand stays
+   dark-by-default — gold-on-charcoal is Duelo's identity — but every token
+   below is deliberately chosen, not just inverted: --primary/--success/
+   --destructive/--locked are all DEEPENED versions of their dark-mode hues,
+   because the original values were tuned for contrast against a near-black
+   background and read as washed-out (or fail text contrast entirely) on
+   white. Same relationship the dark theme already has to its own
+   background, just recalculated for the opposite direction. */
+:root[data-theme="light"] {
+  --background: #F6F6FA;
+  --foreground: #15161F;
+
+  --card: #FFFFFF;
+  --card-foreground: #15161F;
+  --popover: #FFFFFF;
+  --popover-foreground: #15161F;
+
+  --primary: #A9790C;
+  --primary-foreground: #14150B;
+
+  --secondary: #EEEFF3;
+  --secondary-foreground: #15161F;
+
+  --muted: #EEEFF3;
+  --muted-foreground: #6B7280;
+
+  --accent: #FBF1D6;
+  --accent-foreground: #8A6508;
+
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+
+  --success: #059669;
+  --success-foreground: #FFFFFF;
+  --locked: #6D28D9;
+  --locked-foreground: #FFFFFF;
+  --live: #DC2626;
+
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #A9790C;
+
+  --shadow-card: 0 2px 12px rgba(20, 21, 31, 0.08);
+  --shadow-elevated: 0 0 28px rgba(169, 121, 12, 0.30);
+  --shadow-focus: 0 0 0 3px rgba(169, 121, 12, 0.22);
+
+  --success-10: rgba(5, 150, 105, 0.10);
+  --success-15: rgba(5, 150, 105, 0.15);
+  --success-20: rgba(5, 150, 105, 0.20);
+  --success-25: rgba(5, 150, 105, 0.25);
+  --success-90: rgba(5, 150, 105, 0.90);
+  --primary-10: rgba(169, 121, 12, 0.10);
+  --primary-15: rgba(169, 121, 12, 0.15);
+  --primary-20: rgba(169, 121, 12, 0.20);
+  --primary-30: rgba(169, 121, 12, 0.30);
+  --primary-40: rgba(169, 121, 12, 0.40);
+  --primary-50: rgba(169, 121, 12, 0.50);
+  --primary-80: rgba(169, 121, 12, 0.80);
+  --primary-90: rgba(169, 121, 12, 0.90);
+  --destructive-10: rgba(220, 38, 38, 0.10);
+  --destructive-20: rgba(220, 38, 38, 0.20);
+  --destructive-30: rgba(220, 38, 38, 0.30);
+  --destructive-35: rgba(220, 38, 38, 0.35);
+  --destructive-40: rgba(220, 38, 38, 0.40);
+  --destructive-50: rgba(220, 38, 38, 0.50);
+  --locked-10: rgba(109, 40, 217, 0.10);
+  --live-10: rgba(220, 38, 38, 0.10);
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
 @theme inline {
   --font-sans: var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 

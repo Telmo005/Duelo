@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { importUpcomingFixtures } from "@/lib/fixtures-import";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
+import { logError } from "@/lib/errorLog";
 
 /**
  * Imports upcoming fixtures for the covered European leagues — see
@@ -21,6 +22,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await importUpcomingFixtures();
-  return NextResponse.json(result);
+  try {
+    const result = await importUpcomingFixtures();
+    return NextResponse.json(result);
+  } catch (err) {
+    await logError("cron_import_fixtures", err, { stage: "top_level" });
+    return NextResponse.json({ error: "internal error" }, { status: 500 });
+  }
 }

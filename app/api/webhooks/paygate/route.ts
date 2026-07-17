@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { PayGateClient, type PayGateWebhook } from "@/lib/paygate-client";
+import { logError } from "@/lib/errorLog";
 
 /**
  * Receives fan-out events from the PayGate gateway (mpesa/emola via
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
       // PayGate retry) or the reconciliation job tries again. No phantom
       // 'success' is ever written before the money lands.
       console.error("wallet_credit failed for deposit", deposit.id, creditError);
+      await logError("webhook_paygate", creditError, { depositId: deposit.id, userId: deposit.user_id });
       return NextResponse.json({ error: "credit failed" }, { status: 500 });
     }
 

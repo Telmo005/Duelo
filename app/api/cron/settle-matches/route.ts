@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { fetchFixtureResult } from "@/lib/sportsData";
 import { broadcastFeedEvent } from "@/lib/realtime";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
+import { logError } from "@/lib/errorLog";
 
 const GRACE_WINDOW_MS = 72 * 60 * 60 * 1000; // SETL-04: void if no result 72h after kickoff
 
@@ -28,6 +29,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    return await settleMatches();
+  } catch (err) {
+    // Anything that escapes the per-match try/catch below (e.g. the DB
+    // itself unreachable) would otherwise just 500 with nothing durable to
+    // show for it — this is exactly the "cron silently died at 3am" case
+    // the error log exists to catch.
+    await logError("cron_settle_matches", err, { stage: "top_level" });
+    return NextResponse.json({ error: "internal error" }, { status: 500 });
+  }
+}
+
+async function settleMatches() {
   const candidates = await db
     .select()
     .from(matches)
@@ -72,6 +86,7 @@ export async function GET(request: Request) {
       }
     } catch (err) {
       results.push({ matchId: match.id, action: "error", detail: err instanceof Error ? err.message : String(err) });
+      await logError("cron_settle_matches", err, { matchId: match.id });
     }
   }
 
@@ -99,6 +114,7 @@ export async function GET(request: Request) {
     const { data: closed, error } = await service.rpc("match_close_if_empty", { p_match_id: match.id });
     if (error) {
       results.push({ matchId: match.id, action: "error", detail: error.message });
+      await logError("cron_settle_matches", error, { matchId: match.id, stage: "close_if_empty" });
     } else if (closed) {
       results.push({ matchId: match.id, action: "closed_no_bets" });
     }
