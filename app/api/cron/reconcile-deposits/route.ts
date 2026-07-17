@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { reconcileStuckDeposits } from "@/lib/deposit-reconcile";
+import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 /**
  * Reconciliation safety net for the deposit webhook — see
@@ -12,8 +13,7 @@ import { reconcileStuckDeposits } from "@/lib/deposit-reconcile";
  * (e.g. `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/reconcile-deposits`).
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

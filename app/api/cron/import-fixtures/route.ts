@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { importUpcomingFixtures } from "@/lib/fixtures-import";
+import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 /**
  * Imports upcoming fixtures for the covered European leagues — see
@@ -16,8 +17,7 @@ import { importUpcomingFixtures } from "@/lib/fixtures-import";
  * Local dev: `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/import-fixtures`
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -4,6 +4,7 @@ import { and, eq, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { matches } from "@/db/schema";
 import { fetchFixtureLive } from "@/lib/sportsData";
+import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 /**
  * Polls API-Football for the live score + minute of every in-play,
@@ -23,8 +24,7 @@ import { fetchFixtureLive } from "@/lib/sportsData";
  *   curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/update-live-scores
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

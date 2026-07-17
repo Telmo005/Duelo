@@ -7,7 +7,7 @@ import { profiles } from "@/db/schema";
 import { registerSchema, signInSchema, changePasswordSchema } from "@/lib/validation/auth";
 import { normalizePhone } from "@/lib/phone";
 import { getRequestFingerprint } from "@/lib/requestInfo";
-import { checkLoginRateLimit, recordLoginAttempt } from "@/lib/rateLimit";
+import { checkLoginRateLimit, recordLoginAttempt, checkRegisterRateLimit, recordRegisterAttempt } from "@/lib/rateLimit";
 
 type ActionResult = { error?: string };
 
@@ -43,10 +43,23 @@ export async function registerUser(
   const { displayName, password, ageConfirmed } = parsed.data;
   const phone = normalizePhone(parsed.data.phone);
   const syntheticEmail = phoneToSyntheticEmail(phone);
+  const { ip } = await getRequestFingerprint();
 
   // 2. Enforce 18+ server-side — belt AND suspenders (client also disables the button)
   if (!ageConfirmed) {
     return { error: "Deves confirmar que tens 18 anos ou mais" };
+  }
+
+  // Fail OPEN, same reasoning as signIn: this is an extra layer against a
+  // script mass-creating accounts, not the actual account-creation logic —
+  // a DB hiccup here shouldn't stop real people from registering.
+  try {
+    const rateLimit = await checkRegisterRateLimit(ip);
+    if (!rateLimit.allowed) {
+      return { error: rateLimit.message };
+    }
+  } catch (err) {
+    console.error("checkRegisterRateLimit failed, allowing attempt through:", err);
   }
 
   // 3. Create Supabase Auth user (owns credential hashing — never hand-rolled).
@@ -58,6 +71,16 @@ export async function registerUser(
     password,
     email_confirm: true,
   });
+
+  // Best-effort only, same as recordLoginAttempt — counts the expensive
+  // part (a real Supabase Auth user creation call) towards the per-IP
+  // ceiling regardless of what happens downstream (profile insert, wallet
+  // creation), since that's the part actually worth rate-limiting.
+  try {
+    await recordRegisterAttempt(phone, ip, !authError);
+  } catch (err) {
+    console.error("recordRegisterAttempt failed:", err);
+  }
 
   if (authError) {
     // Normalise Supabase errors into user-friendly messages (no stack leak)

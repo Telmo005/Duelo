@@ -51,7 +51,15 @@ export class PayGateClient {
     private readonly baseUrl = process.env.PAYGATE_BASE_URL!,
     private readonly apiKey = process.env.PAYGATE_API_KEY!,
     private readonly callbackSecret = process.env.PAYGATE_CALLBACK_SECRET!
-  ) {}
+  ) {
+    // Fail loudly at construction, not silently at HMAC-verification time —
+    // an unset PAYGATE_CALLBACK_SECRET would otherwise make verifyWebhook
+    // compute its HMAC against the literal string "undefined", which is a
+    // fixed, guessable key anyone could forge a signature against.
+    if (!this.baseUrl || !this.apiKey || !this.callbackSecret) {
+      throw new Error("PayGateClient: PAYGATE_BASE_URL, PAYGATE_API_KEY and PAYGATE_CALLBACK_SECRET must all be set");
+    }
+  }
 
   /** Inicia uma cobrança. Devolve o checkout_url para redirecionar o utilizador. */
   async createCharge(input: CreateChargeInput): Promise<CreateChargeResult> {
