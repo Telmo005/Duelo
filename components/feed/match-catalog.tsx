@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link, { useLinkStatus } from "next/link";
-import { Search } from "lucide-react";
+import { Search, CalendarX } from "lucide-react";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Input } from "@/components/ui/input";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -78,8 +78,18 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
       </div>
 
       {groups.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          {open.length === 0 ? "Sem jogos disponíveis de momento." : "Nenhum jogo encontrado."}
+        <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-6 py-12 text-center">
+          <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground" aria-hidden>
+            <CalendarX className="size-7" />
+          </div>
+          <p className="mb-1.5 text-base font-bold">
+            {open.length === 0 ? "Sem jogos disponíveis" : "Nenhum jogo encontrado"}
+          </p>
+          <p className="max-w-64 text-sm leading-relaxed text-muted-foreground">
+            {open.length === 0
+              ? "Ainda não há jogos abertos para apostar. Volta mais tarde."
+              : "Tenta outra equipa ou liga."}
+          </p>
         </div>
       ) : (
         <div className="flex flex-col gap-4">

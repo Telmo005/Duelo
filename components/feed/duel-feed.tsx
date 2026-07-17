@@ -45,7 +45,7 @@ export function DuelFeed({ duels, live = false, currentUserId }: { duels: Duel[]
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div data-no-swipe className="flex gap-1.5 overflow-x-auto pb-1">
         {FILTERS.map((f) => {
           const isActive = filter === f.key;
           const Icon = "icon" in f ? f.icon : null;
