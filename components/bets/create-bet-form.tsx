@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Lock, Handshake, CalendarX } from "lucide-react";
+import { Lock, Handshake, CalendarX, Search } from "lucide-react";
 import { createBetAction } from "@/lib/actions/bets";
 import { TeamBadge } from "@/components/match/team-badge";
 import { SectionLabel } from "@/components/ui/section-label";
 import { OptionCard } from "@/components/ui/option-card";
 import { InfoRow } from "@/components/ui/info-row";
 import { ActionButton } from "@/components/ui/action-button";
+import { Input } from "@/components/ui/input";
+import { leagueRank } from "@/lib/leagueTiers";
 
 export type MatchOption = {
   id: string;
@@ -64,6 +66,7 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
   const [prediction, setPrediction] = useState<PredictionKey | null>(null);
   const [stake, setStake] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [matchQuery, setMatchQuery] = useState("");
 
   // If the selected match ages out (its kickoff passes while this form is
   // open) fall back to the next available one instead of leaving a phantom,
@@ -109,49 +112,53 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
     });
   }
 
+  // Same "best leagues first" grouping the feed's own "Jogos" tab uses
+  // (lib/leagueTiers.ts) plus a name search — this list can be long once the
+  // catalogue fills up, and the match is already chosen by default (or via
+  // the feed), so this is "change the match" rather than the primary path.
+  const matchNeedle = matchQuery.trim().toLowerCase();
+  const searchedMatches = matchNeedle
+    ? openMatches.filter((m) => `${m.home} ${m.away} ${m.league}`.toLowerCase().includes(matchNeedle))
+    : openMatches;
+  const matchGroups = useMemo(() => {
+    const byLeague = new Map<string, MatchOption[]>();
+    for (const m of searchedMatches) {
+      if (!byLeague.has(m.league)) byLeague.set(m.league, []);
+      byLeague.get(m.league)!.push(m);
+    }
+    return [...byLeague.entries()].sort(([a], [b]) => leagueRank(a) - leagueRank(b));
+  }, [searchedMatches]);
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      {/* ── Step 1: pick the match ─────────────────────────────── */}
-      <section>
-        <SectionLabel step={1}>Escolhe o jogo</SectionLabel>
-        {openMatches.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-5 py-8 text-center">
-            <CalendarX className="size-6 text-muted-foreground" aria-hidden />
-            <p className="text-sm text-muted-foreground">Os jogos disponíveis já começaram entretanto. Volta à lista e escolhe outro.</p>
+      {/* ── Selected match, always visible up top ─────────────────── */}
+      {selectedMatch ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <TeamBadge name={selectedMatch.home} logoUrl={selectedMatch.homeLogoUrl} size={34} />
+            <TeamBadge name={selectedMatch.away} logoUrl={selectedMatch.awayLogoUrl} size={34} />
           </div>
-        ) : (
-        <div className="flex flex-col gap-2.5">
-          {openMatches.map((m) => (
-            <OptionCard
-              key={m.id}
-              selected={matchId === m.id}
-              onSelect={() => { setMatchId(m.id); setPrediction(null); }}
-              ariaLabel={`${m.home} vs ${m.away}`}
-              className="flex items-center gap-3 pr-10"
-            >
-              <div className="flex items-center gap-1.5">
-                <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={30} />
-                <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={30} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">
-                  {m.home} <span className="text-muted-foreground">vs</span> {m.away}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {m.league} · {m.kickoffLabel}
-                  {m.isElimination && <span className="ml-1.5 font-semibold text-locked">· Eliminação</span>}
-                </p>
-              </div>
-            </OptionCard>
-          ))}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold">
+              {selectedMatch.home} <span className="font-normal text-muted-foreground">vs</span> {selectedMatch.away}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {selectedMatch.league} · {selectedMatch.kickoffLabel}
+              {selectedMatch.isElimination && <span className="ml-1.5 font-semibold text-locked">· Eliminação</span>}
+            </p>
+          </div>
         </div>
-        )}
-      </section>
+      ) : (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-5 py-8 text-center">
+          <CalendarX className="size-6 text-muted-foreground" aria-hidden />
+          <p className="text-sm text-muted-foreground">Sem jogos disponíveis de momento.</p>
+        </div>
+      )}
 
-      {/* ── Step 2: prediction ─────────────────────────────────── */}
+      {/* ── Step 1: prediction ─────────────────────────────────── */}
       {selectedMatch && (
         <section>
-          <SectionLabel step={2}>A tua previsão</SectionLabel>
+          <SectionLabel step={1}>A tua previsão</SectionLabel>
           {selectedMatch.isElimination && (
             <p className="mb-2.5 -mt-1 text-xs font-medium text-muted-foreground">
               Jogo de eliminação — não há opção de empate, há sempre um vencedor.
@@ -191,9 +198,9 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
         </section>
       )}
 
-      {/* ── Step 3: stake ──────────────────────────────────────── */}
+      {/* ── Step 2: stake ──────────────────────────────────────── */}
       <section>
-        <SectionLabel step={3} htmlFor="stake">Valor da aposta</SectionLabel>
+        <SectionLabel step={2} htmlFor="stake">Valor da aposta</SectionLabel>
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 transition-colors focus-within:border-primary">
           <input
             id="stake"
@@ -268,6 +275,60 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
       <p className="text-center text-xs leading-relaxed text-muted-foreground">
         O valor fica bloqueado na tua carteira até um adversário aceitar e o jogo terminar.
       </p>
+
+      {/* ── Trocar de jogo — searchable, league-grouped, scrolls on its
+           own so browsing it never drags the whole page down with it. ── */}
+      <section>
+        <SectionLabel>Trocar de jogo</SectionLabel>
+        <div className="relative mb-2.5">
+          <Input
+            value={matchQuery}
+            onChange={(e) => setMatchQuery(e.target.value)}
+            placeholder="Procurar equipa ou liga..."
+            className="pr-8"
+          />
+          <Search className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+        </div>
+
+        {matchGroups.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
+            {openMatches.length === 0 ? "Sem jogos disponíveis de momento." : "Nenhum jogo encontrado."}
+          </p>
+        ) : (
+          <div className="max-h-80 overflow-y-auto rounded-2xl border border-border">
+            <div className="flex flex-col gap-3 p-2.5">
+              {matchGroups.map(([league, leagueMatches]) => (
+                <div key={league} className="flex flex-col gap-1.5">
+                  <SectionLabel className="mb-0 px-0.5">{league}</SectionLabel>
+                  {leagueMatches.map((m) => (
+                    <OptionCard
+                      key={m.id}
+                      selected={matchId === m.id}
+                      onSelect={() => { setMatchId(m.id); setPrediction(null); }}
+                      ariaLabel={`${m.home} vs ${m.away}`}
+                      className="flex items-center gap-3 pr-10"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={30} />
+                        <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={30} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold">
+                          {m.home} <span className="text-muted-foreground">vs</span> {m.away}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {m.league} · {m.kickoffLabel}
+                          {m.isElimination && <span className="ml-1.5 font-semibold text-locked">· Eliminação</span>}
+                        </p>
+                      </div>
+                    </OptionCard>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
     </form>
   );
 }

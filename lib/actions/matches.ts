@@ -63,7 +63,12 @@ const bulkFixtureSchema = z.object({
   isElimination: z.boolean().optional().default(false),
 });
 
-const MAX_BULK_FIXTURES = 100;
+// Must stay comfortably above RESULTS_CAP in fixture-search-picker.tsx (150)
+// — that's the most fixtures "Selecionar todos" can ever hand this action in
+// one request, and this cap rejecting the whole batch below that number is
+// exactly what silently zeroed out a real bulk-add attempt (150 selected,
+// this used to cap at 100 with no partial insert — nothing landed at all).
+const MAX_BULK_FIXTURES = 200;
 
 /**
  * Bulk version of addMatchAction, backing the multi-select "Procurar jogo

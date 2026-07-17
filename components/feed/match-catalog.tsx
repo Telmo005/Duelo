@@ -31,7 +31,7 @@ function RowPendingOverlay() {
   const { pending } = useLinkStatus();
   if (!pending) return null;
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-[1px]">
       <Spinner className="size-4" />
     </div>
   );
@@ -44,6 +44,10 @@ function RowPendingOverlay() {
  * groups use (lib/leagueTiers.ts), and searchable by team/league name.
  * Tapping a match jumps straight into bet creation with it preselected
  * (see the matchId query param handling in app/(app)/bets/new/page.tsx).
+ * Each row's Link is `prefetch={false}` — see the comment on CardBody in
+ * duel-post.tsx for why (eager prefetch of every row scrolling through the
+ * viewport both wastes data on slow connections and can make the pending
+ * spinner below skip itself entirely).
  */
 export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
   const [query, setQuery] = useState("");
@@ -100,6 +104,7 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
                 <Link
                   key={m.id}
                   href={`/bets/new?matchId=${m.id}`}
+                  prefetch={false}
                   className="press relative flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-card)] transition-colors hover:border-primary-30"
                 >
                   <span className="flex shrink-0 items-center gap-1">

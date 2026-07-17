@@ -59,7 +59,7 @@ function CardBodyPendingOverlay() {
   const { pending } = useLinkStatus();
   if (!pending) return null;
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-[1px]">
       <Spinner className="size-5" />
     </div>
   );
@@ -68,11 +68,19 @@ function CardBodyPendingOverlay() {
 /** Wraps the row in a link to the full duel receipt (/d/[reference]) — only
  *  for real bets. Falls back to a plain div for the logged-out marketing
  *  preview, which has nothing real to link to. `press` gives the same
- *  immediate tap feedback every other pressable element in the app has. */
+ *  immediate tap feedback every other pressable element in the app has.
+ *  `prefetch={false}`: this is a scrollable list, so every row that drifts
+ *  through the viewport would otherwise get eagerly prefetched — besides
+ *  the wasted data on the slow connections this app targets, a route
+ *  Next.js already fetched ahead of time finishes too fast for the pending
+ *  overlay above to ever have a chance to render (see Next's useLinkStatus
+ *  docs: "If the linked route has been prefetched, the pending state will
+ *  be skipped"). A real tap still triggers an actual navigation either way
+ *  — this only stops the silent background prefetch. */
 function CardBody({ duel, className, children }: { duel: Duel; className: string; children: React.ReactNode }) {
   if (!duel.reference) return <div className={className}>{children}</div>;
   return (
-    <Link href={`/d/${duel.reference}`} className={`press relative ${className}`}>
+    <Link href={`/d/${duel.reference}`} prefetch={false} className={`press relative ${className}`}>
       {children}
       <CardBodyPendingOverlay />
     </Link>
