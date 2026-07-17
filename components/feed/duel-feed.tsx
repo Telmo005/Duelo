@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CheckCheck, LayoutGrid } from "lucide-react";
 import { DuelPost, type Duel } from "./duel-post";
+import { SectionLabel } from "@/components/ui/section-label";
 
 /** Icon-first, one-word filters — the earlier "Aguardam adversário" /
  *  "Trancados" text pills plus a decorative dot-strip underneath were pure
@@ -18,11 +19,42 @@ const FILTERS = [
 
 type FilterKey = (typeof FILTERS)[number]["key"];
 
+/** League display order — not alphabetical, not recency, but relevance to
+ *  Duelo's actual audience: Moçambola leads (the flagship local league this
+ *  product is built around — see CLAUDE.md's market constraints), then the
+ *  Mundial (whatever World Cup cycle is live draws the most attention of
+ *  anything on the calendar), then the three other named v1 competitions in
+ *  their usual prestige order. Anything else not in this list (a league
+ *  added later) falls back after all of these, ordered by recency — so a
+ *  new competition never needs this list touched just to show up. */
+const LEAGUE_PRIORITY = ["Moçambola", "Mundial", "Champions League", "Premier League", "La Liga"];
+
+function leagueRank(league: string): number {
+  const i = LEAGUE_PRIORITY.indexOf(league);
+  return i === -1 ? LEAGUE_PRIORITY.length : i;
+}
+
 export function DuelFeed({ duels, live = false, currentUserId }: { duels: Duel[]; live?: boolean; currentUserId?: string }) {
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const filtered = filter === "all" ? duels : duels.filter((d) => d.status === filter);
   const activeLabel = FILTERS.find((f) => f.key === filter)?.label ?? "";
+
+  // Grouped by league so a Moçambola fan isn't scrolling past a wall of
+  // Champions League duels to find their game. Groups themselves are then
+  // ordered by relevance (see LEAGUE_PRIORITY), not by whichever league
+  // happened to have the most recent bet — recency only breaks ties within
+  // that ranking (Array.sort is stable, and a Map preserves insertion
+  // order, so unranked/tied leagues keep the recency order they arrived in).
+  const groups = useMemo(() => {
+    const byLeague = new Map<string, Duel[]>();
+    for (const duel of filtered) {
+      const league = duel.match.league;
+      if (!byLeague.has(league)) byLeague.set(league, []);
+      byLeague.get(league)!.push(duel);
+    }
+    return [...byLeague.entries()].sort(([a], [b]) => leagueRank(a) - leagueRank(b));
+  }, [filtered]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -58,9 +90,14 @@ export function DuelFeed({ duels, live = false, currentUserId }: { duels: Duel[]
           Nenhum duelo &ldquo;{activeLabel.toLowerCase()}&rdquo; neste momento.
         </div>
       ) : (
-        <div className="flex flex-col gap-1.5">
-          {filtered.map((duel) => (
-            <DuelPost key={duel.id} duel={duel} live={live} currentUserId={currentUserId} />
+        <div className="flex flex-col gap-4">
+          {groups.map(([league, leagueDuels]) => (
+            <div key={league} className="flex flex-col gap-1.5">
+              <SectionLabel className="mb-0 px-0.5">{league}</SectionLabel>
+              {leagueDuels.map((duel) => (
+                <DuelPost key={duel.id} duel={duel} live={live} currentUserId={currentUserId} />
+              ))}
+            </div>
           ))}
         </div>
       )}

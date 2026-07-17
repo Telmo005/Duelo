@@ -137,17 +137,19 @@ export function DuelPost({
   const isOwnBet = live && duel.creatorId === currentUserId;
 
   const info = (
-    <div className="min-w-0 flex-1">
-      <div className="flex min-w-0 items-center gap-1 text-[13.5px] font-bold leading-tight">
-        <span className="truncate">{duel.match.home}</span>
-        <TeamBadge name={duel.match.home} logoUrl={duel.match.homeLogoUrl} size={16} />
-        <span className="shrink-0 font-normal text-muted-foreground">vs</span>
-        <TeamBadge name={duel.match.away} logoUrl={duel.match.awayLogoUrl} size={16} />
-        <span className="truncate">{duel.match.away}</span>
+    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1">
+        <TeamBadge name={duel.match.home} logoUrl={duel.match.homeLogoUrl} size={18} />
+        <TeamBadge name={duel.match.away} logoUrl={duel.match.awayLogoUrl} size={18} />
       </div>
-      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-        {duel.a.name} · {duel.prediction}
-      </p>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-bold leading-tight">
+          {duel.match.home} <span className="font-normal text-muted-foreground">vs</span> {duel.match.away}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          {duel.a.name} · {duel.prediction}
+        </p>
+      </div>
     </div>
   );
 
