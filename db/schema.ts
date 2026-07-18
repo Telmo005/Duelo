@@ -206,10 +206,10 @@ export const matches = pgTable("matches", {
    *  its own. */
   country: text("country"),
   kickoffAt: timestamp("kickoff_at", { withTimezone: true }).notNull(),
-  /** API-Football fixture ID — null for manually seeded matches. Lifecycle/
-   *  settlement no longer depends on this (see 0028_match_live_lifecycle.sql
-   *  — purely time-based now); it only gates the optional live-score badge
-   *  (update-live-scores cron). */
+  /** API-Football fixture ID — null for manually seeded matches. Kept for
+   *  provenance/dedup on re-import only; lifecycle/settlement and the live
+   *  scoreboard are both purely time-based / manual admin input now (see
+   *  0028_match_live_lifecycle.sql) and don't care whether it's set. */
   externalId: text("external_id").unique(),
   resultHome: bigint("result_home", { mode: "number" }),
   resultAway: bigint("result_away", { mode: "number" }),
@@ -236,10 +236,12 @@ export const matches = pgTable("matches", {
 
   /** In-play score + minute (migration 0007) — display-only, deliberately
    *  separate from result_home/result_away so tracking a live score can
-   *  never accidentally trigger or affect settlement (bet_settle_match
-   *  only reads result_home/result_away, never these). Written by the
-   *  update-live-scores cron for API-linked matches, or manually by an
-   *  admin (updateLiveScoreAction) for matches with no automated feed. */
+   *  never accidentally trigger or affect settlement (bet_settle_match only
+   *  reads result_home/result_away, never these). Goals are always manual
+   *  admin input now (updateLiveScoreAction, lib/actions/matches.ts) — there
+   *  is no polling cron. liveMinute is likewise an optional manual override;
+   *  left null, the feed shows an automatic kickoff-based clock instead (see
+   *  computeElapsedMinute in lib/bets.ts). */
   liveHome: integer("live_home"),
   liveAway: integer("live_away"),
   liveMinute: integer("live_minute"),

@@ -9,11 +9,13 @@ import { logError } from "@/lib/errorLog";
  * 'matched' bets, admin notified) 90 minutes later. See
  * supabase/migrations/0028_match_live_lifecycle.sql for the full state
  * machine and why this no longer calls the sports-data API at all: polling
- * api-sports.io per candidate match here (and in update-live-scores) was
- * exhausting the Free-plan quota in production (repeated 429s), stalling
- * every match — real or test — behind the same rate limit. Result entry is
- * manual now (see lib/actions/settlement.ts settleMatchAction), triggered by
- * the admin notification match_advance_lifecycle sends itself.
+ * api-sports.io per candidate match here (and in the now-retired
+ * update-live-scores cron) was exhausting the Free-plan quota in production
+ * (repeated 429s), stalling every match — real or test — behind the same
+ * rate limit. Result entry is manual now (see lib/actions/settlement.ts
+ * settleMatchAction), triggered by the admin notification
+ * match_advance_lifecycle sends itself; the live scoreboard is manual too
+ * (lib/actions/matches.ts updateLiveScoreAction).
  *
  * Wired to the same external cron-job.org schedule this route already had
  * (kept the path so nothing needs reconfiguring there) — protected the same

@@ -73,6 +73,12 @@ export function BetReceiptCard({
   const [copied, setCopied] = useState(false);
   const isCreator = viewerId === bet.creator.id;
   const status = STATUS_LABEL[bet.status];
+  // Real name unless the viewer IS that specific participant — never
+  // inferred from "not the creator", which used to mislabel any third-party
+  // visitor (or the wrong logged-in user) as "Tu" for someone else's bet.
+  function displayName(participantId: string, participantName: string): string {
+    return viewerId === participantId ? "Tu" : participantName;
+  }
   // Short reference, not the raw bet id — a bare UUID in a shared URL reads
   // as a spammy tracking link once it lands in someone else's WhatsApp.
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/d/${bet.reference}` : "";
@@ -169,6 +175,48 @@ export function BetReceiptCard({
           ? { text: "Cancelado", className: "text-muted-foreground border-muted-foreground" }
           : null;
 
+  // Ticket stub slots — positioned by which OUTCOME each side predicted
+  // (home/draw/away), not by creator/opponent role, so whoever bet on a
+  // team always shows up under that team's flag rather than always
+  // left-for-creator/right-for-opponent regardless of what they actually
+  // picked.
+  type Slot = { role: "Criador" | "Adversário"; name: string; label: string };
+  const creatorSlot: Slot = { role: "Criador", name: displayName(bet.creator.id, bet.creator.name), label: bet.predictionLabel };
+
+  let opponentSide: PredictionKey | null = null;
+  let opponentSlot: Slot | null = null;
+  if (bet.opponent && bet.opponentPrediction && bet.opponentPredictionLabel) {
+    opponentSide = bet.opponentPrediction;
+    opponentSlot = { role: "Adversário", name: displayName(bet.opponent.id, bet.opponent.name), label: bet.opponentPredictionLabel };
+  } else if (bet.opponent) {
+    // Matched before the three-way market existed (see
+    // 0021_opponent_prediction.sql) — the opponent implicitly bet against
+    // the creator's exact pick, so there's no specific side to align them
+    // under. Rare (only pre-migration bets); falls back to the old generic
+    // framing rendered separately below.
+    opponentSlot = { role: "Adversário", name: displayName(bet.opponent.id, bet.opponent.name), label: `Contra "${bet.predictionLabel}"` };
+  } else if (canAcceptHere && effectiveOpponentPrediction) {
+    opponentSide = effectiveOpponentPrediction;
+    opponentSlot = { role: "Adversário", name: "Tu", label: predictionLabel(effectiveOpponentPrediction) };
+  }
+  const legacyOpponentSlot = opponentSlot && !opponentSide ? opponentSlot : null;
+
+  const bySide: Partial<Record<PredictionKey, Slot>> = { [bet.prediction]: creatorSlot };
+  if (opponentSlot && opponentSide) bySide[opponentSide] = opponentSlot;
+  const showDrawColumn = !!bySide.draw;
+  const emptySlotText = bet.status === "waiting" ? "por decidir…" : "—";
+
+  function renderSlot(slot: Slot | undefined) {
+    if (!slot) return <p className="text-sm text-muted-foreground">{emptySlotText}</p>;
+    return (
+      <>
+        <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{slot.role}</p>
+        <p className="max-w-full truncate text-sm font-bold">{slot.name}</p>
+        <p className={`text-sm font-extrabold ${slot.role === "Criador" ? "text-primary" : "text-success"}`}>{slot.label}</p>
+      </>
+    );
+  }
+
   return (
     <div className="relative overflow-hidden rounded-lg border border-border bg-card shadow-[var(--shadow-elevated)]">
       <div className="ticket-edge-top" aria-hidden />
@@ -248,41 +296,38 @@ export function BetReceiptCard({
 
       <div className="mx-5 border-t border-dashed border-border" />
 
-      {/* Ticket stub — literally two halves of the same slip, one per side
-       *  of the duel, so who's betting what is never a sentence you have to
-       *  parse. Gold for the creator's call, green for the challenger's —
-       *  same colour "who wins what" already carries everywhere else in
-       *  the app (the feed's payout chip is the same green). */}
-      <div className="grid grid-cols-2">
-        <div className="flex flex-col items-center gap-1 border-r border-dashed border-border px-3 py-4 text-center">
-          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Criador</p>
-          <p className="max-w-full truncate text-sm font-bold">{bet.creator.name}</p>
-          <p className="text-sm font-extrabold text-primary">{bet.predictionLabel}</p>
+      {/* Ticket stub — positioned by predicted side (home/draw/away), not by
+       *  creator/opponent role, so whoever bet on a team always lines up
+       *  under that team's flag above. Gold for the creator's call, green
+       *  for the challenger's — same colour "who wins what" already carries
+       *  everywhere else in the app (the feed's payout chip is the same
+       *  green). Real names always — "Tu" only for the actual viewer, never
+       *  inferred for a third party looking at someone else's bet. */}
+      {legacyOpponentSlot ? (
+        <div className="grid grid-cols-2">
+          <div className="flex flex-col items-center gap-1 border-r border-dashed border-border px-3 py-4 text-center">
+            {renderSlot(creatorSlot)}
+          </div>
+          <div className="flex flex-col items-center gap-1 px-3 py-4 text-center">{renderSlot(legacyOpponentSlot)}</div>
         </div>
-        <div className="flex flex-col items-center gap-1 px-3 py-4 text-center">
-          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-            {isCreator ? "Adversário" : "A tua aposta"}
-          </p>
-          {bet.opponent && bet.opponentPredictionLabel ? (
-            <>
-              <p className="max-w-full truncate text-sm font-bold">{isCreator ? bet.opponent.name : "Tu"}</p>
-              <p className="text-sm font-extrabold text-success">{bet.opponentPredictionLabel}</p>
-            </>
-          ) : bet.opponent ? (
-            <>
-              <p className="max-w-full truncate text-sm font-bold">{isCreator ? bet.opponent.name : "Tu"}</p>
-              <p className="text-sm font-extrabold text-success">Contra &ldquo;{bet.predictionLabel}&rdquo;</p>
-            </>
-          ) : canAcceptHere && effectiveOpponentPrediction ? (
-            <>
-              <p className="max-w-full truncate text-sm font-bold">Tu</p>
-              <p className="text-sm font-extrabold text-success">{predictionLabel(effectiveOpponentPrediction)}</p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">por decidir…</p>
-          )}
+      ) : showDrawColumn ? (
+        <div className="grid grid-cols-3">
+          <div className="flex flex-col items-center gap-1 border-r border-dashed border-border px-2 py-4 text-center">
+            {renderSlot(bySide.home)}
+          </div>
+          <div className="flex flex-col items-center gap-1 border-r border-dashed border-border px-2 py-4 text-center">
+            {renderSlot(bySide.draw)}
+          </div>
+          <div className="flex flex-col items-center gap-1 px-2 py-4 text-center">{renderSlot(bySide.away)}</div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2">
+          <div className="flex flex-col items-center gap-1 border-r border-dashed border-border px-3 py-4 text-center">
+            {renderSlot(bySide.home)}
+          </div>
+          <div className="flex flex-col items-center gap-1 px-3 py-4 text-center">{renderSlot(bySide.away)}</div>
+        </div>
+      )}
 
       {/* Choose your side — only for a prospective acceptor, before they've
        *  committed. A knockout fixture leaves exactly one outcome once the

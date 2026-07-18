@@ -85,13 +85,12 @@ const MAX_BULK_FIXTURES = 200;
  * Bulk version of addMatchAction, backing the multi-select "Procurar jogo
  * real" picker (components/admin/fixture-search-picker.tsx) — an admin
  * ticks N fixtures from a day's list and adds them all in one request
- * instead of one form submission per match. Every row keeps its
- * `externalId`, which is the whole point: matches added this way (unlike
- * hand-typed ones) become eligible for the update-live-scores cron's score
- * badge (see lib/sportsData.ts fetchFixtureLive, keyed by externalId) —
- * lifecycle/settlement itself is now purely time-based and doesn't care
- * whether externalId is set (see 0028_match_live_lifecycle.sql). Idempotent
- * via onConflictDoNothing on externalId, so re-adding an already-picked fixture
+ * instead of one form submission per match. Every row keeps its `externalId`
+ * mainly for provenance/dedup — lifecycle/settlement is purely time-based
+ * and doesn't care whether it's set (see 0028_match_live_lifecycle.sql); the
+ * live scoreboard is manual admin input for every match now, API-linked or
+ * not (see updateLiveScoreAction). Idempotent via onConflictDoNothing on
+ * externalId, so re-adding an already-picked fixture
  * (e.g. the admin re-runs a search overlapping a previous one) is a no-op,
  * not a duplicate or a clobber of settlement state already recorded against
  * it.
@@ -302,11 +301,13 @@ const liveScoreSchema = z.object({
  * progresses — completely separate from settlement. Liquidar (see
  * lib/actions/settlement.ts::settleMatchAction) is the only action that
  * writes result_home/result_away and pays out; this one never touches
- * either, so an admin can update the score every time a team scores
- * without triggering any payment, and only run Liquidar once at full time.
- * The fallback for matches with no automated live-score feed (no
- * external_id) — API-linked ones already get this from the
- * update-live-scores cron.
+ * either, so an admin can update the score every time a team scores without
+ * triggering any payment, and only run Liquidar once at full time. The sole
+ * source for every match now, API-linked or not — there is no polling cron
+ * (see 0028_match_live_lifecycle.sql for why: it was exhausting the
+ * API-Football Free-plan quota). Minute is optional; left blank, the feed
+ * shows an automatic kickoff-based clock instead (computeElapsedMinute in
+ * lib/bets.ts) — only pass one to override/correct it.
  */
 export async function updateLiveScoreAction(matchId: string, input: Record<string, unknown>): Promise<ActionResult> {
   const admin = await requireAdmin();
