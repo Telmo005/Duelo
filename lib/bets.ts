@@ -177,13 +177,18 @@ async function fetchLiveByMatch(matchIds: string[]): Promise<Map<string, LiveRow
   }
 }
 
-/** Elapsed minutes since kickoff, clamped to a normal match's length — the
- *  default "clock" shown for a 'live' match with no manual minute override
- *  from the admin (see updateLiveScoreAction). Purely derived, no polling:
- *  the same time-based approach match_advance_lifecycle uses to decide the
- *  90-minute cutoff (0028_match_live_lifecycle.sql). */
-function computeElapsedMinute(kickoffAt: Date): number {
-  return Math.max(0, Math.min(90, Math.floor((Date.now() - kickoffAt.getTime()) / 60000)));
+/** Elapsed-minutes label since kickoff — the default "clock" shown for a
+ *  live/awaiting-result match with no manual minute override from the admin
+ *  (see updateLiveScoreAction). Purely derived, no polling: the same
+ *  time-based approach match_advance_lifecycle uses to decide the 90-minute
+ *  cutoff (0028_match_live_lifecycle.sql). Past 90 real minutes — which
+ *  includes every 'needs_review' match, since that's exactly what triggers
+ *  at the 90-minute mark — shown as "90+" (stoppage time), matching how
+ *  every football broadcast reads a match still going past regulation,
+ *  rather than freezing at a literal "90" that looks stuck. */
+function computeElapsedMinuteLabel(kickoffAt: Date): string {
+  const minutes = Math.max(0, Math.floor((Date.now() - kickoffAt.getTime()) / 60000));
+  return minutes > 90 ? "90+" : String(minutes);
 }
 
 /** Fixtures a user can still bet on: kickoff strictly in the future AND
@@ -300,9 +305,15 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
       // (match_advance_lifecycle flips it at kickoff — see
       // 0028_match_live_lifecycle.sql), not derived from a time window. A
       // "waiting" bet (nobody matched it) never shows as live regardless —
-      // there's no real duel in progress to show.
+      // there's no real duel in progress to show. 'needs_review' counts as
+      // live too: that's the exact state a match sits in from the 90-minute
+      // mark until an admin enters the real result, and to a bettor it's
+      // still "the match is happening/just ended, awaiting the outcome" —
+      // reverting to a plain scheduled-time label the moment the internal
+      // 90-minute cutover fires (before any admin has actually settled
+      // anything) reads as the match mysteriously going backwards in time.
       const live = liveById.get(match.id);
-      const isLive = bet.status === "matched" && match.matchStatus === "live";
+      const isLive = bet.status === "matched" && (match.matchStatus === "live" || match.matchStatus === "needs_review");
 
       return {
         id: bet.id,
@@ -331,7 +342,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         // Admin's manual minute (see updateLiveScoreAction) wins when set;
         // otherwise the clock runs automatically off kickoff time — no
         // polling needed either way.
-        minute: isLive ? `${live?.live_minute ?? computeElapsedMinute(match.kickoffAt)}'` : undefined,
+        minute: isLive ? `${live?.live_minute ?? computeElapsedMinuteLabel(match.kickoffAt)}'` : undefined,
       };
     })
     .filter((d): d is Duel => d !== null)
