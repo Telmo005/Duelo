@@ -2,46 +2,14 @@
  * API-Football (api-sports.io) client. Settlement/lifecycle (bet_settle_match
  * / bet_void_match / match_advance_lifecycle, see
  * supabase/migrations/0028_match_live_lifecycle.sql) is purely time-based and
- * never calls this file — result entry is a manual admin action. What's left
- * here is fixture import (kickoff time/teams) and the optional live-score
- * badge for the feed.
+ * never calls this file — result entry and the live scoreboard (goals; the
+ * minute ticks automatically off kickoff time) are both manual admin input
+ * now (lib/actions/matches.ts updateLiveScoreAction). What's left here is
+ * fixture import (kickoff time/teams) and the admin's team-search/fixture-
+ * search pickers — the only remaining calls to the vendor API, all
+ * admin-triggered rather than polled, to stay well inside a Free-plan daily
+ * quota (see the 429s that motivated 0028_match_live_lifecycle.sql).
  */
-
-export type FixtureLive =
-  | { state: "live"; homeGoals: number; awayGoals: number; minute: number | null; short: string }
-  | { state: "not_live"; short: string };
-
-/** API-Football short-status codes that mean the match is currently being played
- *  (or paused mid-match). Anything else — NS/FT/PST/… — is "not live". */
-const IN_PLAY_CODES = new Set(["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT", "LIVE"]);
-
-/**
- * Fetches the *live* score + elapsed minute for an in-play fixture, purely
- * for display on the feed scoreboard — never drives settlement (that's
- * manual/time-based now, see the file header). Returns state "not_live" for
- * anything not currently being played — the caller then leaves the match's
- * live columns untouched.
- */
-export async function fetchFixtureLive(externalId: string): Promise<FixtureLive> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) throw new Error("API_FOOTBALL_KEY is not set");
-
-  const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${encodeURIComponent(externalId)}`, {
-    headers: { "x-apisports-key": apiKey },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`API-Football request failed: ${res.status}`);
-
-  const body = await res.json();
-  const fixture = body?.response?.[0];
-  const short: string = fixture?.fixture?.status?.short ?? "";
-  if (!fixture || !IN_PLAY_CODES.has(short)) return { state: "not_live", short };
-
-  const homeGoals = typeof fixture.goals?.home === "number" ? fixture.goals.home : 0;
-  const awayGoals = typeof fixture.goals?.away === "number" ? fixture.goals.away : 0;
-  const minute = typeof fixture.fixture?.status?.elapsed === "number" ? fixture.fixture.status.elapsed : null;
-  return { state: "live", homeGoals, awayGoals, minute, short };
-}
 
 export type FixtureSearchResult = {
   externalId: string;

@@ -145,14 +145,6 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
   };
 }
 
-/** A live score is only treated as "live" if the poller (or an admin's
- *  manual entry — see updateLiveScoreAction, the only source for matches
- *  with no external_id to auto-poll) refreshed it within this window —
- *  stops a stale "67'" lingering if updates stop or the match ended but
- *  hasn't been settled yet. 90 minutes covers a full match without a
- *  score update in between going stale mid-game. */
-const LIVE_FRESHNESS_MS = 90 * 60 * 1000;
-
 type LiveRow = {
   id: string;
   live_home: number | null;
@@ -163,7 +155,12 @@ type LiveRow = {
 
 /** Reads live_* columns for the given matches. Guarded: if migration 0007
  *  hasn't been applied yet the columns don't exist, so we swallow the error
- *  and report no live matches (the feed just shows kickoff times). */
+ *  and report no live matches (the feed just shows kickoff times). No
+ *  freshness filter here — whether a match is actually live at all is
+ *  match_status === 'live' (real, stored state, see
+ *  0028_match_live_lifecycle.sql), checked by the caller. Goals are always
+ *  manual admin input now (see updateLiveScoreAction) — there's no poller
+ *  left that could go stale mid-game. */
 async function fetchLiveByMatch(matchIds: string[]): Promise<Map<string, LiveRow>> {
   if (matchIds.length === 0) return new Map();
   try {
@@ -173,15 +170,19 @@ async function fetchLiveByMatch(matchIds: string[]): Promise<Map<string, LiveRow
         from public.matches
        where id in (${idList})
     `)) as unknown as LiveRow[];
-    const now = Date.now();
-    return new Map(
-      rows
-        .filter((r) => r.live_updated_at != null && now - new Date(r.live_updated_at).getTime() < LIVE_FRESHNESS_MS && r.live_minute != null)
-        .map((r) => [r.id, r]),
-    );
+    return new Map(rows.map((r) => [r.id, r]));
   } catch {
     return new Map();
   }
+}
+
+/** Elapsed minutes since kickoff, clamped to a normal match's length — the
+ *  default "clock" shown for a 'live' match with no manual minute override
+ *  from the admin (see updateLiveScoreAction). Purely derived, no polling:
+ *  the same time-based approach match_advance_lifecycle uses to decide the
+ *  90-minute cutoff (0028_match_live_lifecycle.sql). */
+function computeElapsedMinute(kickoffAt: Date): number {
+  return Math.max(0, Math.min(90, Math.floor((Date.now() - kickoffAt.getTime()) / 60000)));
 }
 
 /** Fixtures a user can still bet on: kickoff strictly in the future AND
@@ -318,8 +319,11 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         stakeCents: bet.stakeCents,
         status: isLive ? "live" : bet.status === "matched" ? "locked" : "waiting",
         createdAgo: new Date(bet.createdAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
-        score: isLive && live!.live_home != null && live!.live_away != null ? { home: live!.live_home, away: live!.live_away } : undefined,
-        minute: isLive && live!.live_minute != null ? `${live!.live_minute}'` : undefined,
+        score: isLive && live?.live_home != null && live?.live_away != null ? { home: live.live_home, away: live.live_away } : undefined,
+        // Admin's manual minute (see updateLiveScoreAction) wins when set;
+        // otherwise the clock runs automatically off kickoff time — no
+        // polling needed either way.
+        minute: isLive ? `${live?.live_minute ?? computeElapsedMinute(match.kickoffAt)}'` : undefined,
       };
     })
     .filter((d): d is Duel => d !== null);

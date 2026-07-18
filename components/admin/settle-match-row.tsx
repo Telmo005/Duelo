@@ -16,6 +16,16 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   needs_review: { label: "Precisa de liquidação", className: "bg-destructive-10 text-destructive" },
 };
 
+/** Mirrors lib/bets.ts computeElapsedMinute — duplicated rather than
+ *  imported since that file pulls in server-only db code that shouldn't
+ *  bundle into this client component (same reasoning as the lib/ledger-
+ *  format.ts split documented elsewhere in this codebase). Shown as a hint
+ *  so the admin knows leaving "min" blank isn't "no minute", it's "let the
+ *  automatic kickoff clock handle it". */
+function computeElapsedMinute(kickoffAt: Date): number {
+  return Math.max(0, Math.min(90, Math.floor((Date.now() - kickoffAt.getTime()) / 60000)));
+}
+
 /** Small "X-Y" pair of number inputs, reused for both the live-score
  *  tracker and the final settlement score — same shape, different action
  *  behind them. */
@@ -150,9 +160,12 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
       </div>
 
       {/* Placar ao vivo — display-only, updates as goals happen, never pays
-       *  anyone. Kept visually and functionally separate from Liquidar
-       *  below, which is the one action that actually settles bets and
-       *  pays out. */}
+       *  anyone. The minute is optional: leave it blank and the feed shows
+       *  the automatic kickoff-based clock instead (see computeElapsedMinute
+       *  in lib/bets.ts) — only fill it in to correct/override that (e.g.
+       *  stoppage time). Kept visually and functionally separate from
+       *  Liquidar below, which is the one action that actually settles bets
+       *  and pays out. */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary/40 px-3 py-2.5">
         <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
           <Radio className="size-3.5" aria-hidden /> Placar ao vivo
@@ -162,11 +175,11 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           type="number"
           min={0}
           max={150}
-          placeholder="min"
+          placeholder={match.matchStatus === "live" ? `auto ${computeElapsedMinute(match.kickoffAt)}'` : "min"}
           value={liveMinute}
           onChange={(e) => setLiveMinute(e.target.value)}
           disabled={isPending}
-          className="w-14 rounded-lg border border-border bg-background px-2 py-1.5 text-center text-xs outline-none focus:border-primary disabled:opacity-50"
+          className="w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-center text-xs outline-none focus:border-primary disabled:opacity-50"
         />
         <button
           type="button"

@@ -165,9 +165,24 @@ function MoneySlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
   const stakeLabel = formatCentsAsMt(duel.stakeCents);
   const payoutLabel = formatCentsAsMt(payoutCents);
 
-  // Not joinable (already matched/live, or waiting on a match that already
-  // kicked off) — no more "why should I care" hook to sell, just the stake
-  // that was on the table, plain.
+  // Already a real, locked-in duel (matched — "locked" or "live") — the
+  // stake is committed either way, so what's actually interesting now is
+  // what it turns into, not what went in. Muted grey (not the success green
+  // used for the still-joinable preview below) — this isn't a "come join"
+  // hook anymore, just an informational amount.
+  if (duel.status === "locked" || duel.status === "live") {
+    return (
+      <div className="flex w-[76px] shrink-0 items-center justify-end">
+        <span className="flex items-center gap-1 text-[15px] font-bold tabular-nums text-muted-foreground">
+          <TrendingUp className="size-3.5 shrink-0" aria-hidden />+{payoutLabel}
+        </span>
+      </div>
+    );
+  }
+
+  // Not joinable and not a locked duel either (waiting on a match that
+  // already kicked off, or the closed marketing-preview state) — no "why
+  // should I care" hook left to sell, just the stake that was on the table.
   if (!canJoin) {
     return (
       <div className="flex w-[76px] shrink-0 items-center justify-end">
