@@ -12,11 +12,11 @@ import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import
 
 type ActionResult = { error?: string };
 
-const addMatchSchema = z.object({
+const matchFieldsSchema = z.object({
   home: z.string().trim().min(1, "Indica a equipa da casa").max(100),
   away: z.string().trim().min(1, "Indica a equipa visitante").max(100),
   league: z.string().trim().min(1, "Indica a liga/competição").max(100),
-  kickoffAt: z.coerce.date().refine((d) => d.getTime() > Date.now(), { message: "O jogo tem de estar no futuro" }),
+  kickoffAt: z.coerce.date(),
   // Set when the admin picked a team from the search picker — skips the
   // name-guessing fetchTeamLogo fallback below, since we already have the
   // exact crest for the exact team they chose.
@@ -26,6 +26,15 @@ const addMatchSchema = z.object({
   // "on" then, or null when unchecked (never a "true"/"false" string).
   isElimination: z.union([z.literal("on"), z.boolean()]).nullish().transform((v) => v === "on" || v === true),
 });
+
+// Creating a match always requires a future kickoff — nothing to bet on
+// otherwise. Editing (updateMatchSchema below) deliberately allows a past
+// kickoff too, since a 'live'/'needs_review' match (already past its
+// original kickoff) still needs to be editable for typo fixes.
+const addMatchSchema = matchFieldsSchema.extend({
+  kickoffAt: z.coerce.date().refine((d) => d.getTime() > Date.now(), { message: "O jogo tem de estar no futuro" }),
+});
+const updateMatchSchema = matchFieldsSchema;
 
 /** Search-as-you-type backing the "pesquisar equipa" picker in the add-match
  *  form (components/admin/team-search-picker.tsx). Admin-gated like every
@@ -78,10 +87,11 @@ const MAX_BULK_FIXTURES = 200;
  * ticks N fixtures from a day's list and adds them all in one request
  * instead of one form submission per match. Every row keeps its
  * `externalId`, which is the whole point: matches added this way (unlike
- * hand-typed ones) become eligible for the existing automatic live-score
- * and settlement crons (see lib/sportsData.ts fetchFixtureLive/
- * fetchFixtureResult, both keyed by externalId). Idempotent via
- * onConflictDoNothing on externalId, so re-adding an already-picked fixture
+ * hand-typed ones) become eligible for the update-live-scores cron's score
+ * badge (see lib/sportsData.ts fetchFixtureLive, keyed by externalId) —
+ * lifecycle/settlement itself is now purely time-based and doesn't care
+ * whether externalId is set (see 0028_match_live_lifecycle.sql). Idempotent
+ * via onConflictDoNothing on externalId, so re-adding an already-picked fixture
  * (e.g. the admin re-runs a search overlapping a previous one) is a no-op,
  * not a duplicate or a clobber of settlement state already recorded against
  * it.
@@ -182,25 +192,30 @@ export async function addMatchAction(input: Record<string, unknown>): Promise<Ac
   return {};
 }
 
+const EDITABLE_STATUSES = new Set(["scheduled", "live", "needs_review"]);
+
 /**
  * Corrects a match already in the catalogue — team names, league, or
- * kickoff time (the "eu enganei-me na hora" case). Only while it's still
- * 'scheduled': once settled/voided the match is part of a closed financial
- * record, so it shouldn't be rewritten after the fact. Unlike delete, this
- * is allowed even if bets already exist against the match — fixing a wrong
- * kickoff time is exactly the situation where someone may have already bet
- * on it.
+ * kickoff time (the "eu enganei-me na hora" case). Allowed while the match
+ * is still 'scheduled', 'live', or 'needs_review' (see
+ * 0028_match_live_lifecycle.sql) — once settled/voided/closed the match is
+ * part of a closed financial record, so it shouldn't be rewritten after the
+ * fact. Editing the kickoff time while 'live'/'needs_review' is exactly how
+ * an admin pushes back match_advance_lifecycle's 90-minute clock for a real
+ * match that kicked off late. Unlike delete, this is allowed even if bets
+ * already exist against the match — fixing a wrong kickoff time is exactly
+ * the situation where someone may have already bet on it.
  */
 export async function updateMatchAction(matchId: string, input: Record<string, unknown>): Promise<ActionResult> {
   const admin = await requireAdmin();
 
   const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
   if (!match) return { error: "Jogo não encontrado." };
-  if (match.matchStatus !== "scheduled") {
-    return { error: "Este jogo já foi liquidado/anulado e não pode ser editado." };
+  if (!EDITABLE_STATUSES.has(match.matchStatus)) {
+    return { error: "Este jogo já foi liquidado/anulado/fechado e não pode ser editado." };
   }
 
-  const parsed = addMatchSchema.safeParse(input);
+  const parsed = updateMatchSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
   }
@@ -209,6 +224,15 @@ export async function updateMatchAction(matchId: string, input: Record<string, u
     parsed.data.homeLogoUrl || (parsed.data.home !== match.home ? fetchTeamLogo(parsed.data.home) : match.homeLogoUrl),
     parsed.data.awayLogoUrl || (parsed.data.away !== match.away ? fetchTeamLogo(parsed.data.away) : match.awayLogoUrl),
   ]);
+
+  // Pushing the kickoff back into the future (the "jogo real atrasou" case)
+  // resets the match to 'scheduled' so match_advance_lifecycle re-evaluates
+  // it fresh from the new time, instead of staying stuck 'live'/'needs_review'
+  // against a kickoff that's no longer in the past. Conversely, correcting a
+  // still-scheduled match's kickoff into the past (typo fix) flips it
+  // straight to 'live' rather than waiting for the next cron tick.
+  const kickoffInFuture = parsed.data.kickoffAt.getTime() > Date.now();
+  const nextStatus = kickoffInFuture ? "scheduled" : match.matchStatus === "scheduled" ? "live" : match.matchStatus;
 
   await db
     .update(matches)
@@ -220,6 +244,7 @@ export async function updateMatchAction(matchId: string, input: Record<string, u
       homeLogoUrl: homeLogoUrl || null,
       awayLogoUrl: awayLogoUrl || null,
       isElimination: parsed.data.isElimination,
+      matchStatus: nextStatus,
     })
     .where(eq(matches.id, matchId));
 
@@ -288,8 +313,8 @@ export async function updateLiveScoreAction(matchId: string, input: Record<strin
 
   const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
   if (!match) return { error: "Jogo não encontrado." };
-  if (match.matchStatus !== "scheduled") {
-    return { error: "Este jogo já foi liquidado/anulado — o placar ao vivo já não é relevante." };
+  if (!EDITABLE_STATUSES.has(match.matchStatus)) {
+    return { error: "Este jogo já foi liquidado/anulado/fechado — o placar ao vivo já não é relevante." };
   }
 
   const parsed = liveScoreSchema.safeParse(input);

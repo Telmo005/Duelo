@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { db } from "@/db";
 import { matches, bets, profiles, type MatchRow } from "@/db/schema";
-import { eq, ne, desc, inArray, gt, and, sql } from "drizzle-orm";
+import { eq, asc, desc, inArray, gt, and, sql } from "drizzle-orm";
 import type { Duel } from "@/components/feed/duel-post";
 
 export type BetReceipt = {
@@ -214,20 +214,29 @@ export const getUpcomingMatches = unstable_cache(
   { tags: ["upcoming-matches"], revalidate: 60 }
 );
 
-/** Matches still awaiting a result — the manual settlement tool's worklist. */
+/** Matches still awaiting a result — the manual settlement tool's worklist.
+ *  Covers every pre-terminal state (see 0028_match_live_lifecycle.sql):
+ *  'scheduled' (not kicked off yet), 'live' (in its 90-minute window), and
+ *  'needs_review' (past 90min with real 'matched' bets — admin was already
+ *  notified). Ordered oldest-kickoff-first so the most overdue 'needs_review'
+ *  matches surface before matches that haven't even started. */
 export async function getUnsettledMatches(): Promise<MatchRow[]> {
-  return db.select().from(matches).where(eq(matches.matchStatus, "scheduled")).orderBy(desc(matches.kickoffAt));
+  return db
+    .select()
+    .from(matches)
+    .where(inArray(matches.matchStatus, ["scheduled", "live", "needs_review"]))
+    .orderBy(asc(matches.kickoffAt));
 }
 
-/** Matches already processed (postponed/abandoned/finished) — shown in
- *  /admin/matches purely so a stale one (e.g. voided by mistake, or just
- *  clutter) can still be removed from the catalogue. Settlement itself
- *  never touches this list. */
+/** Matches already in a terminal state (finished/postponed/abandoned/closed)
+ *  — shown in /admin/matches purely so a stale one (e.g. voided by mistake,
+ *  or just clutter) can still be removed from the catalogue. Settlement
+ *  itself never touches this list. */
 export async function getProcessedMatches(): Promise<MatchRow[]> {
   return db
     .select()
     .from(matches)
-    .where(ne(matches.matchStatus, "scheduled"))
+    .where(inArray(matches.matchStatus, ["finished", "postponed", "abandoned", "closed"]))
     .orderBy(desc(matches.kickoffAt));
 }
 
@@ -278,20 +287,13 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
 
       const opponent = bet.opponentId ? profileById.get(bet.opponentId) : null;
 
-      // Liveness is a property of the MATCH, not of something an admin (or
-      // the API poller) has to notice and flip — a matched duel (both sides
-      // committed, real money on both stakes) is live the moment its
-      // scheduled kickoff arrives, for the same 90-minute window the feed
-      // already treats live score data as fresh (LIVE_FRESHNESS_MS above).
-      // Actual score data, when present, is layered on top; its absence
-      // just means "live, score not in yet" rather than "not live". A
+      // Liveness is a real, stored property of the match now
+      // (match_advance_lifecycle flips it at kickoff — see
+      // 0028_match_live_lifecycle.sql), not derived from a time window. A
       // "waiting" bet (nobody matched it) never shows as live regardless —
-      // there's no real duel in progress to show, and Phase B's kickoff
-      // check already closes it to new acceptances once kickoff passes.
+      // there's no real duel in progress to show.
       const live = liveById.get(match.id);
-      const kickoffMs = match.kickoffAt.getTime();
-      const withinLiveWindow = Date.now() >= kickoffMs && Date.now() < kickoffMs + LIVE_FRESHNESS_MS;
-      const isLive = bet.status === "matched" && (withinLiveWindow || !!live);
+      const isLive = bet.status === "matched" && match.matchStatus === "live";
 
       return {
         id: bet.id,

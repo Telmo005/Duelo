@@ -1,124 +1,37 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
-import { matches, bets } from "@/db/schema";
-import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
 import { createServiceClient } from "@/lib/supabase/server";
-import { fetchFixtureResult } from "@/lib/sportsData";
-import { broadcastFeedEvent } from "@/lib/realtime";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 import { logError } from "@/lib/errorLog";
 
-const GRACE_WINDOW_MS = 72 * 60 * 60 * 1000; // SETL-04: void if no result 72h after kickoff
-
-// A football match is over well before this, but 90 min from kickoff is the
-// same "has this match's live window ended" line the feed itself uses (see
-// LIVE_FRESHNESS_MS in lib/bets.ts) — reusing it here means a manually-typed
-// fixture (no external_id) only becomes a close candidate once nobody would
-// reasonably expect it to still be in progress.
-const NO_BETS_GRACE_MS = 90 * 60 * 1000;
-
 /**
- * Fetches the official result for every scheduled, API-linked match past
- * kickoff and settles or voids it accordingly (SETL-01..04). Matches
- * without an external_id (manually seeded fixtures) are skipped — nothing
- * to look up. Wired to Vercel Cron (see vercel.json); protected the same
- * way as /api/cron/refund-expired-bets.
+ * Advances every match's lifecycle purely by kickoff time — scheduled→live
+ * at kickoff, live→closed (no 'matched' bets) or live→needs_review (has
+ * 'matched' bets, admin notified) 90 minutes later. See
+ * supabase/migrations/0028_match_live_lifecycle.sql for the full state
+ * machine and why this no longer calls the sports-data API at all: polling
+ * api-sports.io per candidate match here (and in update-live-scores) was
+ * exhausting the Free-plan quota in production (repeated 429s), stalling
+ * every match — real or test — behind the same rate limit. Result entry is
+ * manual now (see lib/actions/settlement.ts settleMatchAction), triggered by
+ * the admin notification match_advance_lifecycle sends itself.
+ *
+ * Wired to the same external cron-job.org schedule this route already had
+ * (kept the path so nothing needs reconfiguring there) — protected the same
+ * way as the other crons via CRON_SECRET.
  */
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    return await settleMatches();
-  } catch (err) {
-    // Anything that escapes the per-match try/catch below (e.g. the DB
-    // itself unreachable) would otherwise just 500 with nothing durable to
-    // show for it — this is exactly the "cron silently died at 3am" case
-    // the error log exists to catch.
-    await logError("cron_settle_matches", err, { stage: "top_level" });
-    return NextResponse.json({ error: "internal error" }, { status: 500 });
-  }
-}
-
-async function settleMatches() {
-  const candidates = await db
-    .select()
-    .from(matches)
-    .where(and(eq(matches.matchStatus, "scheduled"), isNotNull(matches.externalId), lt(matches.kickoffAt, new Date())));
-
   const service = createServiceClient();
-  const results: Array<{ matchId: string; action: string; detail?: string }> = [];
+  const { data, error } = await service.rpc("match_advance_lifecycle");
 
-  for (const match of candidates) {
-    try {
-      const result = await fetchFixtureResult(match.externalId!);
-
-      if (result.status === "finished") {
-        const { data, error } = await service.rpc("bet_settle_match", {
-          p_match_id: match.id,
-          p_result_home: result.homeGoals,
-          p_result_away: result.awayGoals,
-        });
-        if (error) throw error;
-        await broadcastFeedEvent({ type: "bets_settled", matchId: match.id });
-        results.push({ matchId: match.id, action: "settled", detail: `${data} bet(s)` });
-        continue;
-      }
-
-      if (result.status === "postponed" || result.status === "abandoned") {
-        const { data, error } = await service.rpc("bet_void_match", { p_match_id: match.id, p_status: result.status });
-        if (error) throw error;
-        await broadcastFeedEvent({ type: "bets_voided", matchId: match.id });
-        results.push({ matchId: match.id, action: "voided", detail: `${data} bet(s)` });
-        continue;
-      }
-
-      // Still in progress / not started / unknown — check the grace window.
-      const pastGraceWindow = Date.now() - match.kickoffAt.getTime() > GRACE_WINDOW_MS;
-      if (pastGraceWindow) {
-        const { data, error } = await service.rpc("bet_void_match", { p_match_id: match.id, p_status: "abandoned" });
-        if (error) throw error;
-        await broadcastFeedEvent({ type: "bets_voided", matchId: match.id });
-        results.push({ matchId: match.id, action: "voided_grace_window", detail: `${data} bet(s)` });
-      } else {
-        results.push({ matchId: match.id, action: "skipped_not_final", detail: result.status });
-      }
-    } catch (err) {
-      results.push({ matchId: match.id, action: "error", detail: err instanceof Error ? err.message : String(err) });
-      await logError("cron_settle_matches", err, { matchId: match.id });
-    }
+  if (error) {
+    await logError("cron_settle_matches", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Manually-typed fixtures (no external_id — the SETL-01 fallback for
-  // leagues with no automated feed, e.g. Moçambola) never go through the
-  // loop above, so they'd otherwise sit in the admin's "Por liquidar"
-  // worklist forever even when literally nobody bet on them. Nothing to
-  // settle in that case — close it automatically. One that DID get a bet
-  // still needs a human to type in the real result, exactly as before.
-  const emptyCandidates = await db
-    .select({ id: matches.id })
-    .from(matches)
-    .where(
-      and(
-        eq(matches.matchStatus, "scheduled"),
-        isNull(matches.externalId),
-        lt(matches.kickoffAt, new Date(Date.now() - NO_BETS_GRACE_MS))
-      )
-    );
-
-  for (const match of emptyCandidates) {
-    const [existingBet] = await db.select({ id: bets.id }).from(bets).where(eq(bets.matchId, match.id)).limit(1);
-    if (existingBet) continue;
-
-    const { data: closed, error } = await service.rpc("match_close_if_empty", { p_match_id: match.id });
-    if (error) {
-      results.push({ matchId: match.id, action: "error", detail: error.message });
-      await logError("cron_settle_matches", error, { matchId: match.id, stage: "close_if_empty" });
-    } else if (closed) {
-      results.push({ matchId: match.id, action: "closed_no_bets" });
-    }
-  }
-
-  return NextResponse.json({ processed: results.length, results });
+  const result = Array.isArray(data) ? data[0] : data;
+  return NextResponse.json(result ?? { to_live: 0, to_closed: 0, to_needs_review: 0 });
 }
