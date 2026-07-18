@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/admin";
 import { getRecentErrors } from "@/lib/errorLog";
 import { getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
+import { ClearErrorsButton } from "@/components/admin/clear-errors-button";
 
 export const metadata: Metadata = { title: "Erros | Duelo" };
 
@@ -28,12 +29,11 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 /**
- * Read-only view of error_log (see lib/errorLog.ts) — the durable trail for
- * failures that used to only reach console.error (Vercel's ephemeral
- * function logs, nobody watching them at 3am). Nothing to action here
- * beyond "notice something broke and go investigate" — no clear/delete UI,
- * since a growing table of rare failures is not a problem worth building
- * cleanup tooling for yet.
+ * View of error_log (see lib/errorLog.ts) — the durable trail for failures
+ * that used to only reach console.error (Vercel's ephemeral function logs,
+ * nobody watching them at 3am). "Limpar erros" (clearErrorsAction) wipes the
+ * table once the admin's read/investigated the current backlog, so new
+ * failures don't get buried under old, already-handled ones.
  */
 export default async function AdminErrorsPage() {
   const profile = await requireAdmin();
@@ -48,10 +48,13 @@ export default async function AdminErrorsPage() {
             Falhas do servidor persistidas automaticamente — webhooks, crons, login, erros no browser.
           </p>
         </div>
-        <Link href="/admin" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
-          ← Admin
-          <LinkPendingSpinner />
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          {errors.length > 0 && <ClearErrorsButton />}
+          <Link href="/admin" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
+            ← Admin
+            <LinkPendingSpinner />
+          </Link>
+        </div>
       </div>
 
       {errors.length === 0 ? (

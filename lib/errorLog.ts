@@ -28,3 +28,11 @@ export async function logError(source: string, error: unknown, context?: Record<
 export async function getRecentErrors(limit = 100) {
   return db.select().from(errorLog).orderBy(desc(errorLog.createdAt)).limit(limit);
 }
+
+/** Wipes the whole error log — /admin/errors' "Limpar" action. Nothing else
+ *  reads this table (it's a durable trail for humans to notice failures,
+ *  not something settlement/wallet logic depends on), so clearing it has no
+ *  effect beyond the admin view resetting to empty. */
+export async function clearErrorLog(): Promise<void> {
+  await db.delete(errorLog);
+}
