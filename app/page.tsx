@@ -15,6 +15,7 @@ import { FeedListener } from "@/components/realtime/feed-listener";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { getFeedDuels, getRecentWinners, getUpcomingMatches } from "@/lib/bets";
 import { getWalletBalance } from "@/lib/wallet";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Duelo — Apostas P2P entre pessoas reais",
@@ -54,7 +55,7 @@ export default async function LandingPage() {
     league: m.league,
     leagueId: m.leagueId,
     country: m.country,
-    kickoffLabel: new Date(m.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+    kickoffLabel: new Date(m.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE }),
     kickoffAtIso: new Date(m.kickoffAt).toISOString(),
     homeLogoUrl: m.homeLogoUrl,
     awayLogoUrl: m.awayLogoUrl,

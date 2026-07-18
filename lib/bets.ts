@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { matches, bets, profiles, type MatchRow } from "@/db/schema";
 import { eq, asc, desc, inArray, gt, and, sql } from "drizzle-orm";
 import type { Duel } from "@/components/feed/duel-post";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export type BetReceipt = {
   id: string;
@@ -255,6 +256,13 @@ const PREDICTION_LABEL: Record<string, { code: string; homeLabel: (h: string) =>
 };
 
 /** Real open/matched bets, shaped for the DuelPost feed component. */
+// Open (joinable) first, then locked (matched, not yet live), then live last
+// — an open bet is the one thing an incoming visitor can actually act on, so
+// it leads; live duels are already fully spoken for and are really just
+// "currently happening" status updates. Array.prototype.sort is stable, so
+// within each group the query's own createdAt-desc order is preserved.
+const FEED_STATUS_PRIORITY: Record<Duel["status"], number> = { waiting: 0, locked: 1, live: 2, closed: 3 };
+
 export async function getFeedDuels(limit = 30): Promise<Duel[]> {
   const rows = await db
     .select()
@@ -308,7 +316,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
           league: match.league,
           leagueId: match.leagueId,
           country: match.country,
-          time: new Date(match.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+          time: new Date(match.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE }),
           kickoffAtIso: new Date(match.kickoffAt).toISOString(),
           homeLogoUrl: match.homeLogoUrl,
           awayLogoUrl: match.awayLogoUrl,
@@ -318,7 +326,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         stake: bet.stakeCents / 100,
         stakeCents: bet.stakeCents,
         status: isLive ? "live" : bet.status === "matched" ? "locked" : "waiting",
-        createdAgo: new Date(bet.createdAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+        createdAgo: new Date(bet.createdAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE }),
         score: isLive && live?.live_home != null && live?.live_away != null ? { home: live.live_home, away: live.live_away } : undefined,
         // Admin's manual minute (see updateLiveScoreAction) wins when set;
         // otherwise the clock runs automatically off kickoff time — no
@@ -326,7 +334,8 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         minute: isLive ? `${live?.live_minute ?? computeElapsedMinute(match.kickoffAt)}'` : undefined,
       };
     })
-    .filter((d): d is Duel => d !== null);
+    .filter((d): d is Duel => d !== null)
+    .sort((a, b) => FEED_STATUS_PRIORITY[a.status] - FEED_STATUS_PRIORITY[b.status]);
 }
 
 export type RecentWinner = {

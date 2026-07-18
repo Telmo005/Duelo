@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Lock, RotateCcw, Trophy, HeartCrack, ChartColumn, type LucideIcon } from "lucide-react";
 import { describeLedgerEntry } from "@/lib/ledger-format";
-import { formatCentsAsMt } from "@/lib/format";
+import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import { getMoreWalletLedgerAction } from "@/lib/actions/wallet";
 import { Spinner } from "@/components/ui/spinner";
 import type { WalletLedgerEntry } from "@/db/schema";
@@ -36,7 +36,7 @@ function LedgerRow({ entry, bordered }: { entry: WalletLedgerEntry; bordered: bo
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold">{label}</p>
         <p className="truncate text-xs text-muted-foreground">
-          {new Date(entry.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+          {new Date(entry.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
           {entry.description ? ` · ${entry.description}` : ""}
         </p>
       </div>

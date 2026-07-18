@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getBetReceipt } from "@/lib/bets";
-import { formatCentsAsMt } from "@/lib/format";
+import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export const alt = "Duelo — aposta P2P";
 export const size = { width: 1200, height: 630 };
@@ -68,7 +68,13 @@ function Crest({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
   );
 }
 
-const KICKOFF_FORMAT: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
+const KICKOFF_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: MOZAMBIQUE_TIMEZONE,
+};
 
 export default async function OpengraphImage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

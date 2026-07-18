@@ -6,6 +6,7 @@ import { Trash2 } from "lucide-react";
 import { deleteMatchAction } from "@/lib/actions/matches";
 import type { MatchRow } from "@/db/schema";
 import { Spinner } from "@/components/ui/spinner";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 const STATUS_LABEL: Record<string, string> = {
   postponed: "Adiado",
@@ -44,7 +45,7 @@ export function ProcessedMatchRow({ match }: { match: MatchRow }) {
           {match.home} <span className="font-normal text-muted-foreground">vs</span> {match.away}
         </p>
         <p className="text-xs text-muted-foreground">
-          {match.league} · {new Date(match.kickoffAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+          {match.league} · {new Date(match.kickoffAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
           {" · "}
           <span className="font-semibold text-locked">{STATUS_LABEL[match.matchStatus] ?? match.matchStatus}</span>
         </p>

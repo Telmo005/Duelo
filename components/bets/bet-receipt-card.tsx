@@ -9,7 +9,7 @@ import { ActionButton } from "@/components/ui/action-button";
 import { OptionCard } from "@/components/ui/option-card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { acceptBetAction, cancelBetAction } from "@/lib/actions/bets";
-import { formatCentsAsMt } from "@/lib/format";
+import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import type { BetReceipt } from "@/lib/bets";
 
 const STATUS_LABEL: Record<BetReceipt["status"], { label: string; className: string }> = {
@@ -252,7 +252,7 @@ export function BetReceiptCard({
           Nº {bet.reference}
         </button>
         <span className="text-muted-foreground">
-          {bet.createdAt.toLocaleString("pt", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          {bet.createdAt.toLocaleString("pt", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE })}
         </span>
       </div>
 
@@ -285,7 +285,7 @@ export function BetReceiptCard({
             )}
             <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Clock className="size-3" aria-hidden />
-              {bet.match.kickoffAt.toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              {bet.match.kickoffAt.toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE })}
             </p>
           </div>
           <div className="flex flex-col items-center gap-2">
