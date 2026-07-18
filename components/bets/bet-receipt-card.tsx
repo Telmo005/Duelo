@@ -75,9 +75,10 @@ export function BetReceiptCard({
   const status = STATUS_LABEL[bet.status];
   // Real name unless the viewer IS that specific participant — never
   // inferred from "not the creator", which used to mislabel any third-party
-  // visitor (or the wrong logged-in user) as "Tu" for someone else's bet.
+  // visitor (or the wrong logged-in user) as "Sua aposta" for someone else's
+  // bet.
   function displayName(participantId: string, participantName: string): string {
-    return viewerId === participantId ? "Tu" : participantName;
+    return viewerId === participantId ? "Sua aposta" : participantName;
   }
   // Short reference, not the raw bet id — a bare UUID in a shared URL reads
   // as a spammy tracking link once it lands in someone else's WhatsApp.
@@ -197,7 +198,7 @@ export function BetReceiptCard({
     opponentSlot = { role: "Adversário", name: displayName(bet.opponent.id, bet.opponent.name), label: `Contra "${bet.predictionLabel}"` };
   } else if (canAcceptHere && effectiveOpponentPrediction) {
     opponentSide = effectiveOpponentPrediction;
-    opponentSlot = { role: "Adversário", name: "Tu", label: predictionLabel(effectiveOpponentPrediction) };
+    opponentSlot = { role: "Adversário", name: "Sua aposta", label: predictionLabel(effectiveOpponentPrediction) };
   }
   const legacyOpponentSlot = opponentSlot && !opponentSide ? opponentSlot : null;
 
@@ -301,7 +302,7 @@ export function BetReceiptCard({
        *  under that team's flag above. Gold for the creator's call, green
        *  for the challenger's — same colour "who wins what" already carries
        *  everywhere else in the app (the feed's payout chip is the same
-       *  green). Real names always — "Tu" only for the actual viewer, never
+       *  green). Real names always — "Sua aposta" only for the actual viewer, never
        *  inferred for a third party looking at someone else's bet. */}
       {legacyOpponentSlot ? (
         <div className="grid grid-cols-2">
