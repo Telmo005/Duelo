@@ -206,13 +206,18 @@ export const matches = pgTable("matches", {
    *  its own. */
   country: text("country"),
   kickoffAt: timestamp("kickoff_at", { withTimezone: true }).notNull(),
-  /** API-Football fixture ID — null for manually seeded matches, which
-   *  the settlement cron skips (nothing to look up). Set this to enable
-   *  automatic result fetching for a given fixture. */
+  /** API-Football fixture ID — null for manually seeded matches. Lifecycle/
+   *  settlement no longer depends on this (see 0028_match_live_lifecycle.sql
+   *  — purely time-based now); it only gates the optional live-score badge
+   *  (update-live-scores cron). */
   externalId: text("external_id").unique(),
   resultHome: bigint("result_home", { mode: "number" }),
   resultAway: bigint("result_away", { mode: "number" }),
-  /** 'scheduled' | 'finished' | 'postponed' | 'abandoned' */
+  /** 'scheduled' | 'live' | 'needs_review' | 'finished' | 'postponed' |
+   *  'abandoned' | 'closed' — see 0028_match_live_lifecycle.sql for the full
+   *  state machine (match_advance_lifecycle drives scheduled→live→
+   *  closed/needs_review purely off kickoff_at; needs_review/live/scheduled
+   *  →finished/postponed/abandoned is always a manual admin action). */
   matchStatus: text("match_status").notNull().default("scheduled"),
   settledAt: timestamp("settled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

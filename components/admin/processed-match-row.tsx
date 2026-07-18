@@ -14,10 +14,11 @@ const STATUS_LABEL: Record<string, string> = {
   closed: "Fechado (sem apostas)",
 };
 
-/** A match no longer 'scheduled' (postponed/abandoned/finished) — nothing
- *  left to settle or edit, but it can still clutter the catalogue (it stays
- *  selectable-looking until removed, even though getUpcomingMatches already
- *  excludes it from actual bet creation). The only action left is Remover. */
+/** A match in a terminal state (finished/postponed/abandoned/closed) —
+ *  nothing left to settle or edit, but it can still clutter the catalogue (it
+ *  stays selectable-looking until removed, even though getUpcomingMatches
+ *  already excludes it from actual bet creation). The only action left is
+ *  Remover. */
 export function ProcessedMatchRow({ match }: { match: MatchRow }) {
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);

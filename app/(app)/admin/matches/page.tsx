@@ -27,6 +27,14 @@ export default async function AdminMatchesPage() {
     getWalletBalance(profile.id),
   ]);
 
+  // getUnsettledMatches already orders oldest-kickoff-first — grouping by
+  // status here just separates it into the three sections below without
+  // re-sorting, so "needs_review" keeps surfacing its most-overdue match
+  // first, same as "live" and "scheduled".
+  const needsReview = unsettled.filter((m) => m.matchStatus === "needs_review");
+  const live = unsettled.filter((m) => m.matchStatus === "live");
+  const scheduled = unsettled.filter((m) => m.matchStatus === "scheduled");
+
   return (
     <AppShell active="feed" displayName={profile.displayName} availableCents={availableCents} currentUserId={profile.id}>
       <div className="mb-7 flex items-center justify-between">
@@ -51,13 +59,37 @@ export default async function AdminMatchesPage() {
         <AddMatchForm />
       </section>
 
+      {needsReview.length > 0 && (
+        <section className="mb-7">
+          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-destructive">
+            Precisa de liquidação ({needsReview.length})
+          </h2>
+          <div className="overflow-hidden rounded-2xl border border-destructive/30 bg-card">
+            {needsReview.map((match) => (
+              <SettleMatchRow key={match.id} match={match} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {live.length > 0 && (
+        <section className="mb-7">
+          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Ao vivo ({live.length})</h2>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            {live.map((match) => (
+              <SettleMatchRow key={match.id} match={match} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="mb-7">
-        <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Por liquidar</h2>
-        {unsettled.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Não há jogos por liquidar.</p>
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Agendado ({scheduled.length})</h2>
+        {scheduled.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Não há jogos agendados.</p>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
-            {unsettled.map((match) => (
+            {scheduled.map((match) => (
               <SettleMatchRow key={match.id} match={match} />
             ))}
           </div>

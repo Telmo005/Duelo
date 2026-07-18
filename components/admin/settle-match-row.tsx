@@ -11,6 +11,11 @@ import { Spinner } from "@/components/ui/spinner";
 
 type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | "live" | null;
 
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  live: { label: "● Ao vivo", className: "bg-primary-10 text-primary" },
+  needs_review: { label: "Precisa de liquidação", className: "bg-destructive-10 text-destructive" },
+};
+
 /** Small "X-Y" pair of number inputs, reused for both the live-score
  *  tracker and the final settlement score — same shape, different action
  *  behind them. */
@@ -131,6 +136,11 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           {match.home} <span className="font-normal text-muted-foreground">vs</span> {match.away}
           {match.isElimination && (
             <span className="ml-2 rounded-full bg-locked-10 px-2 py-0.5 text-[10px] font-bold text-locked">ELIMINAÇÃO</span>
+          )}
+          {STATUS_BADGE[match.matchStatus] && (
+            <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_BADGE[match.matchStatus].className}`}>
+              {STATUS_BADGE[match.matchStatus].label}
+            </span>
           )}
         </p>
         <p className="text-xs text-muted-foreground">

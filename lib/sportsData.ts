@@ -1,68 +1,11 @@
 /**
- * API-Football (api-sports.io) client — fetches the official result for a
- * single fixture by its external ID. Settlement logic (bet_settle_match /
- * bet_void_match, see supabase/migrations/0003_settlement.sql) is
- * source-agnostic: it only reads from our own `matches` table, so this is
- * the one place that talks to the vendor API. Swapping providers later
- * only touches this file.
+ * API-Football (api-sports.io) client. Settlement/lifecycle (bet_settle_match
+ * / bet_void_match / match_advance_lifecycle, see
+ * supabase/migrations/0028_match_live_lifecycle.sql) is purely time-based and
+ * never calls this file — result entry is a manual admin action. What's left
+ * here is fixture import (kickoff time/teams) and the optional live-score
+ * badge for the feed.
  */
-
-export type FixtureResult =
-  | { status: "finished"; homeGoals: number; awayGoals: number }
-  | { status: "postponed" | "abandoned" }
-  | { status: "in_progress" | "scheduled" | "unknown" };
-
-const FINISHED_CODES = new Set(["FT", "AET", "PEN"]);
-const VOID_CODES: Record<string, "postponed" | "abandoned"> = {
-  PST: "postponed",
-  CANC: "postponed",
-  ABD: "abandoned",
-  WO: "abandoned",
-  AWD: "abandoned",
-};
-
-export async function fetchFixtureResult(externalId: string): Promise<FixtureResult> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) {
-    throw new Error("API_FOOTBALL_KEY is not set");
-  }
-
-  const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${encodeURIComponent(externalId)}`, {
-    headers: { "x-apisports-key": apiKey },
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    throw new Error(`API-Football request failed: ${res.status}`);
-  }
-
-  const body = await res.json();
-  const fixture = body?.response?.[0];
-  if (!fixture) {
-    return { status: "unknown" };
-  }
-
-  const shortStatus: string = fixture.fixture?.status?.short ?? "";
-
-  if (FINISHED_CODES.has(shortStatus)) {
-    const homeGoals = fixture.goals?.home;
-    const awayGoals = fixture.goals?.away;
-    if (typeof homeGoals !== "number" || typeof awayGoals !== "number") {
-      return { status: "unknown" };
-    }
-    return { status: "finished", homeGoals, awayGoals };
-  }
-
-  if (shortStatus in VOID_CODES) {
-    return { status: VOID_CODES[shortStatus] };
-  }
-
-  if (shortStatus === "NS") {
-    return { status: "scheduled" };
-  }
-
-  return { status: "in_progress" };
-}
 
 export type FixtureLive =
   | { state: "live"; homeGoals: number; awayGoals: number; minute: number | null; short: string }
@@ -73,11 +16,11 @@ export type FixtureLive =
 const IN_PLAY_CODES = new Set(["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT", "LIVE"]);
 
 /**
- * Fetches the *live* score + elapsed minute for an in-play fixture. Unlike
- * fetchFixtureResult (which drives settlement and only cares about the final
- * result), this feeds the live scoreboard on the feed. Returns state
- * "not_live" for anything not currently being played — the caller then leaves
- * the match's live columns untouched.
+ * Fetches the *live* score + elapsed minute for an in-play fixture, purely
+ * for display on the feed scoreboard — never drives settlement (that's
+ * manual/time-based now, see the file header). Returns state "not_live" for
+ * anything not currently being played — the caller then leaves the match's
+ * live columns untouched.
  */
 export async function fetchFixtureLive(externalId: string): Promise<FixtureLive> {
   const apiKey = process.env.API_FOOTBALL_KEY;
