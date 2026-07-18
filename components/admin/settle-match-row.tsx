@@ -8,6 +8,7 @@ import { deleteMatchAction, updateLiveScoreAction } from "@/lib/actions/matches"
 import { EditMatchForm } from "@/components/admin/edit-match-form";
 import type { MatchRow } from "@/db/schema";
 import { Spinner } from "@/components/ui/spinner";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | "live" | null;
 
@@ -154,7 +155,7 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           )}
         </p>
         <p className="text-xs text-muted-foreground">
-          {match.league} · {new Date(match.kickoffAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+          {match.league} · {new Date(match.kickoffAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
           {match.externalId ? ` · API #${match.externalId}` : " · sem ligação à API"}
         </p>
       </div>

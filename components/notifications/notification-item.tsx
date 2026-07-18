@@ -6,6 +6,7 @@ import { Handshake, Trophy, HeartCrack, RotateCcw, ArrowUpFromLine, ArrowDownToL
 import { markNotificationReadAction } from "@/lib/actions/notifications";
 import { Spinner } from "@/components/ui/spinner";
 import type { Notification } from "@/db/schema";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 const TYPE_ICON: Record<string, { Icon: LucideIcon; tint: string }> = {
   bet_accepted: { Icon: Handshake, tint: "#F2C22A" },
@@ -42,7 +43,7 @@ export function NotificationItem({ notification }: { notification: Notification 
         <p className={`truncate text-sm ${isUnread ? "font-extrabold" : "font-bold text-muted-foreground"}`}>{notification.title}</p>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{notification.body}</p>
         <p className="mt-1 text-[11px] text-muted-foreground/70">
-          {new Date(notification.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+          {new Date(notification.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
         </p>
       </div>
       {isUnread && (isPending ? <Spinner className="size-3 shrink-0" /> : <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden />)}

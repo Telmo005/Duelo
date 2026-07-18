@@ -8,6 +8,7 @@ import { getPendingWithdrawals } from "@/lib/withdrawals";
 import { formatCentsAsMt, getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { ReconcileDepositsButton } from "@/components/admin/reconcile-deposits-button";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Admin | Duelo" };
 
@@ -118,7 +119,7 @@ export default async function AdminPage() {
                     {bet.creatorName} vs {bet.opponentName} · {bet.matchHome} vs {bet.matchAway}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {formatCentsAsMt(bet.stakeCents)} MT · {new Date(bet.flaggedAt!).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+                    {formatCentsAsMt(bet.stakeCents)} MT · {new Date(bet.flaggedAt!).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
                   </p>
                 </div>
                 <span className="w-fit rounded-full bg-destructive-10 px-2.5 py-1 text-xs font-bold text-destructive">
@@ -149,7 +150,7 @@ export default async function AdminPage() {
                 <div>
                   <p className="font-bold">{d.displayName} · {formatCentsAsMt(d.amountCents)} MT</p>
                   <p className="text-xs text-muted-foreground">
-                    {d.method === "mpesa" ? "M-Pesa" : "e-Mola"} · {d.reference} · {new Date(d.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+                    {d.method === "mpesa" ? "M-Pesa" : "e-Mola"} · {d.reference} · {new Date(d.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${d.status === "pending" ? "bg-primary-10 text-primary" : "bg-destructive-10 text-destructive"}`}>
@@ -246,7 +247,7 @@ export default async function AdminPage() {
                 <div className="flex items-center justify-between">
                   <span className="font-bold">{ADMIN_ACTION_LABELS[a.action] ?? a.action}</span>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(a.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+                    {new Date(a.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">

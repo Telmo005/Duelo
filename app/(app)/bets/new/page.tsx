@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { CreateBetForm } from "@/components/bets/create-bet-form";
 import { getUpcomingMatches } from "@/lib/bets";
 import { getWalletBalance } from "@/lib/wallet";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import { BackLink } from "@/components/ui/back-link";
 import { CalendarX } from "lucide-react";
 
@@ -33,7 +34,7 @@ export default async function NewBetPage({ searchParams }: { searchParams: Promi
     league: m.league,
     leagueId: m.leagueId,
     country: m.country,
-    kickoffLabel: new Date(m.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+    kickoffLabel: new Date(m.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE }),
     kickoffAtIso: new Date(m.kickoffAt).toISOString(),
     homeLogoUrl: m.homeLogoUrl,
     awayLogoUrl: m.awayLogoUrl,

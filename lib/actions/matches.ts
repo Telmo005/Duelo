@@ -9,6 +9,7 @@ import { matches, bets } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { fetchTeamLogo, searchTeams, searchFixturesByDate, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
+import { parseMozambiqueDateTimeLocal, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 type ActionResult = { error?: string };
 
@@ -16,7 +17,14 @@ const matchFieldsSchema = z.object({
   home: z.string().trim().min(1, "Indica a equipa da casa").max(100),
   away: z.string().trim().min(1, "Indica a equipa visitante").max(100),
   league: z.string().trim().min(1, "Indica a liga/competição").max(100),
-  kickoffAt: z.coerce.date(),
+  // KickoffField sends a bare "YYYY-MM-DDTHH:mm" (native datetime-local, no
+  // timezone info) — z.coerce.date() used to parse that with `new Date()`
+  // directly on the SERVER, which Vercel runs in UTC, silently storing every
+  // manually-entered kickoff 2 hours later than the admin actually typed
+  // (they mean Mozambique local time, per the "hora de Moçambique" label
+  // under the field). parseMozambiqueDateTimeLocal fixes the interpretation
+  // regardless of the server's own timezone.
+  kickoffAt: z.string().min(1, "Indica a data e hora").transform(parseMozambiqueDateTimeLocal),
   // Set when the admin picked a team from the search picker — skips the
   // name-guessing fetchTeamLogo fallback below, since we already have the
   // exact crest for the exact team they chose.
@@ -32,7 +40,11 @@ const matchFieldsSchema = z.object({
 // kickoff too, since a 'live'/'needs_review' match (already past its
 // original kickoff) still needs to be editable for typo fixes.
 const addMatchSchema = matchFieldsSchema.extend({
-  kickoffAt: z.coerce.date().refine((d) => d.getTime() > Date.now(), { message: "O jogo tem de estar no futuro" }),
+  kickoffAt: z
+    .string()
+    .min(1, "Indica a data e hora")
+    .transform(parseMozambiqueDateTimeLocal)
+    .refine((d) => d.getTime() > Date.now(), { message: "O jogo tem de estar no futuro" }),
 });
 const updateMatchSchema = matchFieldsSchema;
 
@@ -251,7 +263,7 @@ export async function updateMatchAction(matchId: string, input: Record<string, u
     admin.id,
     "edit_match",
     null,
-    `Jogo editado: ${match.home} vs ${match.away} → ${parsed.data.home} vs ${parsed.data.away}, ${new Date(parsed.data.kickoffAt).toLocaleString("pt")}`
+    `Jogo editado: ${match.home} vs ${match.away} → ${parsed.data.home} vs ${parsed.data.away}, ${new Date(parsed.data.kickoffAt).toLocaleString("pt", { timeZone: MOZAMBIQUE_TIMEZONE })}`
   );
 
   revalidatePath("/admin/matches");

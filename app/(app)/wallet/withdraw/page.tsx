@@ -8,7 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { WithdrawForm } from "@/components/wallet/withdraw-form";
 import { getWalletBalance } from "@/lib/wallet";
 import { getUserWithdrawals } from "@/lib/withdrawals";
-import { formatCentsAsMt } from "@/lib/format";
+import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import { BackLink } from "@/components/ui/back-link";
 
 export const metadata: Metadata = { title: "Levantar | Duelo" };
@@ -73,7 +73,7 @@ export default async function WithdrawPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-bold tabular-nums">{formatCentsAsMt(w.amountCents)} MT</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {new Date(w.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })} · {w.reference}
+                      {new Date(w.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })} · {w.reference}
                     </p>
                   </div>
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>

@@ -3,12 +3,20 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MOZAMBIQUE_TIMEZONE, parseMozambiqueDateTimeLocal } from "@/lib/format";
 
-/** "YYYY-MM-DDTHH:mm" in LOCAL time — what <input type="datetime-local">
- *  needs, as opposed to the UTC-based toISOString(). */
+/** "YYYY-MM-DDTHH:mm" in Mozambique local time — what <input
+ *  type="datetime-local"> needs, as opposed to the UTC-based toISOString().
+ *  Computed via a fixed +2h shift read back with UTC getters, rather than
+ *  the runtime's own getFullYear()/getHours() (which reflect whatever
+ *  timezone the browser/device happens to be set to) — so editing a match
+ *  shows the correct Mozambique wall-clock kickoff even if the admin's
+ *  device isn't actually set to it. Mirrors parseMozambiqueDateTimeLocal's
+ *  fixed-offset approach (no DST in Mozambique, so this is always exact). */
 export function toDatetimeLocal(date: Date): string {
+  const shifted = new Date(date.getTime() + 2 * 60 * 60 * 1000);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}T${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`;
 }
 
 /** A reasonable starting point for a new match — "in a couple of hours,
@@ -29,10 +37,11 @@ export function defaultKickoffLocal(): string {
  *  Moçambique") computed from whatever's currently in the field, updated
  *  live as it changes. That single line is the actual fix for "difícil de
  *  usar": it turns "did I enter this right?" into something you can just
- *  read. `datetime-local` is interpreted by the browser as local time with
- *  no timezone info attached — the label makes explicit the assumption
- *  already baked into toDatetimeLocal/toLocaleString elsewhere in the
- *  project: the admin's device clock is set to Mozambique time. */
+ *  read. Explicitly parsed/rendered as Mozambique time (parseMozambiqueDateTimeLocal
+ *  + timeZone below) rather than relying on the admin's device clock
+ *  actually being set to it — this preview is the source of truth for what
+ *  gets saved (lib/actions/matches.ts uses the same parser), so it stays
+ *  correct even on a misconfigured device. */
 export function KickoffField({
   id,
   disabled,
@@ -45,12 +54,13 @@ export function KickoffField({
   const [value, setValue] = useState(defaultValue ?? defaultKickoffLocal());
 
   const preview = value
-    ? new Date(value).toLocaleString("pt", {
+    ? parseMozambiqueDateTimeLocal(value).toLocaleString("pt", {
         weekday: "long",
         day: "2-digit",
         month: "long",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: MOZAMBIQUE_TIMEZONE,
       })
     : null;
 

@@ -6,6 +6,7 @@ import { getRecentErrors } from "@/lib/errorLog";
 import { getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { ClearErrorsButton } from "@/components/admin/clear-errors-button";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Erros | Duelo" };
 
@@ -70,7 +71,7 @@ export default async function AdminErrorsPage() {
                   {SOURCE_LABELS[e.source] ?? e.source}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {new Date(e.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "medium" })}
+                  {new Date(e.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "medium", timeZone: MOZAMBIQUE_TIMEZONE })}
                 </span>
               </div>
               <p className="font-semibold leading-snug">{e.message}</p>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Swords } from "lucide-react";
 import type { UserBetRow, UserBetsTab } from "@/lib/profile";
 import { getUserBetsPageAction } from "@/lib/actions/profile";
-import { formatCentsAsMt } from "@/lib/format";
+import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import { Spinner } from "@/components/ui/spinner";
 
 const TABS: { key: UserBetsTab; label: string }[] = [
@@ -118,7 +118,7 @@ export function BetsList({
                         {bet.matchHome} vs {bet.matchAway}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {bet.league} · {new Date(bet.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                        {bet.league} · {new Date(bet.kickoffAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE })}
                       </p>
                       <p className="mt-1.5 text-sm font-semibold">{predictionLabel(bet)}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">

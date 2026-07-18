@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Check, X, AlertTriangle } from "lucide-react";
 import { completeWithdrawalAction, rejectWithdrawalAction } from "@/lib/actions/withdrawals";
-import { formatCentsAsMt } from "@/lib/format";
+import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import { Spinner } from "@/components/ui/spinner";
 import type { PendingWithdrawalRow } from "@/lib/withdrawals";
 
@@ -54,7 +54,7 @@ export function WithdrawalRow({ withdrawal }: { withdrawal: PendingWithdrawalRow
         <div className="min-w-0">
           <p className="text-base font-extrabold tabular-nums">{formatCentsAsMt(withdrawal.amountCents)} MT</p>
           <p className="text-xs text-muted-foreground">
-            {withdrawal.reference} · {new Date(withdrawal.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short" })}
+            {withdrawal.reference} · {new Date(withdrawal.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-primary-10 px-2.5 py-1 text-xs font-bold text-primary">
