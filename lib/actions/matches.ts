@@ -306,6 +306,10 @@ const liveScoreSchema = z.object({
   homeGoals: z.coerce.number().int().min(0, "Golos não podem ser negativos").max(50),
   awayGoals: z.coerce.number().int().min(0, "Golos não podem ser negativos").max(50),
   minute: z.coerce.number().int().min(0).max(150).optional(),
+  // Freezes the clock exactly at `minute` (half-time / any other break —
+  // see migration 0029) instead of it ticking up in real time. Ignored
+  // when minute is omitted: there's nothing to freeze without a checkpoint.
+  paused: z.boolean().optional().default(false),
 });
 
 /**
@@ -320,6 +324,13 @@ const liveScoreSchema = z.object({
  * API-Football Free-plan quota). Minute is optional; left blank, the feed
  * shows an automatic kickoff-based clock instead (computeElapsedMinute in
  * lib/bets.ts) — only pass one to override/correct it.
+ *
+ * Every call that includes a minute resets live_minute_anchor_at to now()
+ * (migration 0029) — the displayed minute keeps counting up in real time
+ * from whatever was just entered instead of freezing forever at a stale
+ * number, unless `paused` is true (half-time/injury break), in which case
+ * it's frozen exactly at `minute` until the admin resumes it with another
+ * call.
  */
 export async function updateLiveScoreAction(matchId: string, input: Record<string, unknown>): Promise<ActionResult> {
   const admin = await requireAdmin();
@@ -335,12 +346,16 @@ export async function updateLiveScoreAction(matchId: string, input: Record<strin
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
   }
 
+  const hasMinute = parsed.data.minute != null;
+
   await db
     .update(matches)
     .set({
       liveHome: parsed.data.homeGoals,
       liveAway: parsed.data.awayGoals,
       liveMinute: parsed.data.minute ?? null,
+      liveMinuteAnchorAt: hasMinute ? new Date() : null,
+      livePaused: hasMinute ? parsed.data.paused : false,
       liveUpdatedAt: new Date(),
     })
     .where(eq(matches.id, matchId));
