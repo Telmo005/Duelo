@@ -246,6 +246,16 @@ export const matches = pgTable("matches", {
   liveAway: integer("live_away"),
   liveMinute: integer("live_minute"),
   liveUpdatedAt: timestamp("live_updated_at", { withTimezone: true }),
+
+  /** Real ticking clock, not a frozen number (migration 0029). While
+   *  livePaused is false, the minute shown to users is
+   *  liveMinute + minutes elapsed since liveMinuteAnchorAt — every admin
+   *  update (updateLiveScoreAction) resets the anchor to now(), so the count
+   *  keeps advancing from whatever was just entered instead of sitting
+   *  frozen. livePaused freezes it exactly at liveMinute (half-time or any
+   *  other break) until the admin resumes it. */
+  liveMinuteAnchorAt: timestamp("live_minute_anchor_at", { withTimezone: true }),
+  livePaused: boolean("live_paused").notNull().default(false),
 });
 
 export type MatchRow = typeof matches.$inferSelect;

@@ -15,6 +15,7 @@ import { FeedListener } from "@/components/realtime/feed-listener";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { getFeedDuels, getRecentWinners, getUpcomingMatches } from "@/lib/bets";
 import { getWalletBalance } from "@/lib/wallet";
+import { getUnreadNotificationCount } from "@/lib/notifications";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -30,7 +31,7 @@ export default async function LandingPage() {
   // The feed is real for everyone. getFeedDuels() is a public read of open
   // duels (waiting/matched) — no mock data, ever. Logged-out visitors see the
   // same real activity; only the action buttons differ (accept vs. register).
-  const [duels, winners, upcomingMatches, profileAndWallet] = await Promise.all([
+  const [duels, winners, upcomingMatches, profileAndWallet, unreadCount] = await Promise.all([
     getFeedDuels(),
     getRecentWinners(),
     getUpcomingMatches(),
@@ -40,6 +41,7 @@ export default async function LandingPage() {
           getWalletBalance(user.id),
         ])
       : Promise.resolve(null),
+    user ? getUnreadNotificationCount(user.id) : Promise.resolve(0),
   ]);
 
   const displayName = profileAndWallet?.[0]?.displayName;
@@ -65,7 +67,7 @@ export default async function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
       {loggedIn && <FeedListener currentUserId={user?.id} />}
-      <SiteHeader displayName={displayName} availableCents={availableCents} />
+      <SiteHeader displayName={displayName} availableCents={availableCents} unreadCount={unreadCount} />
 
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[260px_minmax(0,1fr)_300px] lg:py-6">
         <FeedSidebarLeft openCount={openCount} potTotal={`MT ${(totalInPlay / 1000).toFixed(1)}k`} loggedIn={loggedIn} />

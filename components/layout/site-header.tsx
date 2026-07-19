@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { WalletChip } from "@/components/wallet/wallet-chip";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 
-export function SiteHeader({ displayName, availableCents }: { displayName?: string; availableCents?: number }) {
+export function SiteHeader({
+  displayName,
+  availableCents,
+  unreadCount = 0,
+}: {
+  displayName?: string;
+  availableCents?: number;
+  unreadCount?: number;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-6">
@@ -13,6 +22,7 @@ export function SiteHeader({ displayName, availableCents }: { displayName?: stri
         {displayName ? (
           <div className="flex items-center gap-2.5">
             {availableCents != null && <WalletChip availableCents={availableCents} compact />}
+            <NotificationBell unreadCount={unreadCount} compact />
             <Link href="/dashboard" className="flex items-center gap-2">
               <span className="hidden text-sm font-semibold sm:inline">{displayName}</span>
               <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground">

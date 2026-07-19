@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2, Pencil, Radio } from "lucide-react";
+import { Trash2, Pencil, Radio, Pause, Play } from "lucide-react";
 import { settleMatchAction, voidMatchAction } from "@/lib/actions/settlement";
 import { deleteMatchAction, updateLiveScoreAction } from "@/lib/actions/matches";
 import { EditMatchForm } from "@/components/admin/edit-match-form";
@@ -26,6 +26,19 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
 function computeElapsedMinuteLabel(kickoffAt: Date): string {
   const minutes = Math.max(0, Math.floor((Date.now() - kickoffAt.getTime()) / 60000));
   return minutes > 90 ? "90+" : String(minutes);
+}
+
+/** Mirrors lib/bets.ts computeLiveMinuteLabel (migration 0029) — same
+ *  duplication reasoning as computeElapsedMinuteLabel above. Returns null
+ *  only when no admin checkpoint exists yet for this match (nothing to
+ *  pause/resume/tick — the placeholder auto clock is shown instead). `now`
+ *  is passed in rather than read via Date.now() internally so the ticking
+ *  readout below can force a recompute on an interval. */
+function currentLiveMinute(match: MatchRow, now: number): number | null {
+  if (match.liveMinute == null) return null;
+  if (match.livePaused || !match.liveMinuteAnchorAt) return match.liveMinute;
+  const elapsed = Math.max(0, Math.floor((now - new Date(match.liveMinuteAnchorAt).getTime()) / 60000));
+  return match.liveMinute + elapsed;
 }
 
 /** Small "X-Y" pair of number inputs, reused for both the live-score
@@ -81,6 +94,17 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
   const [liveMinute, setLiveMinute] = useState(match.liveMinute != null ? String(match.liveMinute) : "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  // Ticks the "Relógio" readout below forward every 15s so a running (not
+  // paused) clock visibly counts up without needing a page reload — the
+  // actual source of truth is still liveMinute + liveMinuteAnchorAt
+  // (recomputed server-side on every read elsewhere), this is display only.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (match.livePaused) return;
+    const id = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(id);
+  }, [match.livePaused]);
 
   if (editing) {
     return <EditMatchForm match={match} onDone={() => setEditing(false)} />;
@@ -141,6 +165,32 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
     });
   }
 
+  // Pausar freezes the clock exactly where it currently reads (half-time,
+  // injury delay, etc.) instead of it ticking on through the break; Retomar
+  // resets the anchor to now() so it continues counting up from that same
+  // number rather than jumping to reflect the paused duration. Carries the
+  // current score fields along since updateLiveScoreAction always writes
+  // both together.
+  function handleTogglePause() {
+    if (liveHome === "" || liveAway === "") return;
+    const minuteNow = currentLiveMinute(match, Date.now());
+    if (minuteNow == null) return;
+    const nextPaused = !match.livePaused;
+    setActiveAction("live");
+    startTransition(async () => {
+      const result = await updateLiveScoreAction(match.id, {
+        homeGoals: liveHome,
+        awayGoals: liveAway,
+        minute: minuteNow,
+        paused: nextPaused,
+      });
+      if (result?.error) toast.error(result.error);
+      else toast.success(nextPaused ? "Relógio pausado" : "Relógio retomado — a contar a partir daqui");
+      setLiveMinute(String(minuteNow));
+      setActiveAction(null);
+    });
+  }
+
   return (
     <div className="flex flex-col gap-3 border-b border-border p-4 last:border-b-0">
       <div>
@@ -165,9 +215,13 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
        *  anyone. The minute is optional: leave it blank and the feed shows
        *  the automatic kickoff-based clock instead (see
        *  computeElapsedMinuteLabel in lib/bets.ts) — only fill it in to
-       *  correct/override that (e.g. stoppage time). Kept visually and
-       *  functionally separate from Liquidar below, which is the one action
-       *  that actually settles bets and pays out. */}
+       *  correct/override that (e.g. stoppage time). Once set, it's a real
+       *  ticking clock (migration 0029): "Atualizar" resets it to keep
+       *  counting up from whatever was just typed instead of freezing there
+       *  forever, and Pausar/Retomar lets the admin stop it exactly for a
+       *  real break (half-time, injury delay) without losing the count.
+       *  Kept visually and functionally separate from Liquidar below, which
+       *  is the one action that actually settles bets and pays out. */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary/40 px-3 py-2.5">
         <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
           <Radio className="size-3.5" aria-hidden /> Placar ao vivo
@@ -196,6 +250,24 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           {activeAction === "live" && <Spinner className="size-3" />}
           {activeAction === "live" ? "A atualizar…" : "Atualizar"}
         </button>
+        {currentLiveMinute(match, now) != null && (
+          <button
+            type="button"
+            onClick={handleTogglePause}
+            disabled={isPending || liveHome === "" || liveAway === ""}
+            className={`press inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              match.livePaused ? "border-success bg-success-10 text-success" : "border-border text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            {match.livePaused ? <Play className="size-3" aria-hidden /> : <Pause className="size-3" aria-hidden />}
+            {match.livePaused ? "Retomar" : "Pausar"}
+          </button>
+        )}
+        {currentLiveMinute(match, now) != null && (
+          <span className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
+            Relógio: {currentLiveMinute(match, now)}'{match.livePaused ? " (pausado)" : ""}
+          </span>
+        )}
         {match.liveUpdatedAt && (
           <span className="text-[11px] text-muted-foreground">
             Última atualização: {new Date(match.liveUpdatedAt).toLocaleTimeString("pt", { hour: "2-digit", minute: "2-digit" })}

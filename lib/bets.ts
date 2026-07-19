@@ -152,6 +152,8 @@ type LiveRow = {
   live_away: number | null;
   live_minute: number | null;
   live_updated_at: string | Date | null;
+  live_minute_anchor_at: string | Date | null;
+  live_paused: boolean;
 };
 
 /** Reads live_* columns for the given matches. Guarded: if migration 0007
@@ -167,7 +169,7 @@ async function fetchLiveByMatch(matchIds: string[]): Promise<Map<string, LiveRow
   try {
     const idList = sql.join(matchIds.map((id) => sql`${id}`), sql`, `);
     const rows = (await db.execute(sql`
-      select id, live_home, live_away, live_minute, live_updated_at
+      select id, live_home, live_away, live_minute, live_updated_at, live_minute_anchor_at, live_paused
         from public.matches
        where id in (${idList})
     `)) as unknown as LiveRow[];
@@ -189,6 +191,24 @@ async function fetchLiveByMatch(matchIds: string[]): Promise<Map<string, LiveRow
 function computeElapsedMinuteLabel(kickoffAt: Date): string {
   const minutes = Math.max(0, Math.floor((Date.now() - kickoffAt.getTime()) / 60000));
   return minutes > 90 ? "90+" : String(minutes);
+}
+
+/** Real ticking clock anchored to the admin's last checkpoint (migration
+ *  0029), not a number frozen forever the moment an admin first types one in.
+ *  - No admin entry yet → falls back to computeElapsedMinuteLabel (auto,
+ *    capped "90+").
+ *  - live_paused → frozen exactly at live_minute (half-time/any break),
+ *    however long that lasts.
+ *  - Otherwise → live_minute + minutes elapsed since live_minute_anchor_at,
+ *    which updateLiveScoreAction resets to now() on every save — so setting
+ *    "46" at the second-half restart keeps counting up from 46 instead of
+ *    sitting stuck there. */
+function computeLiveMinuteLabel(kickoffAt: Date, live: LiveRow | undefined): string {
+  if (live?.live_minute == null) return computeElapsedMinuteLabel(kickoffAt);
+  if (live.live_paused || !live.live_minute_anchor_at) return String(live.live_minute);
+  const anchorMs = new Date(live.live_minute_anchor_at).getTime();
+  const elapsed = Math.max(0, Math.floor((Date.now() - anchorMs) / 60000));
+  return String(live.live_minute + elapsed);
 }
 
 /** Fixtures a user can still bet on: kickoff strictly in the future AND
@@ -339,10 +359,12 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         status: isLive ? "live" : bet.status === "matched" ? "locked" : "waiting",
         createdAgo: new Date(bet.createdAt).toLocaleString("pt", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE }),
         score: isLive && live?.live_home != null && live?.live_away != null ? { home: live.live_home, away: live.live_away } : undefined,
-        // Admin's manual minute (see updateLiveScoreAction) wins when set;
-        // otherwise the clock runs automatically off kickoff time — no
-        // polling needed either way.
-        minute: isLive ? `${live?.live_minute ?? computeElapsedMinuteLabel(match.kickoffAt)}'` : undefined,
+        // Admin's manual minute (see updateLiveScoreAction) keeps ticking up
+        // in real time from whatever was last entered, or freezes at that
+        // number while paused (half-time/injury break) — see
+        // computeLiveMinuteLabel. With no admin entry yet, falls back to the
+        // automatic kickoff-based clock.
+        minute: isLive ? `${computeLiveMinuteLabel(match.kickoffAt, live)}'${live?.live_paused ? " ⏸" : ""}` : undefined,
       };
     })
     .filter((d): d is Duel => d !== null)
