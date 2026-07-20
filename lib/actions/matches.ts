@@ -318,7 +318,14 @@ const liveScoreSchema = z.object({
  *  displayed clock keeps ticking up from whatever was just entered, unless
  *  `paused` is true (half-time/injury break), in which case it freezes
  *  exactly at `minute` until resumed. */
-async function writeLiveScore(matchId: string, homeGoals: number, awayGoals: number, minute: number | null, paused: boolean) {
+async function writeLiveScore(
+  matchId: string,
+  homeGoals: number,
+  awayGoals: number,
+  minute: number | null,
+  paused: boolean,
+  statusCode: string | null
+) {
   const hasMinute = minute != null;
   await db
     .update(matches)
@@ -328,6 +335,7 @@ async function writeLiveScore(matchId: string, homeGoals: number, awayGoals: num
       liveMinute: minute ?? null,
       liveMinuteAnchorAt: hasMinute ? new Date() : null,
       livePaused: hasMinute ? paused : false,
+      liveStatusCode: statusCode,
       liveUpdatedAt: new Date(),
     })
     .where(eq(matches.id, matchId));
@@ -358,7 +366,9 @@ export async function updateLiveScoreAction(matchId: string, input: Record<strin
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
   }
 
-  await writeLiveScore(matchId, parsed.data.homeGoals, parsed.data.awayGoals, parsed.data.minute ?? null, parsed.data.paused);
+  // Manual entry clears any previously-fetched API status code — it's now
+  // stale/superseded by whatever the admin just typed by hand.
+  await writeLiveScore(matchId, parsed.data.homeGoals, parsed.data.awayGoals, parsed.data.minute ?? null, parsed.data.paused, null);
 
   revalidatePath("/admin/matches");
   revalidatePath("/");
@@ -370,6 +380,11 @@ type LiveScoreApiResult = ActionResult & {
   awayGoals?: number;
   minute?: number | null;
   statusLabel?: string;
+  /** True when API-Football reports the match as genuinely over
+   *  (FT/AET/PEN/PST/CANC/ABD/AWD/WO) — the client uses this to prefill the
+   *  "Resultado final" fields and prompt the admin to liquidate, instead of
+   *  just showing a toast that scrolls away. */
+  finished?: boolean;
 };
 
 /**
@@ -405,11 +420,17 @@ export async function updateLiveScoreFromApiAction(matchId: string): Promise<Liv
     return { error: `A API ainda não tem placar para este jogo (${data.statusLabel}).` };
   }
 
-  await writeLiveScore(matchId, data.homeGoals, data.awayGoals, data.minute, data.paused);
+  await writeLiveScore(matchId, data.homeGoals, data.awayGoals, data.minute, data.paused, data.statusCode);
 
   revalidatePath("/admin/matches");
   revalidatePath("/");
-  return { homeGoals: data.homeGoals, awayGoals: data.awayGoals, minute: data.minute, statusLabel: data.statusLabel };
+  return {
+    homeGoals: data.homeGoals,
+    awayGoals: data.awayGoals,
+    minute: data.minute,
+    statusLabel: data.statusLabel,
+    finished: data.finished,
+  };
 }
 
 /** Manual trigger for importUpcomingFixtures() — lets an admin test/force an

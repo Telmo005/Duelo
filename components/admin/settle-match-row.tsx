@@ -41,6 +41,28 @@ function currentLiveMinute(match: MatchRow, now: number): number | null {
   return match.liveMinute + elapsed;
 }
 
+/** Mirrors lib/sportsData.ts's FINISHED_STATUS_CODES/STATUS_LABELS — same
+ *  duplication reasoning as the two helpers above. Used to turn the raw
+ *  live_status_code the API-refresh button persisted (migration 0030) into
+ *  an unambiguous label: without this, a match stuck at "90'" reads exactly
+ *  the same whether it just paused for a moment or ended twenty minutes ago. */
+const FINISHED_STATUS_CODES = new Set(["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"]);
+const STATUS_LABELS: Record<string, string> = {
+  HT: "Intervalo",
+  BT: "Intervalo do prolongamento",
+  P: "Grandes penalidades",
+  SUSP: "Suspenso",
+  INT: "Interrompido",
+  FT: "Terminado",
+  AET: "Terminado (prolongamento)",
+  PEN: "Terminado (penalidades)",
+  PST: "Adiado",
+  CANC: "Cancelado",
+  ABD: "Abandonado",
+  AWD: "Decidido por w.o.",
+  WO: "Decidido por w.o.",
+};
+
 /** Small "X-Y" pair of number inputs, reused for both the live-score
  *  tracker and the final settlement score — same shape, different action
  *  behind them. */
@@ -180,7 +202,16 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
         setLiveHome(String(result.homeGoals));
         setLiveAway(String(result.awayGoals));
         setLiveMinute(result.minute != null ? String(result.minute) : "");
-        toast.success(`Atualizado da API — ${result.statusLabel}`);
+        if (result.finished) {
+          // The API says this one is over — prefill "Resultado final" too so
+          // the admin can go straight to reviewing + Liquidar instead of
+          // re-typing the same score they just fetched.
+          setHome(String(result.homeGoals));
+          setAway(String(result.awayGoals));
+          toast.success(`Jogo terminado (${result.statusLabel}) — confere o resultado e liquida.`, { duration: 6000 });
+        } else {
+          toast.success(`Atualizado da API — ${result.statusLabel}`);
+        }
       }
       setActiveAction(null);
     });
@@ -211,6 +242,12 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
       setActiveAction(null);
     });
   }
+
+  const liveStatusIsFinished = match.liveStatusCode != null && FINISHED_STATUS_CODES.has(match.liveStatusCode);
+  const liveStatusLabel = match.liveStatusCode ? (STATUS_LABELS[match.liveStatusCode] ?? match.liveStatusCode) : null;
+  // Falls back to the generic "pausado" only when there's no API status code
+  // to be specific with (e.g. the admin paused it by hand via Pausar).
+  const clockStatusText = liveStatusLabel ?? (match.livePaused ? "pausado" : null);
 
   return (
     <div className="flex flex-col gap-3 border-b border-border p-4 last:border-b-0">
@@ -297,8 +334,8 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           </button>
         )}
         {currentLiveMinute(match, now) != null && (
-          <span className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-            Relógio: {currentLiveMinute(match, now)}'{match.livePaused ? " (pausado)" : ""}
+          <span className={`flex items-center gap-1 text-[11px] font-bold ${liveStatusIsFinished ? "text-destructive" : "text-muted-foreground"}`}>
+            Relógio: {currentLiveMinute(match, now)}'{clockStatusText ? ` — ${clockStatusText}` : ""}
           </span>
         )}
         {match.liveUpdatedAt && (
@@ -307,6 +344,12 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           </span>
         )}
       </div>
+
+      {liveStatusIsFinished && (
+        <p className="flex items-center gap-1.5 text-xs font-bold text-destructive">
+          🏁 A API diz que este jogo já terminou ({liveStatusLabel}) — confere o resultado abaixo e liquida.
+        </p>
+      )}
 
       {blockedByElimination && (
         <p className="text-xs font-semibold text-destructive">

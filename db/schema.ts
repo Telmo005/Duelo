@@ -256,6 +256,16 @@ export const matches = pgTable("matches", {
    *  other break) until the admin resumes it. */
   liveMinuteAnchorAt: timestamp("live_minute_anchor_at", { withTimezone: true }),
   livePaused: boolean("live_paused").notNull().default(false),
+
+  /** Raw API-Football fixture status code ('FT', 'HT', '2H', ...) from the
+   *  last updateLiveScoreFromApiAction call (migration 0030) — lets the admin
+   *  UI show an unambiguous "Terminado"/"Intervalo" label instead of a bare
+   *  minute that would otherwise look like it's still ticking (or ambiguous
+   *  about whether it stopped because the match paused or because it ended).
+   *  Null for a manual score entry (updateLiveScoreAction clears it — a
+   *  manual override makes any previously-fetched status stale) and for
+   *  matches never linked to the API. */
+  liveStatusCode: text("live_status_code"),
 });
 
 export type MatchRow = typeof matches.$inferSelect;

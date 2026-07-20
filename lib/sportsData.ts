@@ -127,13 +127,19 @@ export async function searchFixturesByDate(date: string): Promise<{ fixtures: Fi
   }
 }
 
-/** API-Football fixture status codes that mean "the clock is not running
- *  right now" — half-time, the break between extra-time halves, a penalty
- *  shootout (no running minute makes sense there), or the match being
+/** API-Football fixture status codes for a match that's genuinely OVER —
+ *  distinct from HALTED_STATUS_CODES below because the admin still needs to
+ *  know "this is done, go liquidate" rather than "this paused, it'll
+ *  resume". */
+const FINISHED_STATUS_CODES = new Set(["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"]);
+
+/** Fixture status codes that mean "the clock is not running right now" but
+ *  the match ISN'T over — half-time, the break between extra-time halves, a
+ *  penalty shootout (no running minute makes sense there), or the match
  *  suspended/interrupted by the referee. Anything else returned while a
  *  fixture is still in progress ("1H", "2H", "ET") means the clock should
  *  keep ticking. */
-const PAUSED_STATUS_CODES = new Set(["HT", "BT", "P", "SUSP", "INT"]);
+const HALTED_STATUS_CODES = new Set(["HT", "BT", "P", "SUSP", "INT"]);
 
 const STATUS_LABELS: Record<string, string> = {
   NS: "Ainda não começou",
@@ -159,7 +165,14 @@ export type FixtureUpdate = {
   homeGoals: number | null;
   awayGoals: number | null;
   minute: number | null;
+  /** True for both "halted, will resume" (half-time, suspended) and
+   *  "finished" statuses — either way the ticking clock should freeze
+   *  exactly at `minute` instead of counting up in real time forever.
+   *  Distinguish the two with `finished` below for what label to show. */
   paused: boolean;
+  /** True only for a genuinely-over match (FT/AET/PEN/PST/CANC/ABD/AWD/WO) —
+   *  the admin's cue to go liquidate with the final score, not just wait. */
+  finished: boolean;
   statusCode: string;
   statusLabel: string;
 };
@@ -196,12 +209,14 @@ export async function fetchFixtureById(externalId: string): Promise<{ data?: Fix
     if (!fx) return { error: "Jogo não encontrado na API (verifica a ligação ao API-Football)" };
 
     const statusCode: string = fx.fixture?.status?.short ?? "NS";
+    const finished = FINISHED_STATUS_CODES.has(statusCode);
     return {
       data: {
         homeGoals: fx.goals?.home ?? null,
         awayGoals: fx.goals?.away ?? null,
         minute: fx.fixture?.status?.elapsed ?? null,
-        paused: PAUSED_STATUS_CODES.has(statusCode),
+        paused: finished || HALTED_STATUS_CODES.has(statusCode),
+        finished,
         statusCode,
         statusLabel: STATUS_LABELS[statusCode] ?? statusCode,
       },
