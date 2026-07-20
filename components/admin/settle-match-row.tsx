@@ -202,13 +202,17 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
         setLiveHome(String(result.homeGoals));
         setLiveAway(String(result.awayGoals));
         setLiveMinute(result.minute != null ? String(result.minute) : "");
-        if (result.finished) {
-          // The API says this one is over — prefill "Resultado final" too so
-          // the admin can go straight to reviewing + Liquidar instead of
-          // re-typing the same score they just fetched.
+        if (result.autoSettled) {
+          // The API confirmed this exact score twice in a row — already
+          // liquidated automatically, nothing left for the admin to do.
+          toast.success(`Jogo liquidado automaticamente — ${result.homeGoals}-${result.awayGoals}. Pagamentos processados.`, { duration: 6000 });
+        } else if (result.finished) {
+          // First sighting of a finished score — prefill "Resultado final"
+          // so reviewing + Liquidar is one click, but this won't auto-pay
+          // until the API confirms the same score again on a later check.
           setHome(String(result.homeGoals));
           setAway(String(result.awayGoals));
-          toast.success(`Jogo terminado (${result.statusLabel}) — confere o resultado e liquida.`, { duration: 6000 });
+          toast.success(`Jogo terminado (${result.statusLabel}) — confere o resultado e liquida, ou aguarda a confirmação automática.`, { duration: 6000 });
         } else {
           toast.success(`Atualizado da API — ${result.statusLabel}`);
         }

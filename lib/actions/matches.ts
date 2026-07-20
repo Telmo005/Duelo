@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { matches, bets } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { fetchTeamLogo, searchTeams, searchFixturesByDate, fetchFixtureById, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
-import { writeLiveScore, syncLiveMatchesFromApi, type LiveSyncResult } from "@/lib/liveScoreSync";
+import { writeLiveScore, syncLiveMatchesFromApi, attemptAutoSettleIfConfirmed, type LiveSyncResult } from "@/lib/liveScoreSync";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 import { parseMozambiqueDateTimeLocal, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
@@ -357,6 +357,11 @@ type LiveScoreApiResult = ActionResult & {
    *  "Resultado final" fields and prompt the admin to liquidate, instead of
    *  just showing a toast that scrolls away. */
   finished?: boolean;
+  /** True when this exact call auto-settled the match (the API confirmed the
+   *  same score twice in a row — see attemptAutoSettleIfConfirmed). The
+   *  client should tell the admin it's already paid out, not prompt them to
+   *  liquidate manually. */
+  autoSettled?: boolean;
 };
 
 /**
@@ -392,6 +397,10 @@ export async function updateLiveScoreFromApiAction(matchId: string): Promise<Liv
     return { error: `A API ainda não tem placar para este jogo (${data.statusLabel}).` };
   }
 
+  // Must run BEFORE writeLiveScore — compares against what was already on
+  // file to tell "the API just confirmed this score again" from "first
+  // sighting" (see attemptAutoSettleIfConfirmed).
+  const { settled } = await attemptAutoSettleIfConfirmed(match, data);
   await writeLiveScore(matchId, data.homeGoals, data.awayGoals, data.minute, data.paused, data.statusCode);
 
   revalidatePath("/admin/matches");
@@ -402,6 +411,7 @@ export async function updateLiveScoreFromApiAction(matchId: string): Promise<Liv
     minute: data.minute,
     statusLabel: data.statusLabel,
     finished: data.finished,
+    autoSettled: settled,
   };
 }
 
