@@ -360,8 +360,14 @@ html[data-theme="light"] {
    (toast(title, { description })) is a separate nested node sonner themes
    internally with its own low-contrast gray, unaffected by that `style`
    object — read as too dim/gray against the dark theme's card background.
-   Overridden here to the same --foreground the title already uses, in both
-   themes (already correctly themed per [data-theme] below). */
+   Dark mode uses literal pure white here (not --foreground's softened
+   #E9EAF0 — a deliberate app-wide choice for body text, but this toast
+   description was specifically asked to be pure white); light mode keeps
+   --foreground (#15161F) since white text would vanish on the light
+   theme's white card background. */
 [data-sonner-toaster] [data-description] {
+  color: #FFFFFF;
+}
+:root[data-theme="light"] [data-sonner-toaster] [data-description] {
   color: var(--foreground);
 }
