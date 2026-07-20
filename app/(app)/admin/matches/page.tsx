@@ -28,12 +28,15 @@ export default async function AdminMatchesPage() {
     getWalletBalance(profile.id),
   ]);
 
-  // getUnsettledMatches already orders oldest-kickoff-first — grouping by
-  // status here just separates it into the three sections below without
-  // re-sorting, so "needs_review" keeps surfacing its most-overdue match
-  // first, same as "live" and "scheduled".
+  // getUnsettledMatches already orders oldest-kickoff-first. 'needs_review'
+  // and 'live' are grouped into one combined "Ao vivo" bucket — both are
+  // "this match is happening or just happened, not settled yet" from the
+  // admin's point of view — needs_review first within it since those are
+  // the most overdue (already past 90 minutes), so the whole list reads as
+  // one clear priority order: everything live, then scheduled soonest-first.
   const needsReview = unsettled.filter((m) => m.matchStatus === "needs_review");
   const live = unsettled.filter((m) => m.matchStatus === "live");
+  const inProgress = [...needsReview, ...live];
   const scheduled = unsettled.filter((m) => m.matchStatus === "scheduled");
 
   return (
@@ -61,24 +64,14 @@ export default async function AdminMatchesPage() {
         <AddMatchForm />
       </section>
 
-      {needsReview.length > 0 && (
+      {inProgress.length > 0 && (
         <section className="mb-7">
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-destructive">
-            Precisa de liquidação ({needsReview.length})
+          <h2 className={`mb-3 text-xs font-bold uppercase tracking-wider ${needsReview.length > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+            Ao vivo ({inProgress.length})
+            {needsReview.length > 0 && ` — ${needsReview.length} precisa${needsReview.length > 1 ? "m" : ""} de liquidação`}
           </h2>
-          <div className="overflow-hidden rounded-2xl border border-destructive/30 bg-card">
-            {needsReview.map((match) => (
-              <SettleMatchRow key={match.id} match={match} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {live.length > 0 && (
-        <section className="mb-7">
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Ao vivo ({live.length})</h2>
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
-            {live.map((match) => (
+          <div className={`overflow-hidden rounded-2xl border bg-card ${needsReview.length > 0 ? "border-destructive/30" : "border-border"}`}>
+            {inProgress.map((match) => (
               <SettleMatchRow key={match.id} match={match} />
             ))}
           </div>
