@@ -367,6 +367,23 @@ export const adminAuditLog = pgTable("admin_audit_log", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * live_sync_state — singleton row (migration 0031) tracking the automatic
+ * live-score sync's own state: when it last actually called API-Football,
+ * and the daily quota remaining as last reported by the vendor
+ * (x-ratelimit-requests-remaining response header — read from every
+ * API-Football call via lib/apiFootballClient.ts, not a self-maintained
+ * guess). Read by lib/liveScoreSync.ts to decide whether a given cron tick
+ * is allowed to spend a request at all.
+ */
+export const liveSyncState = pgTable("live_sync_state", {
+  id: integer("id").primaryKey().default(1),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  quotaRemaining: integer("quota_remaining"),
+  quotaUpdatedAt: timestamp("quota_updated_at", { withTimezone: true }),
+  quotaExhaustedNotifiedAt: timestamp("quota_exhausted_notified_at", { withTimezone: true }),
+});
+
 export type AdminAuditLogEntry = typeof adminAuditLog.$inferSelect;
 
 /**

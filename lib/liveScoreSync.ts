@@ -1,10 +1,12 @@
 import { db } from "@/db";
-import { matches, profiles, notifications } from "@/db/schema";
+import { matches, profiles, notifications, liveSyncState } from "@/db/schema";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { fetchLiveFixtures, type FixtureUpdate } from "@/lib/sportsData";
+import { getKnownRemainingQuota } from "@/lib/apiFootballClient";
 import { createServiceClient } from "@/lib/supabase/server";
 import { broadcastFeedEvent } from "@/lib/realtime";
 import { logError } from "@/lib/errorLog";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 /** Shared write path for every live-score writer (manual form, per-match
  *  API-refresh, bulk API-refresh, and the checkpoint cron below) — same
@@ -117,8 +119,8 @@ export async function attemptAutoSettleIfConfirmed(
  * (fetchLiveFixtures — live=all) and writes it through to every tracked
  * 'live'/'needs_review' match linked to the API. Shared core behind both
  * the admin's "Atualizar jogos ao vivo" button (refreshAllLiveMatchesAction)
- * and the automatic checkpoint cron (runLiveScoreCheckpointSync) — same
- * single-request cost either way, only the trigger differs. Also the place
+ * and the automatic sync cron (runLiveScoreAutoSync) — same single-request
+ * cost either way, only the trigger differs. Also the place
  * auto-settlement is attempted (attemptAutoSettleIfConfirmed) for every
  * match whose result the API has now confirmed twice in a row.
  */
@@ -163,52 +165,121 @@ export async function syncLiveMatchesFromApi(): Promise<LiveSyncResult> {
   return { updated, missing };
 }
 
-/** Kickoff, half-time, full-time — the three moments a football score
- *  actually needs a fresh read. Purely local math (kickoff time + whatever
- *  minute we last fetched), zero API cost to evaluate every cron tick. */
-const CHECKPOINT_MINUTES = [0, 45, 90];
-
 /** Matches older than this (real time since kickoff) stop being considered
- *  for automatic checkpoint syncing at all, even if a checkpoint condition
- *  is still (or again) true — the safety net against a match that never
- *  comes back in live=all (SUSP, or a finished match nobody's liquidated
- *  yet) causing every single cron tick to re-trigger a sync forever. 90
- *  regulation minutes + a generous stoppage/extra-time/half-time buffer;
- *  past this, the admin's manual buttons take over. */
-const CHECKPOINT_ELIGIBLE_MINUTES = 150;
+ *  for automatic syncing at all, even if still 'live'/'needs_review' — the
+ *  safety net against a match that never comes back in live=all (SUSP, or a
+ *  finished match nobody's liquidated yet) causing every single cron tick
+ *  to spend a request forever. 90 regulation minutes + a generous
+ *  stoppage/extra-time/half-time buffer; past this, the admin's manual
+ *  buttons take over. */
+const AUTO_SYNC_ELIGIBLE_MINUTES = 150;
+
+/** Baseline interval between automatic polls while at least one match is
+ *  live — catches a goal within roughly this long, not just at 45'/90'. */
+const PEAK_INTERVAL_MINUTES = 5;
+
+/** 00:00–09:00 Mozambique time is when this platform sees the least
+ *  activity (explicit product decision, not a guess) — polling less often
+ *  during that window trades a bit of freshness nobody's watching for
+ *  meaningfully more daily quota headroom for the hours that matter. */
+const OFF_PEAK_INTERVAL_MINUTES = 15;
+const OFF_PEAK_START_HOUR = 0;
+const OFF_PEAK_END_HOUR = 9;
+
+/** Hard floor left unspent no matter how much a live match "wants" another
+ *  poll — reserved for the admin's own manual buttons (per-match refresh,
+ *  bulk refresh, team/fixture search) so automatic polling can never eat
+ *  the entire daily budget and leave nothing for a human to use. */
+const QUOTA_SAFETY_RESERVE = 15;
+
+function currentMozambiqueHour(now: Date): number {
+  const parts = new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: MOZAMBIQUE_TIMEZONE }).formatToParts(now);
+  const hourPart = parts.find((p) => p.type === "hour")?.value ?? "12";
+  // Some locales render midnight as "24" rather than "0" — normalize.
+  return Number(hourPart) % 24;
+}
+
+function requiredIntervalMinutes(now: Date): number {
+  const hour = currentMozambiqueHour(now);
+  const isOffPeak = hour >= OFF_PEAK_START_HOUR && hour < OFF_PEAK_END_HOUR;
+  return isOffPeak ? OFF_PEAK_INTERVAL_MINUTES : PEAK_INTERVAL_MINUTES;
+}
+
+async function getSyncState() {
+  const [row] = await db.select().from(liveSyncState).where(eq(liveSyncState.id, 1)).limit(1);
+  return row ?? null;
+}
 
 /**
- * Runs syncLiveMatchesFromApi() ONLY if there's real work to do — never on a
- * bare timer. Two conditions trigger it: (1) at least one tracked match has
- * just crossed a checkpoint (kicked off, or reached 45'/90') since the last
- * time we fetched its minute, or (2) a match is sitting on a first-sighted
- * finished score awaiting its reconfirmation read (see
- * attemptAutoSettleIfConfirmed) — without this second condition, a match
- * that first shows FT exactly at the 90' checkpoint would never get the
- * second read it needs to actually auto-settle, since 90' is the last fixed
- * checkpoint. Backs the automatic checkpoint cron
- * (app/api/cron/live-score-checkpoints): call this as often as you like
- * (every tick is a cheap DB read, no API call) — the API is only ever hit
- * when there's real work to do, and one hit refreshes every tracked live
- * match at once regardless of how many triggered it.
+ * Runs syncLiveMatchesFromApi() ONLY if there's real work to do AND it's
+ * actually time to do it — never on a bare timer, safe to call every few
+ * minutes from the cron (each tick is a couple of cheap DB reads, no API
+ * call by itself). Gates on three independent things, all of which must
+ * allow it:
+ *
+ *  1. At least one tracked 'live'/'needs_review' match, linked to the API,
+ *     still within AUTO_SYNC_ELIGIBLE_MINUTES of its kickoff — otherwise
+ *     there's nothing worth polling for at all.
+ *  2. Enough real time has passed since the last actual poll — 5 minutes
+ *     normally, 15 during Mozambique's 00:00–09:00 off-peak window. Read
+ *     from live_sync_state.last_synced_at, not derived from any one match,
+ *     so overlapping matches never cause back-to-back polls seconds apart.
+ *  3. The vendor's own last-reported quota (x-ratelimit-requests-remaining,
+ *     persisted by every apiFootballFetch call — see
+ *     lib/apiFootballClient.ts) still has room above QUOTA_SAFETY_RESERVE.
+ *     Unknown (never read yet, or stale from a previous day) is treated as
+ *     "assume there's room" — the very next call will refresh it with the
+ *     real number regardless.
+ *
+ * One hit (live=all) refreshes every tracked live match at once, however
+ * many matches are actually in play — that's what makes 5-minute polling
+ * affordable on a 100/day quota at all (see the budget math worked out with
+ * the product owner before this was built): the cost scales with how many
+ * total minutes something is live somewhere, not with match count.
  */
-export async function runLiveScoreCheckpointSync(): Promise<LiveSyncResult & { triggered: boolean }> {
+export async function runLiveScoreAutoSync(): Promise<LiveSyncResult & { triggered: boolean; skippedReason?: string }> {
   const tracked = await db
-    .select({ kickoffAt: matches.kickoffAt, liveMinute: matches.liveMinute, liveStatusCode: matches.liveStatusCode })
+    .select({ kickoffAt: matches.kickoffAt })
     .from(matches)
     .where(and(inArray(matches.matchStatus, ["live", "needs_review"]), isNotNull(matches.externalId)));
 
-  const now = Date.now();
-  const dueForCheckpoint = tracked.some((m) => {
-    const elapsedMinutes = (now - new Date(m.kickoffAt).getTime()) / 60_000;
-    if (elapsedMinutes < 0 || elapsedMinutes > CHECKPOINT_ELIGIBLE_MINUTES) return false;
-    if (m.liveStatusCode != null && AUTO_SETTLE_STATUS_CODES.has(m.liveStatusCode)) return true; // awaiting reconfirmation
-    const lastKnownMinute = m.liveMinute ?? -1;
-    return CHECKPOINT_MINUTES.some((checkpoint) => lastKnownMinute < checkpoint && elapsedMinutes >= checkpoint);
+  const now = new Date();
+  const nowMs = now.getTime();
+  const hasEligibleLiveMatch = tracked.some((m) => {
+    const elapsedMinutes = (nowMs - new Date(m.kickoffAt).getTime()) / 60_000;
+    return elapsedMinutes >= 0 && elapsedMinutes <= AUTO_SYNC_ELIGIBLE_MINUTES;
   });
+  if (!hasEligibleLiveMatch) return { triggered: false, updated: 0, missing: [], skippedReason: "nothing live" };
 
-  if (!dueForCheckpoint) return { triggered: false, updated: 0, missing: [] };
+  const state = await getSyncState();
+
+  const requiredGapMs = requiredIntervalMinutes(now) * 60_000;
+  if (state?.lastSyncedAt && nowMs - new Date(state.lastSyncedAt).getTime() < requiredGapMs) {
+    return { triggered: false, updated: 0, missing: [], skippedReason: "too soon" };
+  }
+
+  const knownRemaining = await getKnownRemainingQuota();
+  if (knownRemaining != null && knownRemaining <= QUOTA_SAFETY_RESERVE) {
+    const alreadyNotifiedToday =
+      state?.quotaExhaustedNotifiedAt != null && isSameUtcDay(new Date(state.quotaExhaustedNotifiedAt), now);
+    if (!alreadyNotifiedToday) {
+      await notifyAdmins(
+        "quota_exhausted",
+        "Quota da API-Football quase esgotada",
+        `Restam ${knownRemaining} pedidos hoje — a atualização automática do placar ao vivo pausou até amanhã para deixar margem para uso manual. Usa "Última atualização" com cuidado.`,
+        "/admin/matches"
+      );
+      await db.update(liveSyncState).set({ quotaExhaustedNotifiedAt: now }).where(eq(liveSyncState.id, 1));
+    }
+    return { triggered: false, updated: 0, missing: [], skippedReason: "quota reserve" };
+  }
+
+  await db.update(liveSyncState).set({ lastSyncedAt: now }).where(eq(liveSyncState.id, 1));
 
   const result = await syncLiveMatchesFromApi();
   return { triggered: true, ...result };
+}
+
+function isSameUtcDay(a: Date, b: Date): boolean {
+  return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate();
 }

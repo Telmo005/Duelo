@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { matches } from "@/db/schema";
 import { isNotNull } from "drizzle-orm";
+import { apiFootballFetch } from "@/lib/apiFootballClient";
 
 /**
  * Leagues this product covers per CLAUDE.md (Moçambola is deliberately
@@ -23,6 +24,11 @@ function currentSeasonYear(): number {
   const month = now.getUTCMonth() + 1;
   return month >= 7 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
 }
+
+type RawFixture = {
+  fixture?: { id?: number; date?: string };
+  teams?: { home?: { name?: string; logo?: string }; away?: { name?: string; logo?: string } };
+};
 
 export type ImportResult = {
   checked: number;
@@ -48,11 +54,6 @@ export type ImportResult = {
  * admin trigger) surface `errors` rather than treating it as a crash.
  */
 export async function importUpcomingFixtures(windowDays = 14): Promise<ImportResult> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) {
-    return { checked: 0, inserted: 0, updated: 0, errors: ["API_FOOTBALL_KEY não está configurada"] };
-  }
-
   const season = currentSeasonYear();
   const from = new Date().toISOString().slice(0, 10);
   const to = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -70,23 +71,16 @@ export async function importUpcomingFixtures(windowDays = 14): Promise<ImportRes
 
   for (const league of LEAGUES) {
     try {
-      const res = await fetch(
-        `https://v3.football.api-sports.io/fixtures?league=${league.id}&season=${season}&from=${from}&to=${to}`,
-        { headers: { "x-apisports-key": apiKey }, cache: "no-store" }
+      const { body, error } = await apiFootballFetch<{ response?: RawFixture[] }>(
+        `/fixtures?league=${league.id}&season=${season}&from=${from}&to=${to}`
       );
 
-      if (!res.ok) {
-        errors.push(`${league.name}: HTTP ${res.status}`);
+      if (error) {
+        errors.push(`${league.name}: ${error}`);
         continue;
       }
 
-      const body = await res.json();
-      if (body.errors && Object.keys(body.errors).length > 0) {
-        errors.push(`${league.name}: ${JSON.stringify(body.errors)}`);
-        continue;
-      }
-
-      for (const fx of body.response ?? []) {
+      for (const fx of body?.response ?? []) {
         const externalId: string | undefined = fx?.fixture?.id != null ? String(fx.fixture.id) : undefined;
         const home: string | undefined = fx?.teams?.home?.name;
         const away: string | undefined = fx?.teams?.away?.name;
@@ -105,8 +99,8 @@ export async function importUpcomingFixtures(windowDays = 14): Promise<ImportRes
             league: league.name,
             kickoffAt,
             externalId,
-            homeLogoUrl: fx.teams.home.logo ?? null,
-            awayLogoUrl: fx.teams.away.logo ?? null,
+            homeLogoUrl: fx.teams?.home?.logo ?? null,
+            awayLogoUrl: fx.teams?.away?.logo ?? null,
           })
           .onConflictDoUpdate({
             target: matches.externalId,

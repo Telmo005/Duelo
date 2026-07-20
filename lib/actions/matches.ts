@@ -422,8 +422,8 @@ export type BulkLiveRefreshResult = LiveSyncResult;
  * ONE request (syncLiveMatchesFromApi — API-Football's live=all filter),
  * instead of clicking "Última atualização" once per match. Backs the
  * "Atualizar jogos ao vivo" button (app/(app)/admin/matches). The same core
- * also runs automatically off the checkpoint cron (see
- * app/api/cron/live-score-checkpoints) — this is just the admin-triggered,
+ * also runs automatically off the live-score sync cron (see
+ * app/api/cron/live-score-sync) — this is just the admin-triggered,
  * on-demand path into it.
  */
 export async function refreshAllLiveMatchesAction(): Promise<BulkLiveRefreshResult> {
