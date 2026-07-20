@@ -2,16 +2,18 @@
  * API-Football (api-sports.io) client. Settlement/lifecycle (bet_settle_match
  * / bet_void_match / match_advance_lifecycle, see
  * supabase/migrations/0028_match_live_lifecycle.sql) is purely time-based and
- * never calls this file — the live scoreboard (goals + minute) is manual
- * admin input, either typed by hand or fetched one match at a time via
- * fetchFixtureById below (lib/actions/matches.ts updateLiveScoreAction /
- * updateLiveScoreFromApiAction). Every call in this file is admin-triggered
- * rather than polled, to stay well inside a Free-plan daily quota (see the
- * 429s that motivated 0028_match_live_lifecycle.sql) — fixture import
- * (kickoff time/teams), the team-search/fixture-search pickers, and the
- * single-fixture live lookup all only ever run when an admin explicitly asks
- * for that one thing, never on a schedule.
+ * never calls this file — the live scoreboard (goals + minute) comes from
+ * fetchFixtureById/fetchLiveFixtures below, called either by an admin
+ * (updateLiveScoreFromApiAction / refreshAllLiveMatchesAction) or by the
+ * automatic sync (lib/liveScoreSync.ts), which is itself gated against the
+ * real vendor-reported daily quota — see lib/apiFootballClient.ts, which
+ * every function here routes through. That gate (not "nothing calls the API
+ * automatically") is what keeps this inside the Free-plan daily quota now;
+ * see the 429s that motivated 0028_match_live_lifecycle.sql for why that
+ * matters.
  */
+
+import { apiFootballFetch } from "@/lib/apiFootballClient";
 
 export type FixtureSearchResult = {
   externalId: string;
@@ -80,51 +82,35 @@ function isEliminationRound(round: string | undefined): boolean {
  * side, against `league.id` in the (unfiltered) response.
  */
 export async function searchFixturesByDate(date: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) return { fixtures: [], error: "API_FOOTBALL_KEY não está configurada" };
+  const { body, error } = await apiFootballFetch<{ response?: RawFixture[] }>(`/fixtures?date=${encodeURIComponent(date)}`);
+  if (error) return { fixtures: [], error };
 
-  try {
-    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${encodeURIComponent(date)}`, {
-      headers: { "x-apisports-key": apiKey },
-      cache: "no-store",
-    });
-    if (!res.ok) return { fixtures: [], error: `Pedido falhou (HTTP ${res.status})` };
+  const raw = body?.response ?? [];
+  const fixtures = raw
+    .map((fx): FixtureSearchResult | null => {
+      const externalId = fx.fixture?.id != null ? String(fx.fixture.id) : null;
+      const home = fx.teams?.home?.name;
+      const away = fx.teams?.away?.name;
+      const kickoffAtIso = fx.fixture?.date;
+      const leagueId = fx.league?.id;
+      const league = fx.league?.name;
+      if (!externalId || !home || !away || !kickoffAtIso || leagueId == null || !league) return null;
+      return {
+        externalId,
+        home,
+        away,
+        league,
+        leagueId,
+        country: fx.league?.country ?? null,
+        kickoffAtIso,
+        homeLogoUrl: fx.teams?.home?.logo ?? null,
+        awayLogoUrl: fx.teams?.away?.logo ?? null,
+        isElimination: isEliminationRound(fx.league?.round),
+      };
+    })
+    .filter((fx): fx is FixtureSearchResult => fx !== null);
 
-    const body = await res.json();
-    if (body.errors && Object.keys(body.errors).length > 0) {
-      const messages = Object.values(body.errors as Record<string, string>);
-      return { fixtures: [], error: messages.join(" ") || "A API rejeitou o pedido" };
-    }
-
-    const raw: RawFixture[] = body.response ?? [];
-    const fixtures = raw
-      .map((fx): FixtureSearchResult | null => {
-        const externalId = fx.fixture?.id != null ? String(fx.fixture.id) : null;
-        const home = fx.teams?.home?.name;
-        const away = fx.teams?.away?.name;
-        const kickoffAtIso = fx.fixture?.date;
-        const leagueId = fx.league?.id;
-        const league = fx.league?.name;
-        if (!externalId || !home || !away || !kickoffAtIso || leagueId == null || !league) return null;
-        return {
-          externalId,
-          home,
-          away,
-          league,
-          leagueId,
-          country: fx.league?.country ?? null,
-          kickoffAtIso,
-          homeLogoUrl: fx.teams?.home?.logo ?? null,
-          awayLogoUrl: fx.teams?.away?.logo ?? null,
-          isElimination: isEliminationRound(fx.league?.round),
-        };
-      })
-      .filter((fx): fx is FixtureSearchResult => fx !== null);
-
-    return { fixtures };
-  } catch (err) {
-    return { fixtures: [], error: err instanceof Error ? err.message : String(err) };
-  }
+  return { fixtures };
 }
 
 /** API-Football fixture status codes for a match that's genuinely OVER —
@@ -189,29 +175,13 @@ export type FixtureUpdate = {
  * between "no live data at all" and "poll everything constantly".
  */
 export async function fetchFixtureById(externalId: string): Promise<{ data?: FixtureUpdate; error?: string }> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) return { error: "API_FOOTBALL_KEY não está configurada" };
+  const { body, error } = await apiFootballFetch<{ response?: RawLiveFixture[] }>(`/fixtures?id=${encodeURIComponent(externalId)}`);
+  if (error) return { error };
 
-  try {
-    const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${encodeURIComponent(externalId)}`, {
-      headers: { "x-apisports-key": apiKey },
-      cache: "no-store",
-    });
-    if (!res.ok) return { error: `Pedido falhou (HTTP ${res.status})` };
+  const fx = body?.response?.[0];
+  if (!fx) return { error: "Jogo não encontrado na API (verifica a ligação ao API-Football)" };
 
-    const body = await res.json();
-    if (body.errors && Object.keys(body.errors).length > 0) {
-      const messages = Object.values(body.errors as Record<string, string>);
-      return { error: messages.join(" ") || "A API rejeitou o pedido" };
-    }
-
-    const fx = body?.response?.[0];
-    if (!fx) return { error: "Jogo não encontrado na API (verifica a ligação ao API-Football)" };
-
-    return { data: parseFixtureUpdate(fx) };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
-  }
+  return { data: parseFixtureUpdate(fx) };
 }
 
 type RawLiveFixture = {
@@ -251,33 +221,17 @@ function parseFixtureUpdate(fx: RawLiveFixture): FixtureUpdate {
  * including FT/SUSP) for that one match.
  */
 export async function fetchLiveFixtures(): Promise<{ data?: Map<string, FixtureUpdate>; error?: string }> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) return { error: "API_FOOTBALL_KEY não está configurada" };
+  const { body, error } = await apiFootballFetch<{ response?: RawLiveFixture[] }>("/fixtures?live=all");
+  if (error) return { error };
 
-  try {
-    const res = await fetch("https://v3.football.api-sports.io/fixtures?live=all", {
-      headers: { "x-apisports-key": apiKey },
-      cache: "no-store",
-    });
-    if (!res.ok) return { error: `Pedido falhou (HTTP ${res.status})` };
-
-    const body = await res.json();
-    if (body.errors && Object.keys(body.errors).length > 0) {
-      const messages = Object.values(body.errors as Record<string, string>);
-      return { error: messages.join(" ") || "A API rejeitou o pedido" };
-    }
-
-    const raw: RawLiveFixture[] = body.response ?? [];
-    const byExternalId = new Map<string, FixtureUpdate>();
-    for (const fx of raw) {
-      const externalId = fx.fixture?.id != null ? String(fx.fixture.id) : null;
-      if (!externalId) continue;
-      byExternalId.set(externalId, parseFixtureUpdate(fx));
-    }
-    return { data: byExternalId };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+  const raw = body?.response ?? [];
+  const byExternalId = new Map<string, FixtureUpdate>();
+  for (const fx of raw) {
+    const externalId = fx.fixture?.id != null ? String(fx.fixture.id) : null;
+    if (!externalId) continue;
+    byExternalId.set(externalId, parseFixtureUpdate(fx));
   }
+  return { data: byExternalId };
 }
 
 /**
@@ -288,22 +242,11 @@ export async function fetchLiveFixtures(): Promise<{ data?: Map<string, FixtureU
  * falls back to the coloured-shield placeholder either way).
  */
 export async function fetchTeamLogo(teamName: string): Promise<string | null> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const res = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(teamName)}`, {
-      headers: { "x-apisports-key": apiKey },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-
-    const body = await res.json();
-    const logo: string | undefined = body?.response?.[0]?.team?.logo;
-    return logo ?? null;
-  } catch {
-    return null;
-  }
+  const { body, error } = await apiFootballFetch<{ response?: Array<{ team?: { logo?: string } }> }>(
+    `/teams?search=${encodeURIComponent(teamName)}`
+  );
+  if (error) return null;
+  return body?.response?.[0]?.team?.logo ?? null;
 }
 
 export type TeamSearchResult = { id: number; name: string; country: string; logo: string };
@@ -364,8 +307,7 @@ function asciiFold(s: string): string {
  * plan the way current-season fixtures are.
  */
 export async function searchTeams(query: string): Promise<TeamSearchResult[]> {
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!apiKey || query.trim().length < 3) return [];
+  if (query.trim().length < 3) return [];
 
   const asciiQuery = asciiFold(query);
   if (asciiQuery.length < 3) return [];
@@ -373,29 +315,22 @@ export async function searchTeams(query: string): Promise<TeamSearchResult[]> {
   const countryTranslation = PT_TO_EN_COUNTRY[asciiQuery.toLowerCase()];
   const searchTerms = countryTranslation ? [countryTranslation, asciiQuery] : [asciiQuery];
 
-  try {
-    const seen = new Set<number>();
-    const results: TeamSearchResult[] = [];
+  const seen = new Set<number>();
+  const results: TeamSearchResult[] = [];
 
-    for (const term of searchTerms) {
-      const res = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(term)}`, {
-        headers: { "x-apisports-key": apiKey },
-        cache: "no-store",
-      });
-      if (!res.ok) continue;
+  for (const term of searchTerms) {
+    const { body, error } = await apiFootballFetch<{
+      response?: Array<{ team: { id: number; name: string; country: string; logo: string } }>;
+    }>(`/teams?search=${encodeURIComponent(term)}`);
+    if (error) continue;
 
-      const body = await res.json();
-      const response: Array<{ team: { id: number; name: string; country: string; logo: string } }> = body?.response ?? [];
-      for (const r of response) {
-        if (seen.has(r.team.id)) continue;
-        seen.add(r.team.id);
-        results.push({ id: r.team.id, name: r.team.name, country: r.team.country, logo: r.team.logo });
-      }
-      if (results.length >= 8) break;
+    for (const r of body?.response ?? []) {
+      if (seen.has(r.team.id)) continue;
+      seen.add(r.team.id);
+      results.push({ id: r.team.id, name: r.team.name, country: r.team.country, logo: r.team.logo });
     }
-
-    return results.slice(0, 8);
-  } catch {
-    return [];
+    if (results.length >= 8) break;
   }
+
+  return results.slice(0, 8);
 }
