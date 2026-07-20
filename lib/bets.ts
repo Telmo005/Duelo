@@ -241,6 +241,68 @@ export const getUpcomingMatches = unstable_cache(
   { tags: ["upcoming-matches"], revalidate: 60 }
 );
 
+export type FeedCatalogMatch = {
+  id: string;
+  home: string;
+  away: string;
+  league: string;
+  leagueId: number | null;
+  country: string | null;
+  kickoffAt: Date;
+  homeLogoUrl: string | null;
+  awayLogoUrl: string | null;
+  isElimination: boolean;
+  /** 'scheduled' | 'live' | 'needs_review' — this list never includes a
+   *  terminal status (see getFeedMatchCatalog); used client-side to decide
+   *  whether tapping the row opens bet creation or shows the "already
+   *  started" explanation instead. */
+  matchStatus: string;
+  score?: { home: number; away: number };
+  minute?: string;
+};
+
+/** Every match still worth showing in the feed's "Jogos" tab — unlike
+ *  getUpcomingMatches (the bet-creation picker), this also includes
+ *  'live'/'needs_review' matches, so a match doesn't just vanish the moment
+ *  it kicks off with no bets on it yet. Real complaint this fixes: users
+ *  opened the app mid-final with no bets already placed on it and found
+ *  nothing, no explanation, just gone. Tapping a started match shows an
+ *  explanatory message instead of the bet form — bet_create still rejects
+ *  it server-side regardless (see lib/actions/bets.ts); this is purely a
+ *  visibility fix, not a change to who can bet when. Uncached, like
+ *  getUnsettledMatches/getFeedDuels — a live score staying fresh matters
+ *  more here than it does for the picker. */
+export async function getFeedMatchCatalog(): Promise<FeedCatalogMatch[]> {
+  const rows = await db
+    .select()
+    .from(matches)
+    .where(inArray(matches.matchStatus, ["scheduled", "live", "needs_review"]))
+    .orderBy(asc(matches.kickoffAt));
+
+  const startedIds = rows.filter((m) => m.matchStatus !== "scheduled").map((m) => m.id);
+  const liveById = await fetchLiveByMatch(startedIds);
+
+  return rows.map((m) => {
+    const live = liveById.get(m.id);
+    const isStarted = m.matchStatus !== "scheduled";
+    return {
+      id: m.id,
+      home: m.home,
+      away: m.away,
+      league: m.league,
+      leagueId: m.leagueId,
+      country: m.country,
+      kickoffAt: m.kickoffAt,
+      homeLogoUrl: m.homeLogoUrl,
+      awayLogoUrl: m.awayLogoUrl,
+      isElimination: m.isElimination,
+      matchStatus: m.matchStatus,
+      score: isStarted && live?.live_home != null && live?.live_away != null ? { home: live.live_home, away: live.live_away } : undefined,
+      minute: isStarted ? `${computeLiveMinuteLabel(m.kickoffAt, live)}'${live?.live_paused ? " ⏸" : ""}` : undefined,
+    };
+  });
+}
+
 /** Matches still awaiting a result — the manual settlement tool's worklist.
  *  Covers every pre-terminal state (see 0028_match_live_lifecycle.sql):
  *  'scheduled' (not kicked off yet), 'live' (in its 90-minute window), and

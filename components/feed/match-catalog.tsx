@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link, { useLinkStatus } from "next/link";
+import { toast } from "sonner";
 import { Search, CalendarX } from "lucide-react";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Input } from "@/components/ui/input";
@@ -21,14 +22,19 @@ export type CatalogMatch = {
   leagueId?: number | null;
   country?: string | null;
   kickoffLabel: string;
-  /** Raw kickoff instant (ISO) — lets the catalogue drop a match the moment
-   *  its kickoff passes, even if the server list (getUpcomingMatches, cached
-   *  up to 60s — see lib/bets.ts) hasn't refreshed yet, or the tab has just
-   *  been sitting open since before kickoff. */
+  /** Raw kickoff instant (ISO) — used to flag a match as started the moment
+   *  its kickoff passes client-side, even if the server list (cached up to
+   *  60s — see getFeedMatchCatalog in lib/bets.ts) hasn't refreshed yet.
+   *  Started matches stay VISIBLE (never removed here) — only the tap
+   *  behaviour changes, see StartedRow below. */
   kickoffAtIso: string;
   homeLogoUrl: string | null;
   awayLogoUrl: string | null;
   isElimination: boolean;
+  /** 'scheduled' | 'live' | 'needs_review' — see getFeedMatchCatalog. */
+  matchStatus: string;
+  score?: { home: number; away: number };
+  minute?: string;
 };
 
 /** Dims the row and shows a spinner while its navigation to /bets/new is in
@@ -44,32 +50,77 @@ function RowPendingOverlay() {
 }
 
 /**
- * "Jogos" tab — every match still open for betting, browsable instead of
- * having to already know a duel exists to join one. Grouped by league,
- * ordered by the same competition-prestige ranking the feed's own league
- * groups use (lib/leagueTiers.ts), and searchable by team/league name.
- * Tapping a match jumps straight into bet creation with it preselected
- * (see the matchId query param handling in app/(app)/bets/new/page.tsx).
+ * A match that already kicked off — shown (never hidden, see isStarted)
+ * with its live score/minute instead of a kickoff time, but not a link:
+ * bet_create rejects already-started matches server-side regardless (see
+ * lib/actions/bets.ts), so tapping here explains why instead of leading
+ * into a form that would just error out at the end.
+ */
+function StartedRow({ match: m }: { match: CatalogMatch }) {
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        toast("Este jogo já começou", {
+          description: "Já não é possível criar apostas nele — só antes do apito inicial.",
+        })
+      }
+      className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 text-left opacity-80 transition-colors hover:bg-accent"
+    >
+      <span className="flex shrink-0 items-center gap-1">
+        <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={22} />
+        <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={22} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-bold leading-tight">
+          {m.home} <span className="font-normal text-muted-foreground">vs</span> {m.away}
+        </p>
+      </span>
+      <span className="flex shrink-0 flex-col items-end leading-none">
+        <span className="flex items-center gap-1 text-xs font-extrabold tabular-nums text-live">
+          <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
+          {m.score ? `${m.score.home}-${m.score.away}` : m.matchStatus === "needs_review" ? "Terminado" : "AO VIVO"}
+        </span>
+        {m.minute && <span className="mt-0.5 text-[9px] font-semibold text-live">{m.minute}</span>}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * "Jogos" tab — every match still open for betting OR already in progress,
+ * browsable instead of having to already know a duel exists to join one.
+ * Grouped by league, ordered by the same competition-prestige ranking the
+ * feed's own league groups use (lib/leagueTiers.ts), and searchable by
+ * team/league name. Tapping an upcoming match jumps straight into bet
+ * creation with it preselected (see the matchId query param handling in
+ * app/(app)/bets/new/page.tsx); a match already in progress renders as
+ * StartedRow instead — visible with its live score, but not tappable into
+ * bet creation, since it would only error out at the end anyway.
  * Each row's Link is `prefetch={false}` — see the comment on CardBody in
  * duel-post.tsx for why (eager prefetch of every row scrolling through the
  * viewport both wastes data on slow connections and can make the pending
  * spinner below skip itself entirely).
  */
+function isStarted(m: CatalogMatch, now: number): boolean {
+  return m.matchStatus !== "scheduled" || new Date(m.kickoffAtIso).getTime() <= now;
+}
+
 export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
   const [query, setQuery] = useState("");
 
   // Re-checked every 30s so a match that kicks off while this tab is just
-  // sitting open actually disappears, not only on the next full page load.
+  // sitting open flips from "vs kickoff time" to "started" without a full
+  // page reload — it stays visible either way (see isStarted), only the tap
+  // behaviour changes (StartedRow instead of a link into bet creation).
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
 
-  const open = useMemo(() => matches.filter((m) => new Date(m.kickoffAtIso).getTime() > now), [matches, now]);
-
   const needle = query.trim().toLowerCase();
-  const filtered = needle ? open.filter((m) => `${m.home} ${m.away} ${m.league}`.toLowerCase().includes(needle)) : open;
+  const filtered = needle ? matches.filter((m) => `${m.home} ${m.away} ${m.league}`.toLowerCase().includes(needle)) : matches;
 
   const groups = useMemo(
     () => groupByLeague(filtered, (m) => ({ league: m.league, leagueId: m.leagueId, country: m.country })),
@@ -89,11 +140,11 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
             <CalendarX className="size-7" />
           </div>
           <p className="mb-1.5 text-base font-bold">
-            {open.length === 0 ? "Sem jogos disponíveis" : "Nenhum jogo encontrado"}
+            {matches.length === 0 ? "Sem jogos disponíveis" : "Nenhum jogo encontrado"}
           </p>
           <p className="max-w-64 text-sm leading-relaxed text-muted-foreground">
-            {open.length === 0
-              ? "Ainda não há jogos abertos para apostar. Volta mais tarde."
+            {matches.length === 0
+              ? "Ainda não há jogos no catálogo. Volta mais tarde."
               : "Tenta outra equipa ou liga."}
           </p>
         </div>
@@ -102,27 +153,31 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
           {groups.map(([league, leagueMatches]) => (
             <div key={league} className="flex flex-col gap-1.5">
               <SectionLabel className="mb-0 px-0.5">{league}</SectionLabel>
-              {leagueMatches.map((m) => (
-                <Link
-                  key={m.id}
-                  href={`/bets/new?matchId=${m.id}`}
-                  prefetch={false}
-                  className="press relative flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-card)] transition-colors hover:border-primary-30"
-                >
-                  <span className="flex shrink-0 items-center gap-1">
-                    <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={22} />
-                    <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={22} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-bold leading-tight">
-                      {m.home} <span className="font-normal text-muted-foreground">vs</span> {m.away}
-                      {m.isElimination && <span className="ml-1.5 text-[10px] font-semibold text-locked">· Eliminação</span>}
-                    </p>
-                  </span>
-                  <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{m.kickoffLabel}</span>
-                  <RowPendingOverlay />
-                </Link>
-              ))}
+              {leagueMatches.map((m) =>
+                isStarted(m, now) ? (
+                  <StartedRow key={m.id} match={m} />
+                ) : (
+                  <Link
+                    key={m.id}
+                    href={`/bets/new?matchId=${m.id}`}
+                    prefetch={false}
+                    className="press relative flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-card)] transition-colors hover:border-primary-30"
+                  >
+                    <span className="flex shrink-0 items-center gap-1">
+                      <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={22} />
+                      <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={22} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-bold leading-tight">
+                        {m.home} <span className="font-normal text-muted-foreground">vs</span> {m.away}
+                        {m.isElimination && <span className="ml-1.5 text-[10px] font-semibold text-locked">· Eliminação</span>}
+                      </p>
+                    </span>
+                    <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{m.kickoffLabel}</span>
+                    <RowPendingOverlay />
+                  </Link>
+                )
+              )}
             </div>
           ))}
         </div>

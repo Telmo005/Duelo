@@ -13,7 +13,7 @@ import { FeedTabs } from "@/components/feed/feed-tabs";
 import { RecentWinners } from "@/components/feed/recent-winners";
 import { FeedListener } from "@/components/realtime/feed-listener";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
-import { getFeedDuels, getRecentWinners, getUpcomingMatches } from "@/lib/bets";
+import { getFeedDuels, getRecentWinners, getFeedMatchCatalog } from "@/lib/bets";
 import { getWalletBalance } from "@/lib/wallet";
 import { getUnreadNotificationCount } from "@/lib/notifications";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
@@ -31,10 +31,10 @@ export default async function LandingPage() {
   // The feed is real for everyone. getFeedDuels() is a public read of open
   // duels (waiting/matched) — no mock data, ever. Logged-out visitors see the
   // same real activity; only the action buttons differ (accept vs. register).
-  const [duels, winners, upcomingMatches, profileAndWallet, unreadCount] = await Promise.all([
+  const [duels, winners, catalogMatchRows, profileAndWallet, unreadCount] = await Promise.all([
     getFeedDuels(),
     getRecentWinners(),
-    getUpcomingMatches(),
+    getFeedMatchCatalog(),
     user
       ? Promise.all([
           db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1).then((r) => r[0]),
@@ -50,7 +50,7 @@ export default async function LandingPage() {
   const totalInPlay = duels.reduce((s, d) => s + d.stake * (d.b ? 2 : 1), 0);
   const openCount = duels.filter((d) => d.status === "locked" || d.status === "waiting").length;
 
-  const catalogMatches = upcomingMatches.map((m) => ({
+  const catalogMatches = catalogMatchRows.map((m) => ({
     id: m.id,
     home: m.home,
     away: m.away,
@@ -62,6 +62,9 @@ export default async function LandingPage() {
     homeLogoUrl: m.homeLogoUrl,
     awayLogoUrl: m.awayLogoUrl,
     isElimination: m.isElimination,
+    matchStatus: m.matchStatus,
+    score: m.score,
+    minute: m.minute,
   }));
 
   return (
