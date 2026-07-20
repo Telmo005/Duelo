@@ -6,6 +6,7 @@ import { ProcessedMatchRow } from "@/components/admin/processed-match-row";
 import { RefundExpiredBetsButton } from "@/components/admin/refund-expired-bets-button";
 import { AddMatchForm } from "@/components/admin/add-match-form";
 import { ImportFixturesButton } from "@/components/admin/import-fixtures-button";
+import { RefreshLiveMatchesButton } from "@/components/admin/refresh-live-matches-button";
 import { getUnsettledMatches, getProcessedMatches } from "@/lib/bets";
 import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
@@ -46,6 +47,7 @@ export default async function AdminMatchesPage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ImportFixturesButton />
+          <RefreshLiveMatchesButton />
           <RefundExpiredBetsButton />
           <Link href="/admin" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
             ← Admin
