@@ -6,8 +6,9 @@ import { requireAdmin } from "@/lib/admin";
 import { logAdminAction } from "@/lib/adminAudit";
 import { db } from "@/db";
 import { matches, bets } from "@/db/schema";
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import { fetchTeamLogo, searchTeams, searchFixturesByDate, fetchFixtureById, fetchLiveFixtures, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
+import { eq } from "drizzle-orm";
+import { fetchTeamLogo, searchTeams, searchFixturesByDate, fetchFixtureById, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
+import { writeLiveScore, syncLiveMatchesFromApi, type LiveSyncResult } from "@/lib/liveScoreSync";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 import { parseMozambiqueDateTimeLocal, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
@@ -312,35 +313,6 @@ const liveScoreSchema = z.object({
   paused: z.boolean().optional().default(false),
 });
 
-/** Shared write path for both the manual live-score form and the
- *  API-refresh button below — same anchor/pause semantics either way
- *  (migration 0029): a minute resets live_minute_anchor_at to now() so the
- *  displayed clock keeps ticking up from whatever was just entered, unless
- *  `paused` is true (half-time/injury break), in which case it freezes
- *  exactly at `minute` until resumed. */
-async function writeLiveScore(
-  matchId: string,
-  homeGoals: number,
-  awayGoals: number,
-  minute: number | null,
-  paused: boolean,
-  statusCode: string | null
-) {
-  const hasMinute = minute != null;
-  await db
-    .update(matches)
-    .set({
-      liveHome: homeGoals,
-      liveAway: awayGoals,
-      liveMinute: minute ?? null,
-      liveMinuteAnchorAt: hasMinute ? new Date() : null,
-      livePaused: hasMinute ? paused : false,
-      liveStatusCode: statusCode,
-      liveUpdatedAt: new Date(),
-    })
-    .where(eq(matches.id, matchId));
-}
-
 /**
  * Updates the DISPLAY-ONLY live score (matches.live_*) as a match
  * progresses — completely separate from settlement. Liquidar (see
@@ -433,63 +405,26 @@ export async function updateLiveScoreFromApiAction(matchId: string): Promise<Liv
   };
 }
 
-export type BulkLiveRefreshResult = {
-  error?: string;
-  /** Matches actually written to (found in the API's live=all response). */
-  updated: number;
-  /** Tracked live/needs_review matches with an externalId that did NOT come
-   *  back in live=all (see fetchLiveFixtures — this can mean finished,
-   *  suspended, or just not returned by this endpoint right now, no way to
-   *  tell them apart from here). Named so the admin knows to check these
-   *  individually with the per-match "Última atualização" button, which
-   *  sees every status. */
-  missing: string[];
-};
+export type BulkLiveRefreshResult = LiveSyncResult;
 
 /**
  * Refreshes every tracked 'live'/'needs_review' match linked to the API in
- * ONE request (fetchLiveFixtures — API-Football's live=all filter), instead
- * of clicking "Última atualização" once per match. Backs the "Atualizar
- * todos os jogos ao vivo" button (app/(app)/admin/matches). Matches with no
- * externalId are skipped (nothing to fetch); matches the API no longer
- * reports as live are left untouched and listed in `missing` rather than
- * guessed at.
+ * ONE request (syncLiveMatchesFromApi — API-Football's live=all filter),
+ * instead of clicking "Última atualização" once per match. Backs the
+ * "Atualizar jogos ao vivo" button (app/(app)/admin/matches). The same core
+ * also runs automatically off the checkpoint cron (see
+ * app/api/cron/live-score-checkpoints) — this is just the admin-triggered,
+ * on-demand path into it.
  */
 export async function refreshAllLiveMatchesAction(): Promise<BulkLiveRefreshResult> {
   await requireAdmin();
 
-  const tracked = await db
-    .select({ id: matches.id, home: matches.home, away: matches.away, externalId: matches.externalId })
-    .from(matches)
-    .where(and(inArray(matches.matchStatus, ["live", "needs_review"]), isNotNull(matches.externalId)));
-
-  if (tracked.length === 0) {
-    return { updated: 0, missing: [], error: "Não há jogos ao vivo ligados à API para atualizar." };
-  }
-
-  const { data: liveByExternalId, error } = await fetchLiveFixtures();
-  if (error) return { updated: 0, missing: [], error: `Falha ao consultar a API: ${error}` };
-  if (!liveByExternalId) return { updated: 0, missing: [], error: "Sem dados da API." };
-
-  let updated = 0;
-  const missing: string[] = [];
-
-  for (const match of tracked) {
-    const live = liveByExternalId.get(match.externalId!);
-    if (!live || live.homeGoals == null || live.awayGoals == null) {
-      missing.push(`${match.home} vs ${match.away}`);
-      continue;
-    }
-    await writeLiveScore(match.id, live.homeGoals, live.awayGoals, live.minute, live.paused, live.statusCode);
-    updated++;
-  }
-
-  if (updated > 0) {
+  const result = await syncLiveMatchesFromApi();
+  if (result.updated > 0) {
     revalidatePath("/admin/matches");
     revalidatePath("/");
   }
-
-  return { updated, missing };
+  return result;
 }
 
 /** Manual trigger for importUpcomingFixtures() — lets an admin test/force an
