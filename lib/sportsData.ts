@@ -208,19 +208,73 @@ export async function fetchFixtureById(externalId: string): Promise<{ data?: Fix
     const fx = body?.response?.[0];
     if (!fx) return { error: "Jogo não encontrado na API (verifica a ligação ao API-Football)" };
 
-    const statusCode: string = fx.fixture?.status?.short ?? "NS";
-    const finished = FINISHED_STATUS_CODES.has(statusCode);
-    return {
-      data: {
-        homeGoals: fx.goals?.home ?? null,
-        awayGoals: fx.goals?.away ?? null,
-        minute: fx.fixture?.status?.elapsed ?? null,
-        paused: finished || HALTED_STATUS_CODES.has(statusCode),
-        finished,
-        statusCode,
-        statusLabel: STATUS_LABELS[statusCode] ?? statusCode,
-      },
-    };
+    return { data: parseFixtureUpdate(fx) };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+type RawLiveFixture = {
+  fixture?: { id?: number; status?: { short?: string; elapsed?: number } };
+  goals?: { home?: number | null; away?: number | null };
+};
+
+function parseFixtureUpdate(fx: RawLiveFixture): FixtureUpdate {
+  const statusCode: string = fx.fixture?.status?.short ?? "NS";
+  const finished = FINISHED_STATUS_CODES.has(statusCode);
+  return {
+    homeGoals: fx.goals?.home ?? null,
+    awayGoals: fx.goals?.away ?? null,
+    minute: fx.fixture?.status?.elapsed ?? null,
+    paused: finished || HALTED_STATUS_CODES.has(statusCode),
+    finished,
+    statusCode,
+    statusLabel: STATUS_LABELS[statusCode] ?? statusCode,
+  };
+}
+
+/**
+ * Every fixture currently in play, worldwide, across every league —
+ * API-Football's `live=all` filter — in exactly ONE request regardless of
+ * how many matches that turns out to be. Backs the admin's "Atualizar todos
+ * os jogos ao vivo" button (refreshAllLiveMatchesAction, lib/actions/
+ * matches.ts): instead of clicking "Última atualização" once per match, one
+ * request refreshes every live match this platform has bets on at once.
+ *
+ * Important asymmetry vs fetchFixtureById: a finished match has dropped OUT
+ * of `live=all` — this endpoint can never report `finished`. Confirmed
+ * empirically that SUSP (suspended) drops out too, not just terminal
+ * statuses — so a tracked match missing from the response isn't always "it
+ * ended", just "this bulk endpoint has nothing on it right now". The caller
+ * surfaces that as "sem dados" without guessing the cause, and the admin
+ * falls back to the single-fixture button (which sees every status,
+ * including FT/SUSP) for that one match.
+ */
+export async function fetchLiveFixtures(): Promise<{ data?: Map<string, FixtureUpdate>; error?: string }> {
+  const apiKey = process.env.API_FOOTBALL_KEY;
+  if (!apiKey) return { error: "API_FOOTBALL_KEY não está configurada" };
+
+  try {
+    const res = await fetch("https://v3.football.api-sports.io/fixtures?live=all", {
+      headers: { "x-apisports-key": apiKey },
+      cache: "no-store",
+    });
+    if (!res.ok) return { error: `Pedido falhou (HTTP ${res.status})` };
+
+    const body = await res.json();
+    if (body.errors && Object.keys(body.errors).length > 0) {
+      const messages = Object.values(body.errors as Record<string, string>);
+      return { error: messages.join(" ") || "A API rejeitou o pedido" };
+    }
+
+    const raw: RawLiveFixture[] = body.response ?? [];
+    const byExternalId = new Map<string, FixtureUpdate>();
+    for (const fx of raw) {
+      const externalId = fx.fixture?.id != null ? String(fx.fixture.id) : null;
+      if (!externalId) continue;
+      byExternalId.set(externalId, parseFixtureUpdate(fx));
+    }
+    return { data: byExternalId };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }

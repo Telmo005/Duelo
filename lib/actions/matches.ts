@@ -6,8 +6,8 @@ import { requireAdmin } from "@/lib/admin";
 import { logAdminAction } from "@/lib/adminAudit";
 import { db } from "@/db";
 import { matches, bets } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { fetchTeamLogo, searchTeams, searchFixturesByDate, fetchFixtureById, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { fetchTeamLogo, searchTeams, searchFixturesByDate, fetchFixtureById, fetchLiveFixtures, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 import { parseMozambiqueDateTimeLocal, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
@@ -431,6 +431,65 @@ export async function updateLiveScoreFromApiAction(matchId: string): Promise<Liv
     statusLabel: data.statusLabel,
     finished: data.finished,
   };
+}
+
+export type BulkLiveRefreshResult = {
+  error?: string;
+  /** Matches actually written to (found in the API's live=all response). */
+  updated: number;
+  /** Tracked live/needs_review matches with an externalId that did NOT come
+   *  back in live=all (see fetchLiveFixtures — this can mean finished,
+   *  suspended, or just not returned by this endpoint right now, no way to
+   *  tell them apart from here). Named so the admin knows to check these
+   *  individually with the per-match "Última atualização" button, which
+   *  sees every status. */
+  missing: string[];
+};
+
+/**
+ * Refreshes every tracked 'live'/'needs_review' match linked to the API in
+ * ONE request (fetchLiveFixtures — API-Football's live=all filter), instead
+ * of clicking "Última atualização" once per match. Backs the "Atualizar
+ * todos os jogos ao vivo" button (app/(app)/admin/matches). Matches with no
+ * externalId are skipped (nothing to fetch); matches the API no longer
+ * reports as live are left untouched and listed in `missing` rather than
+ * guessed at.
+ */
+export async function refreshAllLiveMatchesAction(): Promise<BulkLiveRefreshResult> {
+  await requireAdmin();
+
+  const tracked = await db
+    .select({ id: matches.id, home: matches.home, away: matches.away, externalId: matches.externalId })
+    .from(matches)
+    .where(and(inArray(matches.matchStatus, ["live", "needs_review"]), isNotNull(matches.externalId)));
+
+  if (tracked.length === 0) {
+    return { updated: 0, missing: [], error: "Não há jogos ao vivo ligados à API para atualizar." };
+  }
+
+  const { data: liveByExternalId, error } = await fetchLiveFixtures();
+  if (error) return { updated: 0, missing: [], error: `Falha ao consultar a API: ${error}` };
+  if (!liveByExternalId) return { updated: 0, missing: [], error: "Sem dados da API." };
+
+  let updated = 0;
+  const missing: string[] = [];
+
+  for (const match of tracked) {
+    const live = liveByExternalId.get(match.externalId!);
+    if (!live || live.homeGoals == null || live.awayGoals == null) {
+      missing.push(`${match.home} vs ${match.away}`);
+      continue;
+    }
+    await writeLiveScore(match.id, live.homeGoals, live.awayGoals, live.minute, live.paused, live.statusCode);
+    updated++;
+  }
+
+  if (updated > 0) {
+    revalidatePath("/admin/matches");
+    revalidatePath("/");
+  }
+
+  return { updated, missing };
 }
 
 /** Manual trigger for importUpcomingFixtures() — lets an admin test/force an
