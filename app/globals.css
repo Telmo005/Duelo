@@ -354,3 +354,14 @@ html[data-theme="light"] {
   );
   background-repeat: repeat-x;
 }
+
+/* Sonner (app/layout.tsx's <Toaster>) styles the toast's own background/
+   border/title colour via its `style` prop, but the description line
+   (toast(title, { description })) is a separate nested node sonner themes
+   internally with its own low-contrast gray, unaffected by that `style`
+   object — read as too dim/gray against the dark theme's card background.
+   Overridden here to the same --foreground the title already uses, in both
+   themes (already correctly themed per [data-theme] below). */
+[data-sonner-toaster] [data-description] {
+  color: var(--foreground);
+}
