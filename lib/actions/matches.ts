@@ -7,7 +7,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { db } from "@/db";
 import { matches, bets } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { fetchTeamLogo, searchTeams, searchFixturesByDate, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
+import { fetchTeamLogo, searchTeams, searchFixturesByDate, fetchFixtureById, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 import { parseMozambiqueDateTimeLocal, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
@@ -312,25 +312,37 @@ const liveScoreSchema = z.object({
   paused: z.boolean().optional().default(false),
 });
 
+/** Shared write path for both the manual live-score form and the
+ *  API-refresh button below — same anchor/pause semantics either way
+ *  (migration 0029): a minute resets live_minute_anchor_at to now() so the
+ *  displayed clock keeps ticking up from whatever was just entered, unless
+ *  `paused` is true (half-time/injury break), in which case it freezes
+ *  exactly at `minute` until resumed. */
+async function writeLiveScore(matchId: string, homeGoals: number, awayGoals: number, minute: number | null, paused: boolean) {
+  const hasMinute = minute != null;
+  await db
+    .update(matches)
+    .set({
+      liveHome: homeGoals,
+      liveAway: awayGoals,
+      liveMinute: minute ?? null,
+      liveMinuteAnchorAt: hasMinute ? new Date() : null,
+      livePaused: hasMinute ? paused : false,
+      liveUpdatedAt: new Date(),
+    })
+    .where(eq(matches.id, matchId));
+}
+
 /**
  * Updates the DISPLAY-ONLY live score (matches.live_*) as a match
  * progresses — completely separate from settlement. Liquidar (see
  * lib/actions/settlement.ts::settleMatchAction) is the only action that
  * writes result_home/result_away and pays out; this one never touches
  * either, so an admin can update the score every time a team scores without
- * triggering any payment, and only run Liquidar once at full time. The sole
- * source for every match now, API-linked or not — there is no polling cron
- * (see 0028_match_live_lifecycle.sql for why: it was exhausting the
- * API-Football Free-plan quota). Minute is optional; left blank, the feed
- * shows an automatic kickoff-based clock instead (computeElapsedMinute in
- * lib/bets.ts) — only pass one to override/correct it.
- *
- * Every call that includes a minute resets live_minute_anchor_at to now()
- * (migration 0029) — the displayed minute keeps counting up in real time
- * from whatever was just entered instead of freezing forever at a stale
- * number, unless `paused` is true (half-time/injury break), in which case
- * it's frozen exactly at `minute` until the admin resumes it with another
- * call.
+ * triggering any payment, and only run Liquidar once at full time. Minute is
+ * optional; left blank, the feed shows an automatic kickoff-based clock
+ * instead (computeElapsedMinute in lib/bets.ts) — only pass one to
+ * override/correct it. See writeLiveScore for the anchor/pause semantics.
  */
 export async function updateLiveScoreAction(matchId: string, input: Record<string, unknown>): Promise<ActionResult> {
   const admin = await requireAdmin();
@@ -346,23 +358,58 @@ export async function updateLiveScoreAction(matchId: string, input: Record<strin
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
   }
 
-  const hasMinute = parsed.data.minute != null;
-
-  await db
-    .update(matches)
-    .set({
-      liveHome: parsed.data.homeGoals,
-      liveAway: parsed.data.awayGoals,
-      liveMinute: parsed.data.minute ?? null,
-      liveMinuteAnchorAt: hasMinute ? new Date() : null,
-      livePaused: hasMinute ? parsed.data.paused : false,
-      liveUpdatedAt: new Date(),
-    })
-    .where(eq(matches.id, matchId));
+  await writeLiveScore(matchId, parsed.data.homeGoals, parsed.data.awayGoals, parsed.data.minute ?? null, parsed.data.paused);
 
   revalidatePath("/admin/matches");
   revalidatePath("/");
   return {};
+}
+
+type LiveScoreApiResult = ActionResult & {
+  homeGoals?: number;
+  awayGoals?: number;
+  minute?: number | null;
+  statusLabel?: string;
+};
+
+/**
+ * Fetches THIS ONE match's current score/minute/status from API-Football
+ * (fetchFixtureById — a single-fixture lookup, never a day/league scan) and
+ * writes it through the same path as a manual update. Requires the match to
+ * have an externalId (API-Football fixture ID); a manually-seeded match with
+ * no API link has nothing to fetch and uses the manual inputs instead.
+ *
+ * This exists specifically to avoid re-introducing the polling pattern
+ * 0028_match_live_lifecycle.sql moved away from (it was exhausting the
+ * Free-plan daily quota): there's no cron here, no scanning every match in
+ * the catalogue — an admin clicks "Última atualização" only for the specific
+ * match someone actually bet on, only when they want a fresh read, so quota
+ * usage scales with real bets, not with how many fixtures exist.
+ */
+export async function updateLiveScoreFromApiAction(matchId: string): Promise<LiveScoreApiResult> {
+  await requireAdmin();
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!match) return { error: "Jogo não encontrado." };
+  if (!EDITABLE_STATUSES.has(match.matchStatus)) {
+    return { error: "Este jogo já foi liquidado/anulado/fechado — o placar ao vivo já não é relevante." };
+  }
+  if (!match.externalId) {
+    return { error: "Este jogo não está ligado à API-Football — atualiza o placar manualmente." };
+  }
+
+  const { data, error } = await fetchFixtureById(match.externalId);
+  if (error) return { error: `Falha ao consultar a API: ${error}` };
+  if (!data) return { error: "Sem dados desta partida na API." };
+  if (data.homeGoals == null || data.awayGoals == null) {
+    return { error: `A API ainda não tem placar para este jogo (${data.statusLabel}).` };
+  }
+
+  await writeLiveScore(matchId, data.homeGoals, data.awayGoals, data.minute, data.paused);
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/");
+  return { homeGoals: data.homeGoals, awayGoals: data.awayGoals, minute: data.minute, statusLabel: data.statusLabel };
 }
 
 /** Manual trigger for importUpcomingFixtures() — lets an admin test/force an

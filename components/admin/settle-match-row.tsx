@@ -2,15 +2,15 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2, Pencil, Radio, Pause, Play } from "lucide-react";
+import { Trash2, Pencil, Radio, Pause, Play, RefreshCw } from "lucide-react";
 import { settleMatchAction, voidMatchAction } from "@/lib/actions/settlement";
-import { deleteMatchAction, updateLiveScoreAction } from "@/lib/actions/matches";
+import { deleteMatchAction, updateLiveScoreAction, updateLiveScoreFromApiAction } from "@/lib/actions/matches";
 import { EditMatchForm } from "@/components/admin/edit-match-form";
 import type { MatchRow } from "@/db/schema";
 import { Spinner } from "@/components/ui/spinner";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
-type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | "live" | null;
+type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | "live" | "api" | null;
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   live: { label: "● Ao vivo", className: "bg-primary-10 text-primary" },
@@ -165,6 +165,27 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
     });
   }
 
+  // Fetches ONLY this match from API-Football (a single-fixture lookup, see
+  // fetchFixtureById) and writes it through the same path as a manual
+  // update — an admin who links a match to the API never needs to check
+  // another site for the score or leave the app running a poller: one
+  // click, one request, scoped to the one match someone actually bet on.
+  function handleRefreshFromApi() {
+    setActiveAction("api");
+    startTransition(async () => {
+      const result = await updateLiveScoreFromApiAction(match.id);
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        setLiveHome(String(result.homeGoals));
+        setLiveAway(String(result.awayGoals));
+        setLiveMinute(result.minute != null ? String(result.minute) : "");
+        toast.success(`Atualizado da API — ${result.statusLabel}`);
+      }
+      setActiveAction(null);
+    });
+  }
+
   // Pausar freezes the clock exactly where it currently reads (half-time,
   // injury delay, etc.) instead of it ticking on through the break; Retomar
   // resets the anchor to now() so it continues counting up from that same
@@ -241,6 +262,18 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           disabled={isPending}
           className="w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-center text-xs outline-none focus:border-primary disabled:opacity-50"
         />
+        {match.externalId && (
+          <button
+            type="button"
+            onClick={handleRefreshFromApi}
+            disabled={isPending}
+            title="Consulta só este jogo na API-Football — um único pedido"
+            className="press inline-flex items-center gap-1.5 rounded-lg border border-primary-30 bg-primary-10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {activeAction === "api" ? <Spinner className="size-3" /> : <RefreshCw className="size-3" aria-hidden />}
+            {activeAction === "api" ? "A consultar…" : "Última atualização"}
+          </button>
+        )}
         <button
           type="button"
           onClick={handleUpdateLiveScore}

@@ -2,13 +2,15 @@
  * API-Football (api-sports.io) client. Settlement/lifecycle (bet_settle_match
  * / bet_void_match / match_advance_lifecycle, see
  * supabase/migrations/0028_match_live_lifecycle.sql) is purely time-based and
- * never calls this file — result entry and the live scoreboard (goals; the
- * minute ticks automatically off kickoff time) are both manual admin input
- * now (lib/actions/matches.ts updateLiveScoreAction). What's left here is
- * fixture import (kickoff time/teams) and the admin's team-search/fixture-
- * search pickers — the only remaining calls to the vendor API, all
- * admin-triggered rather than polled, to stay well inside a Free-plan daily
- * quota (see the 429s that motivated 0028_match_live_lifecycle.sql).
+ * never calls this file — the live scoreboard (goals + minute) is manual
+ * admin input, either typed by hand or fetched one match at a time via
+ * fetchFixtureById below (lib/actions/matches.ts updateLiveScoreAction /
+ * updateLiveScoreFromApiAction). Every call in this file is admin-triggered
+ * rather than polled, to stay well inside a Free-plan daily quota (see the
+ * 429s that motivated 0028_match_live_lifecycle.sql) — fixture import
+ * (kickoff time/teams), the team-search/fixture-search pickers, and the
+ * single-fixture live lookup all only ever run when an admin explicitly asks
+ * for that one thing, never on a schedule.
  */
 
 export type FixtureSearchResult = {
@@ -122,6 +124,90 @@ export async function searchFixturesByDate(date: string): Promise<{ fixtures: Fi
     return { fixtures };
   } catch (err) {
     return { fixtures: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** API-Football fixture status codes that mean "the clock is not running
+ *  right now" — half-time, the break between extra-time halves, a penalty
+ *  shootout (no running minute makes sense there), or the match being
+ *  suspended/interrupted by the referee. Anything else returned while a
+ *  fixture is still in progress ("1H", "2H", "ET") means the clock should
+ *  keep ticking. */
+const PAUSED_STATUS_CODES = new Set(["HT", "BT", "P", "SUSP", "INT"]);
+
+const STATUS_LABELS: Record<string, string> = {
+  NS: "Ainda não começou",
+  "1H": "1ª parte",
+  HT: "Intervalo",
+  "2H": "2ª parte",
+  ET: "Prolongamento",
+  BT: "Intervalo do prolongamento",
+  P: "Grandes penalidades",
+  SUSP: "Suspenso",
+  INT: "Interrompido",
+  FT: "Terminado",
+  AET: "Terminado (prolongamento)",
+  PEN: "Terminado (penalidades)",
+  PST: "Adiado",
+  CANC: "Cancelado",
+  ABD: "Abandonado",
+  AWD: "Decidido por w.o.",
+  WO: "Decidido por w.o.",
+};
+
+export type FixtureUpdate = {
+  homeGoals: number | null;
+  awayGoals: number | null;
+  minute: number | null;
+  paused: boolean;
+  statusCode: string;
+  statusLabel: string;
+};
+
+/**
+ * Single-fixture lookup by API-Football's own fixture ID — the cheapest
+ * possible call against the vendor (one fixture, not a whole day/league),
+ * used exclusively by the admin's per-match "Última atualização" button
+ * (updateLiveScoreFromApiAction, lib/actions/matches.ts). Deliberately never
+ * called automatically/on a schedule — that's precisely the polling pattern
+ * 0028_match_live_lifecycle.sql moved away from after it exhausted the
+ * Free-plan daily quota. An admin fetching only the specific match someone
+ * actually bet on, only when they choose to, is the quota-safe middle ground
+ * between "no live data at all" and "poll everything constantly".
+ */
+export async function fetchFixtureById(externalId: string): Promise<{ data?: FixtureUpdate; error?: string }> {
+  const apiKey = process.env.API_FOOTBALL_KEY;
+  if (!apiKey) return { error: "API_FOOTBALL_KEY não está configurada" };
+
+  try {
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${encodeURIComponent(externalId)}`, {
+      headers: { "x-apisports-key": apiKey },
+      cache: "no-store",
+    });
+    if (!res.ok) return { error: `Pedido falhou (HTTP ${res.status})` };
+
+    const body = await res.json();
+    if (body.errors && Object.keys(body.errors).length > 0) {
+      const messages = Object.values(body.errors as Record<string, string>);
+      return { error: messages.join(" ") || "A API rejeitou o pedido" };
+    }
+
+    const fx = body?.response?.[0];
+    if (!fx) return { error: "Jogo não encontrado na API (verifica a ligação ao API-Football)" };
+
+    const statusCode: string = fx.fixture?.status?.short ?? "NS";
+    return {
+      data: {
+        homeGoals: fx.goals?.home ?? null,
+        awayGoals: fx.goals?.away ?? null,
+        minute: fx.fixture?.status?.elapsed ?? null,
+        paused: PAUSED_STATUS_CODES.has(statusCode),
+        statusCode,
+        statusLabel: STATUS_LABELS[statusCode] ?? statusCode,
+      },
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
