@@ -7,6 +7,7 @@ import { RefundExpiredBetsButton } from "@/components/admin/refund-expired-bets-
 import { AddMatchForm } from "@/components/admin/add-match-form";
 import { ImportFixturesButton } from "@/components/admin/import-fixtures-button";
 import { RefreshLiveMatchesButton } from "@/components/admin/refresh-live-matches-button";
+import { ApiQuotaBadge } from "@/components/admin/api-quota-badge";
 import { getUnsettledMatches, getProcessedMatches } from "@/lib/bets";
 import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
@@ -48,7 +49,8 @@ export default async function AdminMatchesPage() {
             Insere o resultado oficial para pagar o vencedor automaticamente, ou marca o jogo como adiado/abandonado para reembolsar ambos os lados.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <ApiQuotaBadge />
           <ImportFixturesButton />
           <RefreshLiveMatchesButton />
           <RefundExpiredBetsButton />

@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { matches, profiles, notifications, liveSyncState } from "@/db/schema";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { fetchLiveFixtures, type FixtureUpdate } from "@/lib/sportsData";
-import { getKnownRemainingQuota } from "@/lib/apiFootballClient";
+import { getKnownRemainingQuota, isSameUtcDay } from "@/lib/apiFootballClient";
 import { createServiceClient } from "@/lib/supabase/server";
 import { broadcastFeedEvent } from "@/lib/realtime";
 import { logError } from "@/lib/errorLog";
@@ -313,8 +313,4 @@ export async function runLiveScoreAutoSync(): Promise<LiveSyncResult & { trigger
 
   const result = await syncLiveMatchesFromApi();
   return { triggered: true, ...result };
-}
-
-function isSameUtcDay(a: Date, b: Date): boolean {
-  return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate();
 }
