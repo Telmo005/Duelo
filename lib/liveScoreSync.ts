@@ -189,8 +189,32 @@ const OFF_PEAK_END_HOUR = 9;
 /** Hard floor left unspent no matter how much a live match "wants" another
  *  poll — reserved for the admin's own manual buttons (per-match refresh,
  *  bulk refresh, team/fixture search) so automatic polling can never eat
- *  the entire daily budget and leave nothing for a human to use. */
+ *  the entire daily budget and leave nothing for a human to use. Crossing
+ *  this stops automatic polling completely for the rest of the day (see
+ *  quotaBackoffMultiplier below for the gradual slowdown BEFORE this
+ *  point). */
 const QUOTA_SAFETY_RESERVE = 15;
+
+/** Soft warning zone above the hard reserve: instead of polling at full
+ *  speed right up until the reserve and then slamming to a stop, the
+ *  interval stretches progressively as the known remaining quota gets
+ *  closer to QUOTA_SAFETY_RESERVE — graceful degradation instead of a
+ *  cliff. Both thresholds are counts of requests remaining today, not
+ *  percentages: at the default 100/day plan that's "quota getting tight"
+ *  and "quota very tight" in absolute, easy-to-reason-about terms. */
+const QUOTA_CAUTION_REMAINING = 50;
+const QUOTA_WARNING_REMAINING = 30;
+
+/** How much to stretch the normal interval by, based on the last known
+ *  remaining quota. Unknown (no reading yet today) is treated as
+ *  "comfortable" — the very next real API call refreshes it with the true
+ *  number regardless, so there's nothing to be cautious about yet. */
+function quotaBackoffMultiplier(remaining: number | null): number {
+  if (remaining == null) return 1;
+  if (remaining <= QUOTA_WARNING_REMAINING) return 4;
+  if (remaining <= QUOTA_CAUTION_REMAINING) return 2;
+  return 1;
+}
 
 function currentMozambiqueHour(now: Date): number {
   const parts = new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: MOZAMBIQUE_TIMEZONE }).formatToParts(now);
@@ -220,19 +244,22 @@ async function getSyncState() {
  *  1. At least one tracked 'live'/'needs_review' match, linked to the API,
  *     still within AUTO_SYNC_ELIGIBLE_MINUTES of its kickoff — otherwise
  *     there's nothing worth polling for at all.
- *  2. Enough real time has passed since the last actual poll — 5 minutes
- *     normally, 15 during Mozambique's 00:00–09:00 off-peak window. Read
- *     from live_sync_state.last_synced_at, not derived from any one match,
- *     so overlapping matches never cause back-to-back polls seconds apart.
+ *  2. Enough real time has passed since the last actual poll — the base
+ *     interval (5 min normally, 15 during Mozambique's 00:00–09:00
+ *     off-peak window), stretched by quotaBackoffMultiplier as the known
+ *     remaining quota gets tight. Read from live_sync_state.last_synced_at,
+ *     not derived from any one match, so overlapping matches never cause
+ *     back-to-back polls seconds apart.
  *  3. The vendor's own last-reported quota (x-ratelimit-requests-remaining,
  *     persisted by every apiFootballFetch call — see
- *     lib/apiFootballClient.ts) still has room above QUOTA_SAFETY_RESERVE.
- *     Unknown (never read yet, or stale from a previous day) is treated as
- *     "assume there's room" — the very next call will refresh it with the
- *     real number regardless.
+ *     lib/apiFootballClient.ts) still has room above QUOTA_SAFETY_RESERVE —
+ *     an absolute floor, never crossed regardless of how the interval was
+ *     stretched leading up to it. Unknown (never read yet, or stale from a
+ *     previous day) is treated as "assume there's room" — the very next
+ *     call will refresh it with the real number regardless.
  *
  * One hit (live=all) refreshes every tracked live match at once, however
- * many matches are actually in play — that's what makes 5-minute polling
+ * many matches are actually in play — that's what makes frequent polling
  * affordable on a 100/day quota at all (see the budget math worked out with
  * the product owner before this was built): the cost scales with how many
  * total minutes something is live somewhere, not with match count.
@@ -252,13 +279,10 @@ export async function runLiveScoreAutoSync(): Promise<LiveSyncResult & { trigger
   if (!hasEligibleLiveMatch) return { triggered: false, updated: 0, missing: [], skippedReason: "nothing live" };
 
   const state = await getSyncState();
-
-  const requiredGapMs = requiredIntervalMinutes(now) * 60_000;
-  if (state?.lastSyncedAt && nowMs - new Date(state.lastSyncedAt).getTime() < requiredGapMs) {
-    return { triggered: false, updated: 0, missing: [], skippedReason: "too soon" };
-  }
-
+  // Read once, used for both the hard-stop check and the graceful-backoff
+  // multiplier below — one read, two decisions.
   const knownRemaining = await getKnownRemainingQuota();
+
   if (knownRemaining != null && knownRemaining <= QUOTA_SAFETY_RESERVE) {
     const alreadyNotifiedToday =
       state?.quotaExhaustedNotifiedAt != null && isSameUtcDay(new Date(state.quotaExhaustedNotifiedAt), now);
@@ -272,6 +296,17 @@ export async function runLiveScoreAutoSync(): Promise<LiveSyncResult & { trigger
       await db.update(liveSyncState).set({ quotaExhaustedNotifiedAt: now }).where(eq(liveSyncState.id, 1));
     }
     return { triggered: false, updated: 0, missing: [], skippedReason: "quota reserve" };
+  }
+
+  const multiplier = quotaBackoffMultiplier(knownRemaining);
+  const requiredGapMs = requiredIntervalMinutes(now) * multiplier * 60_000;
+  if (state?.lastSyncedAt && nowMs - new Date(state.lastSyncedAt).getTime() < requiredGapMs) {
+    return {
+      triggered: false,
+      updated: 0,
+      missing: [],
+      skippedReason: multiplier > 1 ? `too soon (quota caution, ${multiplier}x interval)` : "too soon",
+    };
   }
 
   await db.update(liveSyncState).set({ lastSyncedAt: now }).where(eq(liveSyncState.id, 1));

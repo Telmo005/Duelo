@@ -8,12 +8,15 @@ import { logError } from "@/lib/errorLog";
  * lib/fixtures-import.ts. Same Vercel Cron / CRON_SECRET pattern as the
  * other cron routes.
  *
- * Currently a no-op in practice: the configured API-Football key is on the
- * Free plan, which doesn't cover the current season at all. Wire this up
- * once the account is upgraded (Pro tier, ~$19/mo) — the code is ready and
- * will start populating `matches` automatically the moment the API stops
- * rejecting the season. Until then, use the manual "Adicionar jogo" form in
- * /admin/matches.
+ * Guaranteed no-op right now: importUpcomingFixtures short-circuits before
+ * calling the API at all while lib/fixtures-import.ts's
+ * CURRENT_SEASON_PLAN_ACTIVE is false (Free plan doesn't cover the current
+ * season) — a real request here used to burn 3 of the shared daily quota
+ * for a rejection every time this fired, whether or not anyone was
+ * watching. Flip that flag once the account is upgraded (Pro tier,
+ * ~$19/mo) — the rest of the code is ready and will start populating
+ * `matches` automatically. Until then, use the manual "Adicionar jogo" form
+ * in /admin/matches.
  *
  * Local dev: `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/import-fixtures`
  */

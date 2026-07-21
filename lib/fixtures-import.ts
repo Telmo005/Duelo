@@ -40,6 +40,16 @@ export type ImportResult = {
   errors: string[];
 };
 
+/** Flip to true once the API-Football account is upgraded to a plan that
+ *  covers the current season (Free is capped to 2022-2024). Until then this
+ *  function is guaranteed to fail for all 3 leagues on every call — letting
+ *  it run anyway would still burn 3 real requests from the shared daily
+ *  quota (see lib/apiFootballClient.ts) for zero benefit, which is exactly
+ *  what it was silently doing before this guard existed. If a cron-job.org
+ *  schedule still pings /api/cron/import-fixtures while this is false,
+ *  that's a free, harmless no-op — no API-Football call happens at all. */
+const CURRENT_SEASON_PLAN_ACTIVE: boolean = false;
+
 /**
  * Imports upcoming fixtures for the leagues above into `matches`, idempotent
  * per external_id (API-Football's fixture id) via ON CONFLICT — a re-run
@@ -47,13 +57,19 @@ export type ImportResult = {
  * (e.g. a postponement), never touches match_status/result_* so it can
  * never clobber a match settlement already recorded.
  *
- * Requires an API-Football plan that includes the current season — the
- * Free plan does not (it's capped to 2022-2024), so this will return every
- * league in `errors` and import nothing until the account is upgraded. That
- * failure is expected and non-fatal; callers (the cron route, the manual
- * admin trigger) surface `errors` rather than treating it as a crash.
+ * Requires an API-Football plan that includes the current season — see
+ * CURRENT_SEASON_PLAN_ACTIVE above.
  */
 export async function importUpcomingFixtures(windowDays = 14): Promise<ImportResult> {
+  if (!CURRENT_SEASON_PLAN_ACTIVE) {
+    return {
+      checked: 0,
+      inserted: 0,
+      updated: 0,
+      errors: ["Importação automática desligada — o plano Free da API-Football não cobre a época atual. Usa \"Adicionar jogo\" manualmente."],
+    };
+  }
+
   const season = currentSeasonYear();
   const from = new Date().toISOString().slice(0, 10);
   const to = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
