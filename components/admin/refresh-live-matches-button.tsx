@@ -36,7 +36,7 @@ export function RefreshLiveMatchesButton() {
       type="button"
       onClick={handleClick}
       disabled={isPending}
-      title="Um único pedido à API-Football (live=all) para todos os jogos ao vivo"
+      title="Um único pedido à API para todos os jogos ao vivo"
       className="press inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
     >
       {isPending ? <Spinner className="size-4" /> : <RefreshCw className="size-4" aria-hidden />}

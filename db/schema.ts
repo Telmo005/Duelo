@@ -185,29 +185,30 @@ export type Notification = typeof notifications.$inferSelect;
 /**
  * matches — football fixtures available to bet on. Manually seeded for
  * now (see supabase/migrations/0002_bets.sql seed rows); automatic
- * ingestion from a sports-data API (API-Football) is a later phase.
+ * ingestion from a sports-data API (football-data.org) is a later phase.
  */
 export const matches = pgTable("matches", {
   id: uuid("id").primaryKey().defaultRandom(),
   home: text("home").notNull(),
   away: text("away").notNull(),
   league: text("league").notNull(),
-  /** API-Football's numeric league ID — null for manually seeded matches
-   *  (no vendor league to key off of). `league` is a display NAME, and
+  /** football-data.org's numeric competition ID — null for manually seeded
+   *  matches (no vendor league to key off of). `league` is a display NAME, and
    *  different countries' leagues can share the exact same name (England's
    *  "Premier League" and Kazakhstan's, for instance) — grouping/matching
    *  by name alone silently merges them into one section. This is the real
    *  identity; `league`/`country` are what a human reads. */
   leagueId: integer("league_id"),
-  /** API-Football's country name for the league (e.g. "England",
+  /** football-data.org's country/area name for the league (e.g. "England",
    *  "Kazakhstan") — null for manually seeded matches. Only used to
    *  disambiguate a `league` name that collides with a different
    *  leagueId's (see lib/leagueTiers.ts groupByLeague) — never shown on
    *  its own. */
   country: text("country"),
   kickoffAt: timestamp("kickoff_at", { withTimezone: true }).notNull(),
-  /** API-Football fixture ID — null for manually seeded matches. Kept for
-   *  provenance/dedup on re-import only; lifecycle/settlement and the live
+  /** football-data.org match ID (vendor-namespaced as "fd-{id}", see
+   *  lib/sportsData.ts's toExternalId) — null for manually seeded matches.
+   *  Kept for provenance/dedup on re-import only; lifecycle/settlement and the live
    *  scoreboard are both purely time-based / manual admin input now (see
    *  0028_match_live_lifecycle.sql) and don't care whether it's set. */
   externalId: text("external_id").unique(),
@@ -222,9 +223,9 @@ export const matches = pgTable("matches", {
   settledAt: timestamp("settled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 
-  /** Crest URLs sourced from API-Football (media.api-sports.io) — hot-linked,
-   *  never re-hosted, per their media terms. Null falls back to the
-   *  coloured-shield placeholder in TeamBadge (manually seeded matches). */
+  /** Crest URLs sourced from football-data.org (crests.football-data.org) —
+   *  hot-linked, never re-hosted. Null falls back to the coloured-shield
+   *  placeholder in TeamBadge (manually seeded matches). */
   homeLogoUrl: text("home_logo_url"),
   awayLogoUrl: text("away_logo_url"),
 
@@ -257,7 +258,7 @@ export const matches = pgTable("matches", {
   liveMinuteAnchorAt: timestamp("live_minute_anchor_at", { withTimezone: true }),
   livePaused: boolean("live_paused").notNull().default(false),
 
-  /** Raw API-Football fixture status code ('FT', 'HT', '2H', ...) from the
+  /** Raw football-data.org match status code ('FINISHED', 'PAUSED', 'IN_PLAY', ...) from the
    *  last updateLiveScoreFromApiAction call (migration 0030) — lets the admin
    *  UI show an unambiguous "Terminado"/"Intervalo" label instead of a bare
    *  minute that would otherwise look like it's still ticking (or ambiguous
@@ -369,28 +370,20 @@ export const adminAuditLog = pgTable("admin_audit_log", {
 
 /**
  * live_sync_state — singleton row (migration 0031) tracking the automatic
- * live-score sync's own state: when it last actually called API-Football,
- * and the daily quota remaining as last reported by the vendor
- * (x-ratelimit-requests-remaining response header — read from every
- * API-Football call via lib/apiFootballClient.ts, not a self-maintained
- * guess). Read by lib/liveScoreSync.ts to decide whether a given cron tick
- * is allowed to spend a request at all.
+ * live-score sync's own state: when it last actually polled
+ * football-data.org. The quota-tracking columns migration 0031/0032 added
+ * (daily remaining/limit for the previous vendor, API-Football) were
+ * dropped in migration 0034 — football-data.org has no daily cap, just a
+ * flat 10 requests/minute the automatic sync stays nowhere near, so there's
+ * nothing left to track there. Read by lib/liveScoreSync.ts to decide
+ * whether a given cron tick is due yet.
  */
 export const liveSyncState = pgTable("live_sync_state", {
   id: integer("id").primaryKey().default(1),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-  quotaRemaining: integer("quota_remaining"),
-  quotaUpdatedAt: timestamp("quota_updated_at", { withTimezone: true }),
-  quotaExhaustedNotifiedAt: timestamp("quota_exhausted_notified_at", { withTimezone: true }),
-  /** Daily request limit (migration 0032), read from
-   *  x-ratelimit-requests-limit alongside quotaRemaining — lets the admin
-   *  UI show "41/100" without hardcoding the plan's limit, which would go
-   *  stale silently if the plan is ever upgraded. */
-  quotaLimit: integer("quota_limit"),
-  /** Migration 0033 — dedup for the "API-Football calls are failing" admin
-   *  notification (distinct from quotaExhaustedNotifiedAt: this covers
-   *  account suspension, revoked key, vendor outage — a "go fix the
-   *  account" alert, not a "slow down" one). */
+  /** Dedup for the "the sports-data API isn't responding" admin
+   *  notification (migration 0033) — at most once per UTC day, so a
+   *  prolonged outage doesn't spam. */
   apiErrorNotifiedAt: timestamp("api_error_notified_at", { withTimezone: true }),
 });
 

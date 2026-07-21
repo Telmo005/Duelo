@@ -8,7 +8,7 @@
  *
  * Each inner array is one tier (same rank); lower tier index = higher
  * priority. Includes both the Portuguese names this app's own seed data /
- * manual admin entry uses ("Mundial") and the English names API-Football
+ * manual admin entry uses ("Mundial") and the English names football-data.org
  * returns ("World Cup") for the same competition, since a league group in
  * the feed can be populated by either source. Matching is case-insensitive.
  * Anything not listed falls back after every tier here, in whatever order
@@ -21,7 +21,7 @@
  * { name, country } pair (matches ONLY when the country also matches) — for
  * names that different countries' domestic leagues reuse. Real example
  * this app hit: England's "Premier League" and Kazakhstan's are both
- * literally named "Premier League" in API-Football's data. Without the
+ * literally named "Premier League" in football data. Without the
  * country qualifier, whichever one showed up would borrow the other's
  * top-tier prestige. A same-named league with no country match (or no
  * country known at all, e.g. a manually-typed entry) falls through to the

@@ -30,13 +30,13 @@ const DAY_OPTIONS = [
 const RESULTS_CAP = 150;
 
 /**
- * "Procurar jogo real" — an optional search (API-Football, unfiltered
- * `/fixtures?date=`) that lists every real match on a given day so an admin
- * can tick the ones they want and add them all in one go, instead of typing
- * teams/league/kickoff by hand one match at a time. Only reaches ~3 days out
- * — see lib/sportsData.ts's searchFixturesByDate for why (Free-plan
- * limitation, not a bug). Purely additive/self-contained: it inserts the
- * matches itself (via addFixturesBulkAction) and never touches the manual
+ * "Procurar jogo real" — an optional search (football-data.org, unfiltered
+ * `/matches?dateFrom=&dateTo=`) that lists every real match on a given day so
+ * an admin can tick the ones they want and add them all in one go, instead of
+ * typing teams/league/kickoff by hand one match at a time. Only offers
+ * Hoje/Amanhã/Depois de amanhã — a deliberate UI choice to keep the picker
+ * simple, not a vendor limitation. Purely additive/self-contained: it inserts
+ * the matches itself (via addFixturesBulkAction) and never touches the manual
  * form below it — Moçambola/anything the API doesn't cover still goes
  * through manual entry exactly as before this existed.
  */

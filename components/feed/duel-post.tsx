@@ -20,7 +20,7 @@ export type Duel = {
     home: string;
     away: string;
     league: string;
-    /** API-Football league identity — null for manually-seeded matches. Two
+    /** football-data.org league identity — null for manually-seeded matches. Two
      *  different countries can have identically-named leagues (both call it
      *  "Premier League"), so grouping/ranking uses this instead of the bare
      *  name string (see lib/leagueTiers.ts groupByLeague). */

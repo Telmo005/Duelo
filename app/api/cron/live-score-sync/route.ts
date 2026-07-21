@@ -6,22 +6,24 @@ import { runLiveScoreAutoSync } from "@/lib/liveScoreSync";
 /**
  * Automates the admin's "Atualizar jogos ao vivo" button while any match is
  * live — see runLiveScoreAutoSync for the exact gating (nothing live /
- * too-soon / vendor-reported quota reserve). Safe to schedule frequently
- * (every 5 minutes): most ticks are a couple of cheap DB reads and nothing
- * else — API-Football is only ever hit when there's genuinely a match live,
- * enough time has passed since the last real poll, and there's daily quota
- * to spare, and that one hit (live=all) refreshes every tracked live match
- * at once regardless of how many are actually in play. This is deliberately
- * NOT the polling pattern 0028_match_live_lifecycle.sql moved away from —
- * that one hit the API on every tick for every match; this one hits it only
- * when it's actually useful, coalesced into a single request, throttled
- * against the real remaining daily budget.
+ * too-soon). Safe to schedule frequently: most ticks are one cheap DB read
+ * and nothing else — football-data.org is only ever hit when there's
+ * genuinely a match live AND enough time has passed since the last real
+ * poll, and that one hit refreshes every tracked live match at once
+ * regardless of how many are actually in play. This is deliberately NOT the
+ * polling pattern 0028_match_live_lifecycle.sql moved away from (that one
+ * hit the API on every tick for every match) — this one hits it only when
+ * it's actually useful, coalesced into a single request. Unlike the
+ * previous vendor (API-Football, daily quota), this vendor's only limit is
+ * 10 requests/minute with no daily cap, so there's no budget-conservation
+ * logic left to explain here beyond the flat MIN_POLL_INTERVAL_SECONDS
+ * floor in lib/liveScoreSync.ts.
  *
  * Add to the external cron-job.org schedule (same pattern as the other
- * /api/cron/* routes) every 5 minutes, GET, with
- * `Authorization: Bearer $CRON_SECRET`. (Supersedes the old
- * /api/cron/live-score-checkpoints path — if that was already configured
- * there, repoint it to this URL instead of adding a second entry.)
+ * /api/cron/* routes), GET, with `Authorization: Bearer $CRON_SECRET`.
+ * Every 1-5 minutes is all fine now — feel free to tighten it from
+ * whatever it's currently set to for faster real-world freshness, since
+ * there's no daily budget being protected anymore.
  */
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) {

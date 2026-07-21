@@ -11,7 +11,7 @@ function teamColor(name: string) {
 
 const SHIELD_PATH = "polygon(50% 0%, 100% 14%, 100% 62%, 50% 100%, 0% 62%, 0% 14%)";
 
-/** Real crest (from API-Football, hot-linked) when we have one; otherwise a
+/** Real crest (from football-data.org, hot-linked) when we have one; otherwise a
  *  shield-shaped placeholder with a metallic gold trim ring, standing in for
  *  crest artwork we don't have (and shouldn't fake as a real club logo).
  *  Shared between the feed (DuelPost) and the bet composer so both render

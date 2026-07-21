@@ -10,8 +10,8 @@ import { Spinner } from "@/components/ui/spinner";
 import type { TeamSearchResult } from "@/lib/sportsData";
 
 /**
- * "Pesquisar equipa" — an optional live search (API-Football) that lets an
- * admin pick a team by its real, official name instead of typing one by
+ * "Pesquisar equipa" — an optional live search (football-data.org) that lets
+ * an admin pick a team by its real, official name instead of typing one by
  * hand. Exists because guessing a crest from a hand-typed name silently
  * fails for two reasons: the API rejects non-ASCII characters outright, and
  * it only knows English/official names, so a Portuguese name like "Espanha"
@@ -19,8 +19,8 @@ import type { TeamSearchResult } from "@/lib/sportsData";
  * sidesteps both, and fills in the crest for free.
  *
  * Purely additive: the underlying text input is still there and still
- * editable by hand (for Moçambola clubs API-Football has never heard of —
- * no crest either way, exactly like before this picker existed).
+ * editable by hand (for Moçambola clubs football-data.org has never heard of
+ * — no crest either way, exactly like before this picker existed).
  */
 export function TeamSearchPicker({
   id,
