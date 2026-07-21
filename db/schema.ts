@@ -387,6 +387,11 @@ export const liveSyncState = pgTable("live_sync_state", {
    *  UI show "41/100" without hardcoding the plan's limit, which would go
    *  stale silently if the plan is ever upgraded. */
   quotaLimit: integer("quota_limit"),
+  /** Migration 0033 — dedup for the "API-Football calls are failing" admin
+   *  notification (distinct from quotaExhaustedNotifiedAt: this covers
+   *  account suspension, revoked key, vendor outage — a "go fix the
+   *  account" alert, not a "slow down" one). */
+  apiErrorNotifiedAt: timestamp("api_error_notified_at", { withTimezone: true }),
 });
 
 export type AdminAuditLogEntry = typeof adminAuditLog.$inferSelect;

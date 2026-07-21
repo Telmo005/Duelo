@@ -312,5 +312,28 @@ export async function runLiveScoreAutoSync(): Promise<LiveSyncResult & { trigger
   await db.update(liveSyncState).set({ lastSyncedAt: now }).where(eq(liveSyncState.id, 1));
 
   const result = await syncLiveMatchesFromApi();
+
+  // Distinct from the quota-reserve notification above: this fires when the
+  // API itself is unreachable/rejecting every call (suspended account,
+  // revoked key, vendor outage) — a "go check the dashboard" alert, not a
+  // "slow down" one. Same once-per-day dedup pattern. Never blocks
+  // settlement/wallet correctness either way (see attemptAutoSettleIfConfirmed
+  // — no data in means no action, never a wrong one), but the admin should
+  // still know live scores have stopped updating at all.
+  if (result.error) {
+    const alreadyNotifiedToday =
+      state?.apiErrorNotifiedAt != null && isSameUtcDay(new Date(state.apiErrorNotifiedAt), now);
+    if (!alreadyNotifiedToday) {
+      const reason = result.error.replace(/\.+$/, "");
+      await notifyAdmins(
+        "api_football_error",
+        "API-Football não está a responder",
+        `A atualização automática do placar ao vivo está a falhar: ${reason}. Os jogos não estão a atualizar sozinhos — confere https://dashboard.api-football.com. Nada foi pago incorretamente (sem dados = sem ação).`,
+        "/admin/matches"
+      );
+      await db.update(liveSyncState).set({ apiErrorNotifiedAt: now }).where(eq(liveSyncState.id, 1));
+    }
+  }
+
   return { triggered: true, ...result };
 }
