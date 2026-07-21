@@ -382,6 +382,11 @@ export const liveSyncState = pgTable("live_sync_state", {
   quotaRemaining: integer("quota_remaining"),
   quotaUpdatedAt: timestamp("quota_updated_at", { withTimezone: true }),
   quotaExhaustedNotifiedAt: timestamp("quota_exhausted_notified_at", { withTimezone: true }),
+  /** Daily request limit (migration 0032), read from
+   *  x-ratelimit-requests-limit alongside quotaRemaining — lets the admin
+   *  UI show "41/100" without hardcoding the plan's limit, which would go
+   *  stale silently if the plan is ever upgraded. */
+  quotaLimit: integer("quota_limit"),
 });
 
 export type AdminAuditLogEntry = typeof adminAuditLog.$inferSelect;

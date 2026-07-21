@@ -41,9 +41,11 @@ export async function apiFootballFetch<T = unknown>(path: string): Promise<ApiFo
   }
 
   const remainingHeader = res.headers.get("x-ratelimit-requests-remaining");
+  const limitHeader = res.headers.get("x-ratelimit-requests-limit");
   const remaining = remainingHeader != null ? Number(remainingHeader) : undefined;
+  const limit = limitHeader != null ? Number(limitHeader) : undefined;
   if (remaining != null && Number.isFinite(remaining)) {
-    await persistQuotaRemaining(remaining);
+    await persistQuota(remaining, Number.isFinite(limit) ? limit : undefined);
   }
 
   if (!res.ok) return { error: `Pedido falhou (HTTP ${res.status})`, remaining };
@@ -64,11 +66,19 @@ export async function apiFootballFetch<T = unknown>(path: string): Promise<ApiFo
   return { body: body as T, remaining };
 }
 
-async function persistQuotaRemaining(remaining: number): Promise<void> {
+async function persistQuota(remaining: number, limit: number | undefined): Promise<void> {
   await db
     .update(liveSyncState)
-    .set({ quotaRemaining: remaining, quotaUpdatedAt: new Date() })
+    .set({
+      quotaRemaining: remaining,
+      quotaUpdatedAt: new Date(),
+      ...(limit != null ? { quotaLimit: limit } : {}),
+    })
     .where(eq(liveSyncState.id, 1));
+}
+
+export function isSameUtcDay(a: Date, b: Date): boolean {
+  return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate();
 }
 
 /** The last vendor-reported quota reading, if recent enough to trust.
@@ -80,13 +90,30 @@ async function persistQuotaRemaining(remaining: number): Promise<void> {
 export async function getKnownRemainingQuota(): Promise<number | null> {
   const [row] = await db.select().from(liveSyncState).where(eq(liveSyncState.id, 1)).limit(1);
   if (!row || row.quotaRemaining == null || !row.quotaUpdatedAt) return null;
+  return isSameUtcDay(new Date(row.quotaUpdatedAt), new Date()) ? row.quotaRemaining : null;
+}
 
+export type QuotaStatus = {
+  /** Null when there's no reading yet today (first request of the day, or
+   *  the app hasn't called the API at all today) — the UI should show
+   *  "desconhecido" rather than a stale/misleading number. */
+  remaining: number | null;
+  limit: number | null;
+  updatedAt: Date | null;
+};
+
+/** Full quota snapshot for display (e.g. an admin dashboard stat) — same
+ *  same-UTC-day freshness rule as getKnownRemainingQuota, but also surfaces
+ *  the limit and the exact time of the last reading so the UI can show
+ *  "41/100 · há 5 min" instead of a bare number. */
+export async function getQuotaStatus(): Promise<QuotaStatus> {
+  const [row] = await db.select().from(liveSyncState).where(eq(liveSyncState.id, 1)).limit(1);
+  if (!row || row.quotaRemaining == null || !row.quotaUpdatedAt) {
+    return { remaining: null, limit: null, updatedAt: null };
+  }
   const updatedAt = new Date(row.quotaUpdatedAt);
-  const now = new Date();
-  const sameUtcDay =
-    updatedAt.getUTCFullYear() === now.getUTCFullYear() &&
-    updatedAt.getUTCMonth() === now.getUTCMonth() &&
-    updatedAt.getUTCDate() === now.getUTCDate();
-
-  return sameUtcDay ? row.quotaRemaining : null;
+  if (!isSameUtcDay(updatedAt, new Date())) {
+    return { remaining: null, limit: row.quotaLimit ?? null, updatedAt: null };
+  }
+  return { remaining: row.quotaRemaining, limit: row.quotaLimit ?? null, updatedAt };
 }
