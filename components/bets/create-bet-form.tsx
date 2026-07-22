@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ChevronLeft, Lock, Handshake, CalendarX, Search, Goal, Target } from "lucide-react";
+import { ChevronLeft, Lock, Handshake, CalendarX, Search, Goal, Trophy } from "lucide-react";
 import { createBetAction } from "@/lib/actions/bets";
 import { TeamBadge } from "@/components/match/team-badge";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -10,7 +10,7 @@ import { InfoRow } from "@/components/ui/info-row";
 import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
 import { groupByLeague } from "@/lib/leagueTiers";
-import { MARKET_LABEL, MARKET_DESCRIPTION, MARKET_ICON, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
+import { MARKET_LABEL, MARKET_DESCRIPTION, MARKET_ICON, MARKET_ACCENT, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
 
 export type MatchOption = {
   id: string;
@@ -53,6 +53,15 @@ type Step = "match" | "market" | "prediction" | "stake";
 const STEP_ORDER: Step[] = ["match", "market", "prediction", "stake"];
 
 const MARKETS: Market[] = ["1x2", "total_goals", "btts"];
+
+// Full literal class strings (not template-built) so Tailwind's content
+// scanner can actually find them — all already emitted elsewhere in the app
+// for other components, so there's no risk of them being purged.
+const MARKET_BADGE_CLASS: Record<"primary" | "success" | "locked", string> = {
+  primary: "bg-primary-10 text-primary",
+  success: "bg-success-10 text-success",
+  locked: "bg-locked-10 text-locked",
+};
 
 const QUICK_STAKES = [10, 50, 100, 500, 1000];
 
@@ -304,8 +313,8 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
                 ariaLabel={`${MARKET_LABEL[m]} — ${MARKET_DESCRIPTION[m]}`}
                 className="flex flex-col items-center gap-2 p-3.5 text-center"
               >
-                <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
-                  {MARKET_ICON[m] === "target" ? <Target className="size-4" /> : MARKET_ICON[m] === "goal" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
+                <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT[m]]}`} aria-hidden>
+                  {MARKET_ICON[m] === "trophy" ? <Trophy className="size-4" /> : MARKET_ICON[m] === "goal" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
                 </span>
                 <span className="text-xs font-semibold leading-tight">{MARKET_LABEL[m]}</span>
                 <span className="text-[10px] leading-snug text-muted-foreground">{MARKET_DESCRIPTION[m]}</span>
@@ -373,11 +382,11 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
                 className="flex flex-col items-center gap-2 p-3.5 text-center"
               >
                 {market !== "1x2" ? (
-                  <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
+                  <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT[market]]}`} aria-hidden>
                     {market === "total_goals" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
                   </span>
                 ) : p.key === "draw" ? (
-                  <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
+                  <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT["1x2"]]}`} aria-hidden>
                     <Handshake className="size-4" />
                   </span>
                 ) : (

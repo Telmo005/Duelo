@@ -1,12 +1,12 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { X, TrendingUp, Lock, Target, Goal, Handshake } from "lucide-react";
+import { X, TrendingUp, Lock, Trophy, Goal, Handshake } from "lucide-react";
 import { CancelBetButton } from "./cancel-bet-button";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCentsAsMt } from "@/lib/format";
-import { MARKET_ICON, type Market } from "@/lib/betMarkets";
+import { MARKET_ICON, MARKET_ACCENT, type Market } from "@/lib/betMarkets";
 
 export type Duel = {
   id: string;
@@ -75,14 +75,22 @@ export type Duel = {
  *  MARKET_ICON, so the two never drift apart). Lets someone scanning a long
  *  feed tell golos/ambas-marcam/resultado duels apart without reading the
  *  full prediction text on every row. */
-const MARKET_ICON_COMPONENT: Record<"target" | "goal" | "handshake", typeof Target> = {
-  target: Target,
+const MARKET_ICON_COMPONENT: Record<"trophy" | "goal" | "handshake", typeof Trophy> = {
+  trophy: Trophy,
   goal: Goal,
   handshake: Handshake,
 };
+// Full literal class strings (not template-built) so Tailwind's content
+// scanner can actually find them — these are already emitted elsewhere in
+// the app for other components, so there's no risk of them being purged.
+const MARKET_ACCENT_CLASS: Record<"primary" | "success" | "locked", string> = {
+  primary: "text-primary",
+  success: "text-success",
+  locked: "text-locked",
+};
 function MarketIcon({ market }: { market: Market }) {
   const Icon = MARKET_ICON_COMPONENT[MARKET_ICON[market]];
-  return <Icon className="size-3 shrink-0 text-muted-foreground" aria-hidden />;
+  return <Icon className={`size-3 shrink-0 ${MARKET_ACCENT_CLASS[MARKET_ACCENT[market]]}`} aria-hidden />;
 }
 
 /** Dims the row and shows a spinner while its navigation is in flight —

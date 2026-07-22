@@ -10,7 +10,7 @@ import { OptionCard } from "@/components/ui/option-card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { acceptBetAction, cancelBetAction } from "@/lib/actions/bets";
 import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
-import { marketPredictions, marketLabel, type Market } from "@/lib/betMarkets";
+import { marketPredictions, marketLabel, MARKET_ACCENT, type Market } from "@/lib/betMarkets";
 import type { BetReceipt } from "@/lib/bets";
 
 const STATUS_LABEL: Record<BetReceipt["status"], { label: string; className: string }> = {
@@ -33,6 +33,15 @@ const REFUND_MESSAGE: Record<NonNullable<BetReceipt["refundReason"]>, string> = 
 };
 
 type PredictionKey = string;
+
+// Full literal class strings (not template-built) so Tailwind's content
+// scanner can actually find them — all already emitted elsewhere in the app
+// for other components, so there's no risk of them being purged.
+const MARKET_BADGE_CLASS: Record<"primary" | "success" | "locked", string> = {
+  primary: "bg-primary-10 text-primary",
+  success: "bg-success-10 text-success",
+  locked: "bg-locked-10 text-locked",
+};
 
 /** One line of the money breakdown, styled like a till receipt: label, a
  *  dotted leader that stretches to fill whatever space is left, then the
@@ -354,11 +363,11 @@ export function BetReceiptCard({
                       className="flex flex-col items-center gap-2 p-3.5 text-center"
                     >
                       {market !== "1x2" ? (
-                        <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
-                          <Goal className="size-4" />
+                        <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT[market]]}`} aria-hidden>
+                          {market === "total_goals" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
                         </span>
                       ) : p.key === "draw" ? (
-                        <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
+                        <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT["1x2"]]}`} aria-hidden>
                           <Handshake className="size-4" />
                         </span>
                       ) : (
