@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ChevronLeft, Lock, Handshake, CalendarX, Search, Goal, Trophy } from "lucide-react";
+import { ChevronLeft, Lock, CalendarX, Search } from "lucide-react";
 import { createBetAction } from "@/lib/actions/bets";
 import { TeamBadge } from "@/components/match/team-badge";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -10,7 +10,7 @@ import { InfoRow } from "@/components/ui/info-row";
 import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
 import { groupByLeague } from "@/lib/leagueTiers";
-import { MARKET_LABEL, MARKET_DESCRIPTION, MARKET_ICON, MARKET_ACCENT, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
+import { MARKET_LABEL, MARKET_DESCRIPTION, MARKET_EMOJI, MARKET_EMOJI_GRAYSCALE, MARKET_ACCENT, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
 
 export type MatchOption = {
   id: string;
@@ -313,8 +313,8 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
                 ariaLabel={`${MARKET_LABEL[m]} — ${MARKET_DESCRIPTION[m]}`}
                 className="flex flex-col items-center gap-2 p-3.5 text-center"
               >
-                <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT[m]]}`} aria-hidden>
-                  {MARKET_ICON[m] === "trophy" ? <Trophy className="size-4" /> : MARKET_ICON[m] === "goal" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
+                <span className={`flex size-[30px] items-center justify-center rounded-full text-base leading-none ${MARKET_BADGE_CLASS[MARKET_ACCENT[m]]} ${MARKET_EMOJI_GRAYSCALE[m] ? "grayscale" : ""}`} aria-hidden>
+                  {MARKET_EMOJI[m]}
                 </span>
                 <span className="text-xs font-semibold leading-tight">{MARKET_LABEL[m]}</span>
                 <span className="text-[10px] leading-snug text-muted-foreground">{MARKET_DESCRIPTION[m]}</span>
@@ -382,12 +382,12 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
                 className="flex flex-col items-center gap-2 p-3.5 text-center"
               >
                 {market !== "1x2" ? (
-                  <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT[market]]}`} aria-hidden>
-                    {market === "total_goals" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
+                  <span className={`flex size-[30px] items-center justify-center rounded-full text-base leading-none ${MARKET_BADGE_CLASS[MARKET_ACCENT[market]]} ${MARKET_EMOJI_GRAYSCALE[market] ? "grayscale" : ""}`} aria-hidden>
+                    {MARKET_EMOJI[market]}
                   </span>
                 ) : p.key === "draw" ? (
-                  <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT["1x2"]]}`} aria-hidden>
-                    <Handshake className="size-4" />
+                  <span className={`flex size-[30px] items-center justify-center rounded-full text-base leading-none ${MARKET_BADGE_CLASS[MARKET_ACCENT["1x2"]]}`} aria-hidden>
+                    🤝
                   </span>
                 ) : (
                   <TeamBadge

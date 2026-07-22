@@ -28,20 +28,30 @@ export const MARKET_LABEL: Record<Market, string> = {
   btts: "Ambas Marcam",
 };
 
-/** Which icon represents each market — shared between the market-picker
- *  step (create-bet-form.tsx) and the small inline marker shown on every
- *  feed row (duel-post.tsx), so the same market always reads as the same
- *  icon everywhere instead of drifting between the two spots. Trophy for
- *  1x2 (it's fundamentally about who WINS, the same icon the app already
- *  uses for a settled win elsewhere) rather than a generic crosshair — a
- *  concrete "what this bet is about" glyph reads faster in a scrolling feed
- *  than an abstract one. Plain data, no lucide-react import here on purpose
- *  — this file stays framework-free; each consumer maps these keys to its
- *  own icon components. */
-export const MARKET_ICON: Record<Market, "trophy" | "goal" | "handshake"> = {
-  "1x2": "trophy",
-  total_goals: "goal",
-  btts: "handshake",
+/** Which emoji represents each market — shared between the market-picker
+ *  step (create-bet-form.tsx), the "choose your side" step and ticket stub
+ *  (bet-receipt-card.tsx), and the small inline marker on every feed row
+ *  (duel-post.tsx), so the same market always reads as the same glyph
+ *  everywhere instead of drifting between spots. Real emoji rather than a
+ *  monochrome icon set on purpose — they're inherently full-colour (no
+ *  per-market accent colour to pick or keep in sync) and instantly
+ *  recognisable at the small sizes a feed row allows. */
+export const MARKET_EMOJI: Record<Market, string> = {
+  "1x2": "🏆",
+  total_goals: "⚽",
+  btts: "🤝",
+};
+
+/** Whether a market's emoji needs a CSS grayscale filter to read as a
+ *  classic black-and-white ball rather than whatever colour the platform's
+ *  emoji font happens to render ⚽ in (blue-and-white on some Windows
+ *  builds) — the app can't control emoji glyph design, only desaturate it.
+ *  Every consumer that renders MARKET_EMOJI applies `grayscale` when this is
+ *  true. */
+export const MARKET_EMOJI_GRAYSCALE: Record<Market, boolean> = {
+  "1x2": false,
+  total_goals: true,
+  btts: false,
 };
 
 /** Which accent colour represents each market — same sharing rationale as
