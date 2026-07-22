@@ -355,19 +355,10 @@ html[data-theme="light"] {
   background-repeat: repeat-x;
 }
 
-/* Sonner (app/layout.tsx's <Toaster>) styles the toast's own background/
-   border/title colour via its `style` prop, but the description line
-   (toast(title, { description })) is a separate nested node sonner themes
-   internally with its own low-contrast gray, unaffected by that `style`
-   object — read as too dim/gray against the dark theme's card background.
-   Dark mode uses literal pure white here (not --foreground's softened
-   #E9EAF0 — a deliberate app-wide choice for body text, but this toast
-   description was specifically asked to be pure white); light mode keeps
-   --foreground (#15161F) since white text would vanish on the light
-   theme's white card background. */
-[data-sonner-toaster] [data-description] {
-  color: #FFFFFF;
-}
-:root[data-theme="light"] [data-sonner-toaster] [data-description] {
-  color: var(--foreground);
-}
+/* Sonner's own theme (dark/light — a SEPARATE concept from this app's
+   own --theme tokens above) drives its description-text colour internally
+   at higher CSS specificity than a plain attribute-selector override here
+   can beat, and defaults to "light" when the `theme` prop isn't passed —
+   see components/theme/toaster-with-theme.tsx, which reads this app's
+   actual data-theme attribute and passes it through, fixing the mismatch
+   at the root instead of here. Nothing left to override in this stylesheet. */
