@@ -1,21 +1,14 @@
 import { db } from "@/db";
 import { bets, matches, profiles, type Bet, type MatchRow } from "@/db/schema";
 import { eq, or, and, desc, lt, inArray } from "drizzle-orm";
-
-/** 1X2 outcome implied by a final score — mirrors bet_settle_match's SQL rule exactly. */
-function actualResult(match: MatchRow): "home" | "draw" | "away" | null {
-  if (match.resultHome == null || match.resultAway == null) return null;
-  if (match.resultHome > match.resultAway) return "home";
-  if (match.resultHome < match.resultAway) return "away";
-  return "draw";
-}
+import { resolveOutcome, type Market } from "@/lib/betMarkets";
 
 /** Did `userId` win this settled bet? Creator wins when their prediction
  *  matched the result; the opponent (who always bets against the creator's
  *  specific prediction) wins otherwise — same rule bet_settle_match uses. */
 function didUserWin(bet: Bet, match: MatchRow, userId: string): boolean | null {
-  const actual = actualResult(match);
-  if (!actual) return null;
+  if (match.resultHome == null || match.resultAway == null) return null;
+  const actual = resolveOutcome(bet.market as Market, bet.line, match.resultHome, match.resultAway);
   const creatorWon = bet.prediction === actual;
   return bet.creatorId === userId ? creatorWon : !creatorWon;
 }

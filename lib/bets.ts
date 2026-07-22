@@ -4,17 +4,23 @@ import { matches, bets, profiles, type MatchRow } from "@/db/schema";
 import { eq, asc, desc, inArray, gt, and, sql } from "drizzle-orm";
 import type { Duel } from "@/components/feed/duel-post";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
+import { resolveOutcome, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
 
 export type BetReceipt = {
   id: string;
   reference: string;
   status: "waiting" | "matched" | "cancelled" | "refunded" | "settled";
-  prediction: "home" | "draw" | "away";
+  /** Which market this bet is on — see lib/betMarkets.ts. */
+  market: Market;
+  /** Only set for market='total_goals'. */
+  line: number | null;
+  prediction: string;
   predictionLabel: string;
   predictionCode: string;
   /** The opponent's own prediction (see db/schema.ts comment) — null until
-   *  matched. Always one of the two outcomes the creator DIDN'T predict. */
-  opponentPrediction: "home" | "draw" | "away" | null;
+   *  matched. Always the other side of this bet's market from what the
+   *  creator predicted. */
+  opponentPrediction: string | null;
   opponentPredictionLabel: string | null;
   stakeCents: number;
   potCents: number;
@@ -73,15 +79,13 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
   if (!creator) return null;
   const opponent = bet.opponentId ? profileById.get(bet.opponentId) : null;
 
-  const pred = PREDICTION_LABEL[bet.prediction];
-  const predictionLabel = bet.prediction === "away" ? pred.awayLabel(match.away) : pred.homeLabel(match.home);
+  const market = bet.market as Market;
+  const predictionLabel = marketLabel(market, bet.prediction, bet.line, match.home, match.away);
+  const predictionCode = marketShortCode(market, bet.prediction, bet.line);
 
-  const opponentPrediction = bet.opponentPrediction as BetReceipt["opponentPrediction"];
+  const opponentPrediction = bet.opponentPrediction;
   const opponentPredictionLabel = opponentPrediction
-    ? (() => {
-        const p = PREDICTION_LABEL[opponentPrediction];
-        return opponentPrediction === "away" ? p.awayLabel(match.away) : p.homeLabel(match.home);
-      })()
+    ? marketLabel(market, opponentPrediction, bet.line, match.home, match.away)
     : null;
 
   // While waiting, nobody has matched yet (opponent_id is always null here),
@@ -98,7 +102,7 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
 
   let winnerId: string | null = null;
   if (bet.status === "settled" && match.resultHome != null && match.resultAway != null) {
-    const actual = match.resultHome > match.resultAway ? "home" : match.resultHome < match.resultAway ? "away" : "draw";
+    const actual = resolveOutcome(market, bet.line, match.resultHome, match.resultAway);
     winnerId = bet.prediction === actual ? bet.creatorId : bet.opponentId;
   }
 
@@ -118,9 +122,11 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
     id: bet.id,
     reference: bet.reference,
     status: bet.status as BetReceipt["status"],
-    prediction: bet.prediction as BetReceipt["prediction"],
+    market,
+    line: bet.line,
+    prediction: bet.prediction,
     predictionLabel,
-    predictionCode: pred.code,
+    predictionCode,
     opponentPrediction,
     opponentPredictionLabel,
     stakeCents: bet.stakeCents,
@@ -336,12 +342,6 @@ function colorFor(userId: string) {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
-const PREDICTION_LABEL: Record<string, { code: string; homeLabel: (h: string) => string; awayLabel: (a: string) => string }> = {
-  home: { code: "1", homeLabel: (h) => `${h} ganha`, awayLabel: () => "" },
-  draw: { code: "X", homeLabel: () => "Empate", awayLabel: () => "" },
-  away: { code: "2", homeLabel: () => "", awayLabel: (a) => `${a} ganha` },
-};
-
 /** Real open/matched bets, shaped for the DuelPost feed component. */
 // Open (joinable) first, then locked (matched, not yet live), then live last
 // — an open bet is the one thing an incoming visitor can actually act on, so
@@ -378,8 +378,9 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
       const creator = profileById.get(bet.creatorId);
       if (!match || !creator) return null;
 
-      const pred = PREDICTION_LABEL[bet.prediction];
-      const predictionText = bet.prediction === "away" ? pred.awayLabel(match.away) : pred.homeLabel(match.home);
+      const market = bet.market as Market;
+      const predictionText = marketLabel(market, bet.prediction, bet.line, match.home, match.away);
+      const predictionCode = marketShortCode(market, bet.prediction, bet.line);
 
       const opponent = bet.opponentId ? profileById.get(bet.opponentId) : null;
 
@@ -415,7 +416,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
           awayLogoUrl: match.awayLogoUrl,
         },
         prediction: predictionText,
-        predictionCode: pred.code,
+        predictionCode,
         stake: bet.stakeCents / 100,
         stakeCents: bet.stakeCents,
         status: isLive ? "live" : bet.status === "matched" ? "locked" : "waiting",
@@ -477,7 +478,7 @@ export const getRecentWinners = unstable_cache(
     .map((bet) => {
       const match = matchById.get(bet.matchId);
       if (!match || match.resultHome == null || match.resultAway == null || !match.settledAt) return null;
-      const actual = match.resultHome > match.resultAway ? "home" : match.resultHome < match.resultAway ? "away" : "draw";
+      const actual = resolveOutcome(bet.market as Market, bet.line, match.resultHome, match.resultAway);
       const winnerId = bet.prediction === actual ? bet.creatorId : bet.opponentId;
       if (!winnerId) return null;
       const potCents = bet.stakeCents * 2;

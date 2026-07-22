@@ -12,11 +12,23 @@ import { z } from "zod";
 
 type ActionResult = { error?: string; betId?: string };
 
-const createBetSchema = z.object({
-  matchId: z.string().uuid(),
-  prediction: z.enum(["home", "draw", "away"]),
-  stakeMt: z.coerce.number().positive().max(1_000_000),
-});
+// Discriminated on `market` so each variant only accepts the fields that
+// actually make sense for it — a total_goals bet without a line (or a 1x2
+// bet WITH one) fails validation here, before ever reaching bet_create's
+// own (redundant, defense-in-depth) checks. See lib/betMarkets.ts for the
+// single source of truth these values come from.
+const stakeSchema = z.coerce.number().positive().max(1_000_000);
+const createBetSchema = z.discriminatedUnion("market", [
+  z.object({ market: z.literal("1x2"), matchId: z.string().uuid(), prediction: z.enum(["home", "draw", "away"]), stakeMt: stakeSchema }),
+  z.object({
+    market: z.literal("total_goals"),
+    matchId: z.string().uuid(),
+    prediction: z.enum(["over", "under"]),
+    line: z.union([z.literal(1.5), z.literal(2.5), z.literal(3.5)]),
+    stakeMt: stakeSchema,
+  }),
+  z.object({ market: z.literal("btts"), matchId: z.string().uuid(), prediction: z.enum(["yes", "no"]), stakeMt: stakeSchema }),
+]);
 
 /** Friendlier messages for the raw exceptions raised inside bet_* functions. */
 function friendlyBetError(message: string): string {
@@ -69,6 +81,8 @@ export async function createBetAction(input: Record<string, unknown>): Promise<A
       p_stake_cents: stakeCents,
       p_creator_ip: ip,
       p_creator_device_id: deviceId,
+      p_market: parsed.data.market,
+      p_line: parsed.data.market === "total_goals" ? parsed.data.line : null,
     })
     .single<{ bet_id: string; reference: string }>();
 
@@ -86,8 +100,13 @@ export async function createBetAction(input: Record<string, unknown>): Promise<A
   redirect(`/d/${data!.reference}`);
 }
 
+// Not market-specific here — the client only ever sends a prediction valid
+// for the bet's own market (bet-receipt-card.tsx derives it from the same
+// lib/betMarkets.ts used everywhere else), and bet_accept re-validates it
+// against v_bet.market server-side regardless, so this is just "one of the
+// values any market could use", not a redundant per-market check.
 const acceptBetSchema = z.object({
-  opponentPrediction: z.enum(["home", "draw", "away"]),
+  opponentPrediction: z.enum(["home", "draw", "away", "over", "under", "yes", "no"]),
 });
 
 export async function acceptBetAction(betId: string, input: Record<string, unknown>): Promise<ActionResult> {
