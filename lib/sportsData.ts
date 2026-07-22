@@ -98,40 +98,69 @@ function isEliminationStage(stage: string | undefined): boolean {
   return stage != null && ELIMINATION_STAGES.has(stage.toUpperCase());
 }
 
+function parseFixtureSearchResult(fx: RawMatch): FixtureSearchResult | null {
+  const id = fx.id;
+  const home = fx.homeTeam?.name;
+  const away = fx.awayTeam?.name;
+  const kickoffAtIso = fx.utcDate;
+  const leagueId = fx.competition?.id;
+  const league = fx.competition?.name;
+  if (id == null || !home || !away || !kickoffAtIso || leagueId == null || !league) return null;
+  return {
+    externalId: toExternalId(id),
+    home,
+    away,
+    league,
+    leagueId,
+    country: fx.area?.name ?? null,
+    kickoffAtIso,
+    homeLogoUrl: fx.homeTeam?.crest ?? null,
+    awayLogoUrl: fx.awayTeam?.crest ?? null,
+    isElimination: isEliminationStage(fx.stage),
+  };
+}
+
 /**
  * Lists real fixtures across every competition this token can see, for a
- * given date — powers the "Procurar jogo real" admin picker. No
- * league/season restriction here (unlike the old vendor): football-data's
- * Free plan simply returns current-season fixtures.
+ * given date — powers the "Procurar jogo real" admin picker.
+ *
+ * Queries per-competition (like searchTeams below), NOT the unfiltered
+ * `/matches?dateFrom=&dateTo=` endpoint — confirmed directly against the
+ * live API that the unfiltered endpoint silently omits competitions this
+ * same token can see just fine when queried directly (e.g. a real BSA
+ * fixture existed for a given day; the unfiltered call for that exact day
+ * returned zero matches, while `/competitions/BSA/matches` for the same day
+ * returned it correctly). A Free-tier quirk of that endpoint, not a bug on
+ * our side — looping per-competition sidesteps it entirely. Sequential, not
+ * parallel, for the same 10-requests/minute reasoning as searchTeams; one
+ * competition erroring just means it contributes no fixtures to this
+ * search, not a failure of the whole picker.
  */
 export async function searchFixturesByDate(date: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
-  const { body, error } = await footballDataFetch<{ matches?: RawMatch[] }>(`/matches?dateFrom=${date}&dateTo=${date}`);
-  if (error) return { fixtures: [], error };
+  const fixtures: FixtureSearchResult[] = [];
+  const errors: string[] = [];
 
-  const raw = body?.matches ?? [];
-  const fixtures = raw
-    .map((fx): FixtureSearchResult | null => {
-      const id = fx.id;
-      const home = fx.homeTeam?.name;
-      const away = fx.awayTeam?.name;
-      const kickoffAtIso = fx.utcDate;
-      const leagueId = fx.competition?.id;
-      const league = fx.competition?.name;
-      if (id == null || !home || !away || !kickoffAtIso || leagueId == null || !league) return null;
-      return {
-        externalId: toExternalId(id),
-        home,
-        away,
-        league,
-        leagueId,
-        country: fx.area?.name ?? null,
-        kickoffAtIso,
-        homeLogoUrl: fx.homeTeam?.crest ?? null,
-        awayLogoUrl: fx.awayTeam?.crest ?? null,
-        isElimination: isEliminationStage(fx.stage),
-      };
-    })
-    .filter((fx): fx is FixtureSearchResult => fx !== null);
+  for (const comp of FOOTBALL_DATA_COMPETITIONS) {
+    const { body, error } = await footballDataFetch<{ matches?: RawMatch[] }>(
+      `/competitions/${comp.code}/matches?dateFrom=${date}&dateTo=${date}`
+    );
+    if (error) {
+      errors.push(`${comp.name}: ${error}`);
+      continue;
+    }
+    for (const fx of body?.matches ?? []) {
+      const parsed = parseFixtureSearchResult(fx);
+      if (parsed) fixtures.push(parsed);
+    }
+  }
+
+  // Only surface an error if EVERY competition failed (e.g. token/network
+  // down) — a handful of individual failures among 13 calls is normal
+  // background noise, not something the admin needs to see as a blocking
+  // error when the search still turned up real results from the rest.
+  if (fixtures.length === 0 && errors.length === FOOTBALL_DATA_COMPETITIONS.length) {
+    return { fixtures: [], error: errors[0] };
+  }
 
   return { fixtures };
 }
