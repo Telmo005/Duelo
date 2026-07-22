@@ -28,6 +28,16 @@ export const MARKET_LABEL: Record<Market, string> = {
   btts: "Ambas Marcam",
 };
 
+/** One-line plain-language explanation of each market — shown right under
+ *  the market's name wherever it's picked, since the name alone ("Total de
+ *  Golos", "Ambas Marcam") doesn't tell a first-time bettor what they're
+ *  actually predicting. */
+export const MARKET_DESCRIPTION: Record<Market, string> = {
+  "1x2": "Quem ganha o jogo, ou empate",
+  total_goals: "Se o jogo tem mais ou menos golos que uma linha",
+  btts: "Se as duas equipas marcam golo",
+};
+
 /**
  * Every final-score outcome a market can resolve to. Returns null only for
  * the structurally-unreachable "line falls exactly on the total" case

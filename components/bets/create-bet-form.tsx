@@ -10,7 +10,7 @@ import { InfoRow } from "@/components/ui/info-row";
 import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
 import { groupByLeague } from "@/lib/leagueTiers";
-import { MARKET_LABEL, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
+import { MARKET_LABEL, MARKET_DESCRIPTION, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
 
 export type MatchOption = {
   id: string;
@@ -44,16 +44,13 @@ type PredictionKey = string;
  *  shouldn't dump match search + market + prediction + stake on a
  *  non-technical user all at once. Each step here advances automatically
  *  the instant a choice is tapped (only the final "stake" step needs an
- *  explicit submit, since it's typed input, not a tap). `line` only exists
- *  in the order when the chosen market actually needs one — see
- *  stepOrder below, which takes the market explicitly rather than reading
- *  component state, to avoid acting on a stale value the instant a step
- *  transition and a market change happen in the same click. */
-type Step = "match" | "market" | "line" | "prediction" | "stake";
-
-function stepOrder(market: Market): Step[] {
-  return market === "total_goals" ? ["match", "market", "line", "prediction", "stake"] : ["match", "market", "prediction", "stake"];
-}
+ *  explicit submit, since it's typed input, not a tap). Always exactly 4
+ *  steps regardless of market — total_goals' line picker lives INSIDE the
+ *  "prediction" step (see the goal-line stepper below) rather than as its
+ *  own step, since a line by itself isn't a decision worth a whole screen
+ *  the way over/under vs. it is. */
+type Step = "match" | "market" | "prediction" | "stake";
+const STEP_ORDER: Step[] = ["match", "market", "prediction", "stake"];
 
 const MARKETS: { key: Market; icon: "target" | "goal" | "handshake" }[] = [
   { key: "1x2", icon: "target" },
@@ -139,42 +136,39 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
   const [matchId, setMatchId] = useState<string>(hasValidPreselection ? initialMatchId! : "");
   const [step, setStep] = useState<Step>(hasValidPreselection ? "market" : "match");
   const [market, setMarket] = useState<Market>("1x2");
+  // Defaults to the middle line the moment total_goals is picked (see
+  // selectMarket) — there's no separate "choose a line" screen to set it on
+  // anymore, so it needs a sensible value from the start; the stepper in the
+  // prediction step lets the user change it before committing.
   const [line, setLine] = useState<number | null>(null);
   const [prediction, setPrediction] = useState<PredictionKey | null>(null);
   const [stake, setStake] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [matchQuery, setMatchQuery] = useState("");
 
-  function goNext(current: Step, currentMarket: Market) {
-    const order = stepOrder(currentMarket);
-    const idx = order.indexOf(current);
-    setStep(order[idx + 1] ?? current);
+  function goNext(current: Step) {
+    const idx = STEP_ORDER.indexOf(current);
+    setStep(STEP_ORDER[idx + 1] ?? current);
   }
   function goBack() {
-    const order = stepOrder(market);
-    const idx = order.indexOf(step);
-    if (idx > 0) setStep(order[idx - 1]);
+    const idx = STEP_ORDER.indexOf(step);
+    if (idx > 0) setStep(STEP_ORDER[idx - 1]);
   }
 
   function selectMatch(id: string) {
     setMatchId(id);
     setPrediction(null);
-    goNext("match", market);
+    goNext("match");
   }
   function selectMarket(next: Market) {
     setMarket(next);
-    setLine(null);
+    setLine(next === "total_goals" ? 2.5 : null);
     setPrediction(null);
-    goNext("market", next);
-  }
-  function selectLine(l: number) {
-    setLine(l);
-    setPrediction(null);
-    goNext("line", market);
+    goNext("market");
   }
   function selectPrediction(p: PredictionKey) {
     setPrediction(p);
-    goNext("prediction", market);
+    goNext("prediction");
   }
 
   // If the selected match ages out (its kickoff passes while this form is
@@ -190,10 +184,8 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
 
   const selectedMatch = openMatches.find((m) => m.id === matchId);
   const stakeNum = Number(stake) || 0;
-  const needsLine = market === "total_goals";
-  const canSubmit = !!matchId && !!prediction && (!needsLine || line !== null) && stakeNum > 0;
-  const order = stepOrder(market);
-  const stepIndex = order.indexOf(step) + 1;
+  const canSubmit = !!matchId && !!prediction && (market !== "total_goals" || line !== null) && stakeNum > 0;
+  const stepIndex = STEP_ORDER.indexOf(step) + 1;
 
   // Knockout fixtures always produce a winner (extra time/penalties), so
   // "Empate" is never a valid prediction for 1x2 on one — total_goals/btts
@@ -253,7 +245,7 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
       {/* ── Step: match ─────────────────────────────────────────── */}
       {step === "match" && (
         <section className="flex flex-col gap-4">
-          <StepHeader title="Escolhe o jogo" stepIndex={stepIndex} stepCount={order.length} onBack={null} />
+          <StepHeader title="Escolhe o jogo" stepIndex={stepIndex} stepCount={STEP_ORDER.length} onBack={null} />
           <div className="relative">
             <Input
               value={matchQuery}
@@ -305,7 +297,7 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
       {/* ── Step: market ────────────────────────────────────────── */}
       {step === "market" && selectedMatch && (
         <section className="flex flex-col gap-4">
-          <StepHeader title="Em que queres apostar" stepIndex={stepIndex} stepCount={order.length} onBack={goBack} />
+          <StepHeader title="Em que queres apostar" stepIndex={stepIndex} stepCount={STEP_ORDER.length} onBack={goBack} />
           <SelectedMatchSummary match={selectedMatch} />
           <div className="grid grid-cols-3 gap-2.5">
             {MARKETS.map((m) => (
@@ -313,35 +305,14 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
                 key={m.key}
                 selected={market === m.key}
                 onSelect={() => selectMarket(m.key)}
-                ariaLabel={MARKET_LABEL[m.key]}
+                ariaLabel={`${MARKET_LABEL[m.key]} — ${MARKET_DESCRIPTION[m.key]}`}
                 className="flex flex-col items-center gap-2 p-3.5 text-center"
               >
                 <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
                   {m.icon === "target" ? <Target className="size-4" /> : m.icon === "goal" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
                 </span>
                 <span className="text-xs font-semibold leading-tight">{MARKET_LABEL[m.key]}</span>
-              </OptionCard>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Step: line (total_goals only) ──────────────────────── */}
-      {step === "line" && selectedMatch && (
-        <section className="flex flex-col gap-4">
-          <StepHeader title="Linha de golos" stepIndex={stepIndex} stepCount={order.length} onBack={goBack} />
-          <SelectedMatchSummary match={selectedMatch} />
-          <p className="-mt-2 text-xs text-muted-foreground">Vais apostar se o total de golos do jogo fica acima ou abaixo desta linha.</p>
-          <div className="grid grid-cols-3 gap-2.5">
-            {TOTAL_GOALS_LINES.map((l) => (
-              <OptionCard
-                key={l}
-                selected={line === l}
-                onSelect={() => selectLine(l)}
-                ariaLabel={`Linha ${l.toFixed(1)} golos`}
-                className="flex items-center justify-center p-3.5 text-center"
-              >
-                <span className="text-sm font-bold">{l.toFixed(1)}</span>
+                <span className="text-[10px] leading-snug text-muted-foreground">{MARKET_DESCRIPTION[m.key]}</span>
               </OptionCard>
             ))}
           </div>
@@ -351,10 +322,50 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
       {/* ── Step: prediction ────────────────────────────────────── */}
       {step === "prediction" && selectedMatch && (
         <section className="flex flex-col gap-4">
-          <StepHeader title="A tua previsão" stepIndex={stepIndex} stepCount={order.length} onBack={goBack} />
+          <StepHeader title="A tua previsão" stepIndex={stepIndex} stepCount={STEP_ORDER.length} onBack={goBack} />
           <SelectedMatchSummary match={selectedMatch} />
           {market === "1x2" && selectedMatch.isElimination && (
             <p className="-mt-2 text-xs font-medium text-muted-foreground">Jogo de eliminação — não há opção de empate, há sempre um vencedor.</p>
+          )}
+          {market === "total_goals" && line != null && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                Escolhe a linha de golos do jogo todo — depois diz se achas que vai ficar acima ou abaixo dela.
+              </p>
+              <div className="flex items-center justify-center gap-4 rounded-2xl border border-border bg-card px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const idx = TOTAL_GOALS_LINES.indexOf(line as (typeof TOTAL_GOALS_LINES)[number]);
+                    if (idx > 0) {
+                      setLine(TOTAL_GOALS_LINES[idx - 1]);
+                      setPrediction(null);
+                    }
+                  }}
+                  disabled={line <= TOTAL_GOALS_LINES[0]}
+                  className="press flex size-9 items-center justify-center rounded-full border border-border text-lg font-bold text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-label="Linha mais baixa"
+                >
+                  −
+                </button>
+                <span className="min-w-16 text-center text-2xl font-extrabold tabular-nums">{line.toFixed(1)}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const idx = TOTAL_GOALS_LINES.indexOf(line as (typeof TOTAL_GOALS_LINES)[number]);
+                    if (idx < TOTAL_GOALS_LINES.length - 1) {
+                      setLine(TOTAL_GOALS_LINES[idx + 1]);
+                      setPrediction(null);
+                    }
+                  }}
+                  disabled={line >= TOTAL_GOALS_LINES[TOTAL_GOALS_LINES.length - 1]}
+                  className="press flex size-9 items-center justify-center rounded-full border border-border text-lg font-bold text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-label="Linha mais alta"
+                >
+                  +
+                </button>
+              </div>
+            </div>
           )}
           <div className={`grid gap-2.5 ${availablePredictions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
             {availablePredictions.map((p) => (
@@ -397,7 +408,7 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
       {/* ── Step: stake ─────────────────────────────────────────── */}
       {step === "stake" && selectedMatch && (
         <section className="flex flex-col gap-4">
-          <StepHeader title="Valor da aposta" stepIndex={stepIndex} stepCount={order.length} onBack={goBack} />
+          <StepHeader title="Valor da aposta" stepIndex={stepIndex} stepCount={STEP_ORDER.length} onBack={goBack} />
           <SelectedMatchSummary match={selectedMatch} />
           <div>
             <p className="mb-2 text-xs text-muted-foreground">
