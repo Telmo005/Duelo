@@ -7,7 +7,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { db } from "@/db";
 import { matches, bets } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { fetchTeamLogo, searchTeams, searchFixturesByDate, fetchFixtureById, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
+import { fetchTeamLogo, searchTeams, searchFixturesInRange, fetchFixtureById, type TeamSearchResult, type FixtureSearchResult } from "@/lib/sportsData";
 import { writeLiveScore, syncLiveMatchesFromApi, attemptAutoSettleIfConfirmed, type LiveSyncResult } from "@/lib/liveScoreSync";
 import { importUpcomingFixtures, type ImportResult } from "@/lib/fixtures-import";
 import { parseMozambiqueDateTimeLocal, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
@@ -60,14 +60,19 @@ export async function searchTeamsAction(query: string): Promise<TeamSearchResult
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Backs the "Procurar jogo real" picker in the add-match form — see
- *  searchFixturesByDate for the exact date-range window it covers.
+/** Backs the "Procurar jogo real" picker in the add-match form — fetches
+ *  the WHOLE date range the picker offers (Hoje/Amanhã/Depois de amanhã) in
+ *  one call, not once per day button. See searchFixturesInRange for why:
+ *  fetching per single date used to mean 13 requests PER tab, so clicking
+ *  through the 3 tabs could burn ~39 requests and trip the 10/minute
+ *  ceiling (this happened in production). The picker now fetches once and
+ *  filters the exact date client-side, so switching tabs costs nothing.
  *  Admin-gated for the same reason searchTeamsAction is: keeps external API
  *  calls restricted to trusted callers. */
-export async function searchFixturesAction(date: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
+export async function searchFixturesAction(dateFrom: string, dateTo: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
   await requireAdmin();
-  if (!DATE_RE.test(date)) return { fixtures: [], error: "Data inválida" };
-  return searchFixturesByDate(date);
+  if (!DATE_RE.test(dateFrom) || !DATE_RE.test(dateTo)) return { fixtures: [], error: "Data inválida" };
+  return searchFixturesInRange(dateFrom, dateTo);
 }
 
 const bulkFixtureSchema = z.object({
@@ -80,7 +85,7 @@ const bulkFixtureSchema = z.object({
   kickoffAtIso: z.coerce.date(),
   homeLogoUrl: z.string().url().nullable().optional(),
   awayLogoUrl: z.string().url().nullable().optional(),
-  // Derived from the API round name (searchFixturesByDate) — true only for
+  // Derived from the API round name (searchFixturesInRange) — true only for
   // rounds that always produce a decisive result (a final), never guessed
   // for two-legged rounds. Defaults to false so an older client payload
   // missing the field never silently blocks a legitimate draw.

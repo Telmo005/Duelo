@@ -123,8 +123,8 @@ function parseFixtureSearchResult(fx: RawMatch): FixtureSearchResult | null {
 type FixtureSearchOutcome = { fixtures: FixtureSearchResult[]; error?: string };
 
 /**
- * Lists real fixtures across every competition this token can see, for a
- * given date — powers the "Procurar jogo real" admin picker.
+ * Lists real fixtures across every competition this token can see, within a
+ * date RANGE (inclusive) — powers the "Procurar jogo real" admin picker.
  *
  * Queries per-competition (like searchTeams below), NOT the unfiltered
  * `/matches?dateFrom=&dateTo=` endpoint — confirmed directly against the
@@ -135,26 +135,30 @@ type FixtureSearchOutcome = { fixtures: FixtureSearchResult[]; error?: string };
  * returned it correctly). A Free-tier quirk of that endpoint, not a bug on
  * our side — looping per-competition sidesteps it entirely.
  *
- * This alone is 13 sequential requests in one call — already at/over the
- * 10-requests/minute ceiling by itself if it ever needs to run twice close
- * together (e.g. an admin re-clicking the same day, or two admins
- * searching around the same time). Wrapped in unstable_cache per exact
- * date (10 min) so the 13-request cost is paid at most once per date per
- * cache window, no matter how many times it's clicked — the "Procurar jogo
- * real" picker only ever offers 3 fixed dates (Hoje/Amanhã/Depois de
- * amanhã), so there are at most 3 such cache entries alive at once. One
- * competition erroring (including a 429 if the burst itself trips the
- * limit) just means it contributes no fixtures to this search, not a
- * failure of the whole picker — self-heals on the next cache refresh.
+ * Deliberately takes a RANGE, not a single date — an earlier version took
+ * just one date and got called once per day button (Hoje/Amanhã/Depois de
+ * amanhã), which is 13 requests EACH, so clicking through the 3 tabs in the
+ * few seconds an admin naturally would could burn ~39 requests and reliably
+ * trip the 10/minute ceiling (confirmed in production: "Premier League:
+ * Pedido falhou HTTP 429" on the very next tab after a successful first
+ * search). Fetching the whole 3-day window in ONE 13-request sweep and
+ * having the picker filter the single cached result client-side per tab
+ * fixes this at the root — switching tabs costs zero extra requests.
+ * Cached per exact (dateFrom, dateTo) pair (10 min) so even the first,
+ * unavoidable 13-request sweep is paid at most once per window, not once
+ * per page load. One competition erroring (including a 429 if the sweep
+ * itself trips the limit) just means it contributes no fixtures to this
+ * search, not a failure of the whole picker — self-heals on the next cache
+ * refresh.
  */
-const searchFixturesByDateCached = unstable_cache(
-  async (date: string): Promise<FixtureSearchOutcome> => {
+const searchFixturesInRangeCached = unstable_cache(
+  async (dateFrom: string, dateTo: string): Promise<FixtureSearchOutcome> => {
     const fixtures: FixtureSearchResult[] = [];
     const errors: string[] = [];
 
     for (const comp of FOOTBALL_DATA_COMPETITIONS) {
       const { body, error } = await footballDataFetch<{ matches?: RawMatch[] }>(
-        `/competitions/${comp.code}/matches?dateFrom=${date}&dateTo=${date}`
+        `/competitions/${comp.code}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`
       );
       if (error) {
         errors.push(`${comp.name}: ${error}`);
@@ -180,12 +184,12 @@ const searchFixturesByDateCached = unstable_cache(
 
     return { fixtures };
   },
-  ["football-data-fixtures-by-date"],
+  ["football-data-fixtures-in-range"],
   { revalidate: 600 }
 );
 
-export async function searchFixturesByDate(date: string): Promise<FixtureSearchOutcome> {
-  return searchFixturesByDateCached(date);
+export async function searchFixturesInRange(dateFrom: string, dateTo: string): Promise<FixtureSearchOutcome> {
+  return searchFixturesInRangeCached(dateFrom, dateTo);
 }
 
 /** Match statuses that mean the fixture is genuinely OVER as scheduled —
