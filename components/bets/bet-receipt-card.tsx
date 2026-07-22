@@ -3,14 +3,14 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Check, Copy, Handshake, Lock, Share2, X, Trophy, RotateCcw, Clock, Swords, Goal } from "lucide-react";
+import { Check, Copy, Handshake, Lock, Share2, X, Trophy, RotateCcw, Clock, Swords } from "lucide-react";
 import { TeamBadge } from "@/components/match/team-badge";
 import { ActionButton } from "@/components/ui/action-button";
 import { OptionCard } from "@/components/ui/option-card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { acceptBetAction, cancelBetAction } from "@/lib/actions/bets";
 import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
-import { marketPredictions, marketLabel, MARKET_ACCENT, type Market } from "@/lib/betMarkets";
+import { marketPredictions, marketLabel, MARKET_EMOJI, MARKET_EMOJI_GRAYSCALE, MARKET_ACCENT, type Market } from "@/lib/betMarkets";
 import type { BetReceipt } from "@/lib/bets";
 
 const STATUS_LABEL: Record<BetReceipt["status"], { label: string; className: string }> = {
@@ -363,12 +363,12 @@ export function BetReceiptCard({
                       className="flex flex-col items-center gap-2 p-3.5 text-center"
                     >
                       {market !== "1x2" ? (
-                        <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT[market]]}`} aria-hidden>
-                          {market === "total_goals" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
+                        <span className={`flex size-[30px] items-center justify-center rounded-full text-base leading-none ${MARKET_BADGE_CLASS[MARKET_ACCENT[market]]} ${MARKET_EMOJI_GRAYSCALE[market] ? "grayscale" : ""}`} aria-hidden>
+                          {MARKET_EMOJI[market]}
                         </span>
                       ) : p.key === "draw" ? (
-                        <span className={`flex size-[30px] items-center justify-center rounded-full ${MARKET_BADGE_CLASS[MARKET_ACCENT["1x2"]]}`} aria-hidden>
-                          <Handshake className="size-4" />
+                        <span className={`flex size-[30px] items-center justify-center rounded-full text-base leading-none ${MARKET_BADGE_CLASS[MARKET_ACCENT["1x2"]]}`} aria-hidden>
+                          🤝
                         </span>
                       ) : (
                         <TeamBadge
@@ -397,16 +397,42 @@ export function BetReceiptCard({
 
       <div className="mx-5 border-t border-dashed border-border" />
 
-      {/* Money breakdown — itemised like a till slip */}
+      {/* Money breakdown — itemised like a till slip. Always leads with
+       *  "Entrada" (the original stake) regardless of outcome, so someone
+       *  who forgot how much they staked can always find it here — and the
+       *  final line always reflects what actually happened to THIS
+       *  viewer's own money, never the opponent's payout shown out of
+       *  context (a loser used to see the winner's green payout number
+       *  under a bare "RESULTADO" label, which read as "money you're about
+       *  to receive" even though they got nothing). */}
       <div className="px-5 py-3 font-mono">
         {bet.status === "settled" ? (
-          <ReceiptLine
-            label={bet.winnerId === viewerId ? "GANHASTE" : "RESULTADO"}
-            emphasis
-            value={`MT ${formatCentsAsMt(bet.payoutCents)}`}
-            valueClassName="text-success"
-          />
-        ) : bet.refundReason === "no_correct_prediction" && bet.refundFeeCents != null ? (
+          bet.winnerId === viewerId ? (
+            <>
+              <ReceiptLine label="Entrada" value={`MT ${formatCentsAsMt(bet.stakeCents)}`} />
+              <ReceiptLine label="Pote total" value={`MT ${formatCentsAsMt(bet.potCents)}`} />
+              <ReceiptLine label="Comissão (10%)" value={`-MT ${formatCentsAsMt(bet.commissionCents)}`} muted />
+              <div className="my-1 border-t border-dashed border-border" />
+              <ReceiptLine label="GANHASTE" emphasis value={`MT ${formatCentsAsMt(bet.payoutCents)}`} valueClassName="text-success" />
+            </>
+          ) : isParticipant ? (
+            <>
+              <ReceiptLine label="Entrada" value={`MT ${formatCentsAsMt(bet.stakeCents)}`} />
+              <div className="my-1 border-t border-dashed border-border" />
+              <ReceiptLine label="PERDESTE" emphasis value={`-MT ${formatCentsAsMt(bet.stakeCents)}`} valueClassName="text-destructive" />
+            </>
+          ) : (
+            // Third party (or logged-out visitor) following a shared link —
+            // nobody's own money to frame as won/lost, just what was on the
+            // table.
+            <>
+              <ReceiptLine label="Entrada de cada lado" value={`MT ${formatCentsAsMt(bet.stakeCents)}`} />
+              <ReceiptLine label="Pote total" value={`MT ${formatCentsAsMt(bet.potCents)}`} />
+              <div className="my-1 border-t border-dashed border-border" />
+              <ReceiptLine label="PRÉMIO PAGO" emphasis value={`MT ${formatCentsAsMt(bet.payoutCents)}`} valueClassName="text-success" />
+            </>
+          )
+        ) : bet.status === "refunded" && bet.refundReason === "no_correct_prediction" && bet.refundFeeCents != null ? (
           // Partial refund (migration 0036) — shown explicitly, not folded
           // into the generic "devolvido" messaging below, so nobody is
           // surprised their balance went up by less than the full stake.
@@ -420,6 +446,15 @@ export function BetReceiptCard({
               value={`MT ${formatCentsAsMt(bet.stakeCents - bet.refundFeeCents)}`}
               valueClassName="text-locked"
             />
+          </>
+        ) : bet.status === "refunded" || bet.status === "cancelled" ? (
+          // Full refund — either the fixture was voided/postponed, nobody
+          // ever accepted, or the creator cancelled before anyone did. All
+          // three return the whole stake, no commission, nothing retained.
+          <>
+            <ReceiptLine label="Entrada" value={`MT ${formatCentsAsMt(bet.stakeCents)}`} />
+            <div className="my-1 border-t border-dashed border-border" />
+            <ReceiptLine label="DEVOLVIDO" emphasis value={`MT ${formatCentsAsMt(bet.stakeCents)}`} valueClassName="text-locked" />
           </>
         ) : (
           <>
