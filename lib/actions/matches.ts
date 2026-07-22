@@ -414,11 +414,12 @@ export async function updateLiveScoreFromApiAction(matchId: string): Promise<Liv
 export type BulkLiveRefreshResult = LiveSyncResult;
 
 /**
- * Refreshes every tracked 'live'/'needs_review' match linked to the API in
- * ONE request (syncLiveMatchesFromApi — football-data.org's status=LIVE
- * filter), instead of clicking "Última atualização" once per match. Backs the
- * "Atualizar jogos ao vivo" button (app/(app)/admin/matches). The same core
- * also runs automatically off the live-score sync cron (see
+ * Refreshes every tracked 'live'/'needs_review' match linked to the API
+ * (syncLiveMatchesFromApi — one request for everything currently live, plus
+ * a per-match fallback for any that just finished, see that function's doc
+ * comment), instead of clicking "Última atualização" once per match. Backs
+ * the "Atualizar jogos ao vivo" button (app/(app)/admin/matches). The same
+ * core also runs automatically off the live-score sync cron (see
  * app/api/cron/live-score-sync) — this is just the admin-triggered,
  * on-demand path into it.
  */
@@ -434,8 +435,7 @@ export async function refreshAllLiveMatchesAction(): Promise<BulkLiveRefreshResu
 }
 
 /** Manual trigger for importUpcomingFixtures() — lets an admin test/force an
- *  import pass (e.g. right after upgrading the API-Football plan) without
- *  waiting for the next cron tick. */
+ *  import pass without waiting for the next cron tick. */
 export async function importFixturesAction(): Promise<ImportResult> {
   const admin = await requireAdmin();
 

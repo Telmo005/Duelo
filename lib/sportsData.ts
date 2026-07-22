@@ -235,13 +235,19 @@ type CachedTeam = { id: number; name: string; crest: string; country: string };
 /** One competition's full team roster, cached a full day — team rosters
  *  don't change minute to minute, and caching means a search never spends
  *  more than the first request of the day per competition (13 competitions
- *  fetched once every 24h each, not once per keystroke). */
+ *  fetched once every 24h each, not once per keystroke). Throws rather than
+ *  returning [] on a failed fetch — unstable_cache does NOT cache a thrown
+ *  error, only a returned value, so a transient failure (429, network blip)
+ *  gets retried on the next search instead of that competition silently
+ *  reading as "zero teams" for a full day (which returning [] here would
+ *  have cached as if it were a real, successful empty result). Callers
+ *  must catch per competition — see searchTeams. */
 const getCompetitionTeams = unstable_cache(
   async (code: string): Promise<CachedTeam[]> => {
     const { body, error } = await footballDataFetch<{ teams?: Array<{ id: number; name: string; crest?: string; area?: RawArea }> }>(
       `/competitions/${code}/teams`
     );
-    if (error || !body?.teams) return [];
+    if (error || !body?.teams) throw new Error(error ?? `sem dados de equipas para ${code}`);
     return body.teams.map((t) => ({ id: t.id, name: t.name, crest: t.crest ?? "", country: t.area?.name ?? "" }));
   },
   ["football-data-competition-teams"],
@@ -305,7 +311,15 @@ export async function searchTeams(query: string): Promise<TeamSearchResult[]> {
   const results: TeamSearchResult[] = [];
 
   for (const comp of FOOTBALL_DATA_COMPETITIONS) {
-    const teams = await getCompetitionTeams(comp.code);
+    let teams: CachedTeam[];
+    try {
+      teams = await getCompetitionTeams(comp.code);
+    } catch {
+      // getCompetitionTeams throws (never caches) on a failed fetch — skip
+      // this competition for this search; nothing was cached, so the next
+      // search retries it fresh instead of being stuck on a stale failure.
+      continue;
+    }
     for (const team of teams) {
       if (seen.has(team.id)) continue;
       const nameLower = asciiFold(team.name).toLowerCase();

@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { matches, profiles, notifications, liveSyncState } from "@/db/schema";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import { fetchLiveFixtures, type FixtureUpdate } from "@/lib/sportsData";
+import { fetchLiveFixtures, fetchFixtureById, type FixtureUpdate } from "@/lib/sportsData";
 import { createServiceClient } from "@/lib/supabase/server";
 import { broadcastFeedEvent } from "@/lib/realtime";
 import { logError } from "@/lib/errorLog";
@@ -100,6 +100,16 @@ export async function attemptAutoSettleIfConfirmed(
   });
 
   if (error) {
+    // "already processed" specifically means a concurrent caller (e.g. an
+    // admin's manual refresh landing the same instant as this automatic
+    // tick) won the row lock first and settled it correctly — proven safe
+    // under a real concurrent race (both calls hit bet_settle_match at
+    // once; the DB row lock let exactly one through, this is the other).
+    // Not a real failure, so no false-alarm "liquidação falhou" notification
+    // for something that actually succeeded seconds earlier.
+    if (error.message.includes("already processed")) {
+      return { settled: false, settleError: error.message };
+    }
     await logError("auto_settle_match", error, { matchId: match.id, homeGoals: live.homeGoals, awayGoals: live.awayGoals });
     await notifyAdmins(
       "auto_settle_failed",
@@ -123,13 +133,25 @@ export async function attemptAutoSettleIfConfirmed(
 /**
  * Fetches every fixture currently live across every competition this token
  * can see in ONE request (fetchLiveFixtures — football-data.org's
- * status=LIVE filter) and writes it through to every tracked
- * 'live'/'needs_review' match linked to the vendor. Shared core behind both
- * the admin's "Atualizar jogos ao vivo" button (refreshAllLiveMatchesAction)
- * and the automatic sync cron (runLiveScoreAutoSync) — same single-request
- * cost either way, only the trigger differs. Also the place auto-settlement
- * is attempted (attemptAutoSettleIfConfirmed) for every match whose result
- * the vendor has now confirmed twice in a row.
+ * status=LIVE filter, i.e. IN_PLAY or PAUSED only) and writes it through to
+ * every tracked 'live'/'needs_review' match linked to the vendor. Shared
+ * core behind both the admin's "Atualizar jogos ao vivo" button
+ * (refreshAllLiveMatchesAction) and the automatic sync cron
+ * (runLiveScoreAutoSync).
+ *
+ * status=LIVE structurally EXCLUDES FINISHED — the instant a match's real
+ * status flips to FINISHED it drops out of that filter entirely (confirmed
+ * against the live API before this fix), so a tracked match not found in
+ * the LIVE map is not necessarily "the vendor has nothing to say" — it's
+ * very often exactly the tick where the match just ended. Falling back to a
+ * single-fixture lookup (fetchFixtureById) for each such match is what makes
+ * attemptAutoSettleIfConfirmed ever actually see a FINISHED status through
+ * this path at all — without it, the LIVE-only request would never
+ * transition a match out of 'live'/'needs_review' automatically, silently
+ * defeating the whole point of automatic settlement (it would still fall
+ * back fine to the admin's manual per-match button, just never on its own).
+ * Extra cost is one request per match that just dropped off the live list —
+ * negligible given AUTO_SYNC_ELIGIBLE_MINUTES keeps the tracked set tiny.
  */
 export async function syncLiveMatchesFromApi(): Promise<LiveSyncResult> {
   const tracked = await db
@@ -157,7 +179,24 @@ export async function syncLiveMatchesFromApi(): Promise<LiveSyncResult> {
   const missing: string[] = [];
 
   for (const match of tracked) {
-    const live = liveByExternalId.get(match.externalId!);
+    let live = liveByExternalId.get(match.externalId!);
+
+    // Not in the LIVE map — could genuinely be "vendor has nothing yet", but
+    // is very often "just finished" (see doc comment above). One targeted
+    // lookup settles which, at the cost of a single extra request.
+    if (!live || live.homeGoals == null || live.awayGoals == null) {
+      const fallback = await fetchFixtureById(match.externalId!);
+      if (fallback.error) {
+        // Swallowed into "missing" below either way (never blocks the rest
+        // of the batch), but logged so a real recurring cause (bad
+        // external_id, vendor hiccup) is visible on /admin/errors instead
+        // of silently looking identical to "vendor genuinely has nothing
+        // yet" forever.
+        await logError("live_score_sync_fallback", new Error(fallback.error), { matchId: match.id, externalId: match.externalId });
+      }
+      live = fallback.data;
+    }
+
     if (!live || live.homeGoals == null || live.awayGoals == null) {
       missing.push(`${match.home} vs ${match.away}`);
       continue;

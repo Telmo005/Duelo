@@ -7,9 +7,11 @@ import { refreshAllLiveMatchesAction } from "@/lib/actions/matches";
 import { Spinner } from "@/components/ui/spinner";
 
 /** Refreshes every 'live'/'needs_review' match linked to the API in one
- *  request (live=all) instead of clicking "Última atualização" per row —
- *  see refreshAllLiveMatchesAction for why a match can still come back
- *  listed as "sem dados" (it most likely already finished). */
+ *  request (football-data.org's status=LIVE filter, plus a per-match
+ *  fallback for anything that just finished — see syncLiveMatchesFromApi)
+ *  instead of clicking "Última atualização" per row. A match can still come
+ *  back listed as "sem dados" if even the fallback finds nothing (e.g. not
+ *  actually started yet on the vendor's side). */
 export function RefreshLiveMatchesButton() {
   const [isPending, startTransition] = useTransition();
 
