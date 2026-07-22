@@ -3,13 +3,14 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Check, Copy, Handshake, Lock, Share2, X, Trophy, RotateCcw, Clock, Swords } from "lucide-react";
+import { Check, Copy, Handshake, Lock, Share2, X, Trophy, RotateCcw, Clock, Swords, Goal } from "lucide-react";
 import { TeamBadge } from "@/components/match/team-badge";
 import { ActionButton } from "@/components/ui/action-button";
 import { OptionCard } from "@/components/ui/option-card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { acceptBetAction, cancelBetAction } from "@/lib/actions/bets";
 import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
+import { marketPredictions, marketLabel, type Market } from "@/lib/betMarkets";
 import type { BetReceipt } from "@/lib/bets";
 
 const STATUS_LABEL: Record<BetReceipt["status"], { label: string; className: string }> = {
@@ -26,13 +27,7 @@ const REFUND_MESSAGE: Record<NonNullable<BetReceipt["refundReason"]>, string> = 
   no_correct_prediction: "Nenhuma previsão acertou o resultado — valor devolvido",
 };
 
-const PREDICTIONS = [
-  { key: "home", code: "1" },
-  { key: "draw", code: "X" },
-  { key: "away", code: "2" },
-] as const;
-
-type PredictionKey = (typeof PREDICTIONS)[number]["key"];
+type PredictionKey = string;
 
 /** One line of the money breakdown, styled like a till receipt: label, a
  *  dotted leader that stretches to fill whatever space is left, then the
@@ -84,18 +79,20 @@ export function BetReceiptCard({
   // as a spammy tracking link once it lands in someone else's WhatsApp.
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/d/${bet.reference}` : "";
 
-  // The opponent bets on one of the outcomes the creator DIDN'T call —
-  // never both, so accepting means picking exactly one. A knockout fixture
-  // only leaves one outcome once the creator's pick and "draw" are both
-  // excluded, so there's nothing to actually choose there.
+  const market = bet.market;
+
+  // The opponent bets on one of the outcomes the creator DIDN'T call — never
+  // both, so accepting means picking exactly one. For 1x2 a knockout fixture
+  // leaves exactly one outcome once the creator's pick and "draw" are both
+  // excluded; total_goals/btts are inherently two-sided, so excluding the
+  // creator's pick ALWAYS leaves exactly one — there's never really a
+  // choice for those two markets, just a confirmation of the other side.
   function predictionLabel(p: PredictionKey) {
-    if (p === "home") return `${bet.match.home} ganha`;
-    if (p === "away") return `${bet.match.away} ganha`;
-    return "Empate";
+    return marketLabel(market, p, bet.line, bet.match.home, bet.match.away);
   }
-  const availableOpponentPredictions = PREDICTIONS.filter(
-    (p) => p.key !== bet.prediction && !(bet.match.isElimination && p.key === "draw")
-  );
+  const availableOpponentPredictions = marketPredictions(market, bet.match.isElimination)
+    .filter((p) => p !== bet.prediction)
+    .map((p) => ({ key: p }));
   const [pickedPrediction, setPickedPrediction] = useState<PredictionKey | null>(null);
   const effectiveOpponentPrediction =
     availableOpponentPredictions.length === 1 ? availableOpponentPredictions[0].key : pickedPrediction;
@@ -204,7 +201,10 @@ export function BetReceiptCard({
 
   const bySide: Partial<Record<PredictionKey, Slot>> = { [bet.prediction]: creatorSlot };
   if (opponentSlot && opponentSide) bySide[opponentSide] = opponentSlot;
-  const showDrawColumn = !!bySide.draw;
+  // Every possible side for this bet's market, in display order — 3 columns
+  // for 1x2 (home/draw/away), 2 for total_goals/btts (no draw concept at
+  // all, so this is never a 3-column layout for those).
+  const orderedSides = marketPredictions(market, bet.match.isElimination);
   const emptySlotText = bet.status === "waiting" ? "por decidir…" : "—";
 
   function renderSlot(slot: Slot | undefined) {
@@ -311,29 +311,24 @@ export function BetReceiptCard({
           </div>
           <div className="flex flex-col items-center gap-1 px-3 py-4 text-center">{renderSlot(legacyOpponentSlot)}</div>
         </div>
-      ) : showDrawColumn ? (
-        <div className="grid grid-cols-3">
-          <div className="flex flex-col items-center gap-1 border-r border-dashed border-border px-2 py-4 text-center">
-            {renderSlot(bySide.home)}
-          </div>
-          <div className="flex flex-col items-center gap-1 border-r border-dashed border-border px-2 py-4 text-center">
-            {renderSlot(bySide.draw)}
-          </div>
-          <div className="flex flex-col items-center gap-1 px-2 py-4 text-center">{renderSlot(bySide.away)}</div>
-        </div>
       ) : (
-        <div className="grid grid-cols-2">
-          <div className="flex flex-col items-center gap-1 border-r border-dashed border-border px-3 py-4 text-center">
-            {renderSlot(bySide.home)}
-          </div>
-          <div className="flex flex-col items-center gap-1 px-3 py-4 text-center">{renderSlot(bySide.away)}</div>
+        <div className={`grid ${orderedSides.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+          {orderedSides.map((side, i) => (
+            <div
+              key={side}
+              className={`flex flex-col items-center gap-1 px-2 py-4 text-center ${i < orderedSides.length - 1 ? "border-r border-dashed border-border" : ""}`}
+            >
+              {renderSlot(bySide[side])}
+            </div>
+          ))}
         </div>
       )}
 
       {/* Choose your side — only for a prospective acceptor, before they've
-       *  committed. A knockout fixture leaves exactly one outcome once the
-       *  creator's pick and "draw" are excluded, so it's shown as a fact,
-       *  not a choice — nothing to actually pick there. */}
+       *  committed. Only ever a real choice for 1x2 (and even then, only
+       *  when NOT a knockout fixture with 'draw' excluded) — total_goals and
+       *  btts are both inherently two-sided, so excluding the creator's pick
+       *  always leaves exactly one, shown as a fact rather than a choice. */}
       {canAcceptHere && (
         <>
           <div className="mx-5 border-t border-dashed border-border" />
@@ -353,7 +348,11 @@ export function BetReceiptCard({
                       ariaLabel={predictionLabel(p.key)}
                       className="flex flex-col items-center gap-2 p-3.5 text-center"
                     >
-                      {p.key === "draw" ? (
+                      {market !== "1x2" ? (
+                        <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
+                          <Goal className="size-4" />
+                        </span>
+                      ) : p.key === "draw" ? (
                         <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
                           <Handshake className="size-4" />
                         </span>
@@ -371,7 +370,10 @@ export function BetReceiptCard({
               </>
             ) : (
               <p className="text-center text-sm">
-                Jogo de eliminação — só resta um resultado possível. Vais apostar em{" "}
+                {market === "1x2"
+                  ? "Jogo de eliminação — só resta um resultado possível."
+                  : "Este mercado só tem duas opções."}{" "}
+                Vais apostar em{" "}
                 <span className="font-bold text-foreground">{predictionLabel(availableOpponentPredictions[0].key)}</span>.
               </p>
             )}

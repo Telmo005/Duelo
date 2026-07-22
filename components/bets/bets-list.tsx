@@ -6,6 +6,7 @@ import { Swords } from "lucide-react";
 import type { UserBetRow, UserBetsTab } from "@/lib/profile";
 import { getUserBetsPageAction } from "@/lib/actions/profile";
 import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
+import { marketLabel, type Market } from "@/lib/betMarkets";
 import { Spinner } from "@/components/ui/spinner";
 
 const TABS: { key: UserBetsTab; label: string }[] = [
@@ -26,7 +27,7 @@ function statusMeta(bet: UserBetRow) {
 }
 
 function predictionLabel(bet: UserBetRow) {
-  const pick = bet.prediction === "home" ? bet.matchHome : bet.prediction === "away" ? bet.matchAway : "Empate";
+  const pick = marketLabel(bet.market as Market, bet.prediction, bet.line, bet.matchHome, bet.matchAway);
   return bet.isCreator ? pick : `Contra: ${pick}`;
 }
 

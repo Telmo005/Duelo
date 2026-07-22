@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Lock, Handshake, CalendarX, Search } from "lucide-react";
+import { Lock, Handshake, CalendarX, Search, Goal, Target } from "lucide-react";
 import { createBetAction } from "@/lib/actions/bets";
 import { TeamBadge } from "@/components/match/team-badge";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -10,6 +10,7 @@ import { InfoRow } from "@/components/ui/info-row";
 import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
 import { groupByLeague } from "@/lib/leagueTiers";
+import { MARKET_LABEL, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
 
 export type MatchOption = {
   id: string;
@@ -37,13 +38,13 @@ export type MatchOption = {
   isElimination: boolean;
 };
 
-const PREDICTIONS = [
-  { key: "home", code: "1" },
-  { key: "draw", code: "X" },
-  { key: "away", code: "2" },
-] as const;
+type PredictionKey = string;
 
-type PredictionKey = (typeof PREDICTIONS)[number]["key"];
+const MARKETS: { key: Market; icon: "target" | "goal" | "handshake" }[] = [
+  { key: "1x2", icon: "target" },
+  { key: "total_goals", icon: "goal" },
+  { key: "btts", icon: "handshake" },
+];
 
 const QUICK_STAKES = [10, 50, 100, 500, 1000];
 
@@ -69,10 +70,18 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
   // preselection (direct /bets/new visit, or a stale/removed matchId).
   const preselected = initialMatchId && openMatches.some((m) => m.id === initialMatchId) ? initialMatchId : openMatches[0]?.id ?? "";
   const [matchId, setMatchId] = useState<string>(preselected);
+  const [market, setMarket] = useState<Market>("1x2");
+  const [line, setLine] = useState<number | null>(null);
   const [prediction, setPrediction] = useState<PredictionKey | null>(null);
   const [stake, setStake] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [matchQuery, setMatchQuery] = useState("");
+
+  function selectMarket(next: Market) {
+    setMarket(next);
+    setLine(null);
+    setPrediction(null);
+  }
 
   // If the selected match ages out (its kickoff passes while this form is
   // open) fall back to the next available one instead of leaving a phantom,
@@ -86,26 +95,27 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
 
   const selectedMatch = openMatches.find((m) => m.id === matchId);
   const stakeNum = Number(stake) || 0;
-  const canSubmit = !!matchId && !!prediction && stakeNum > 0;
+  const needsLine = market === "total_goals";
+  const canSubmit = !!matchId && !!prediction && (!needsLine || line !== null) && stakeNum > 0;
 
   // Knockout fixtures always produce a winner (extra time/penalties), so
-  // "Empate" is never a valid prediction for one — filtered out entirely
-  // rather than shown-but-disabled, since an option nobody can ever win is
-  // worse than no option at all.
-  const availablePredictions = selectedMatch?.isElimination
-    ? PREDICTIONS.filter((p) => p.key !== "draw")
-    : PREDICTIONS;
+  // "Empate" is never a valid prediction for 1x2 on one — total_goals/btts
+  // have no draw concept at all, so isElimination never affects them.
+  const availablePredictions = marketPredictions(market, selectedMatch?.isElimination ?? false).map((key) => ({
+    key,
+    code: marketShortCode(market, key, line),
+  }));
 
-  // Winner receives the full pot minus the platform's 10% commission.
+  // Winner receives the full pot minus the platform's 10% commission —
+  // same math regardless of market, since every market pays out the same
+  // way once a winner is known.
   const pot = stakeNum * 2;
   const payout = pot * 0.9;
   const profit = payout - stakeNum;
 
   function predictionLabel(p: PredictionKey) {
     if (!selectedMatch) return "";
-    if (p === "home") return `${selectedMatch.home} ganha`;
-    if (p === "away") return `${selectedMatch.away} ganha`;
-    return "Empate";
+    return marketLabel(market, p, line, selectedMatch.home, selectedMatch.away);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -113,7 +123,11 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
     if (!canSubmit) return;
     setError(null);
     startTransition(async () => {
-      const result = await createBetAction({ matchId, prediction: prediction!, stakeMt: stake });
+      const result = await createBetAction(
+        market === "total_goals"
+          ? { market, matchId, prediction: prediction!, line: line!, stakeMt: stake }
+          : { market, matchId, prediction: prediction!, stakeMt: stake }
+      );
       if (result?.error) setError(result.error);
     });
   }
@@ -157,11 +171,57 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
         </div>
       )}
 
-      {/* ── Step 1: prediction ─────────────────────────────────── */}
+      {/* ── Step 1: market ─────────────────────────────────────── */}
       {selectedMatch && (
         <section>
-          <SectionLabel step={1}>A tua previsão</SectionLabel>
-          {selectedMatch.isElimination && (
+          <SectionLabel step={1}>Mercado</SectionLabel>
+          <div className="grid grid-cols-3 gap-2.5">
+            {MARKETS.map((m) => (
+              <OptionCard
+                key={m.key}
+                selected={market === m.key}
+                onSelect={() => selectMarket(m.key)}
+                ariaLabel={MARKET_LABEL[m.key]}
+                className="flex flex-col items-center gap-2 p-3.5 text-center"
+              >
+                <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
+                  {m.icon === "target" ? <Target className="size-4" /> : m.icon === "goal" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
+                </span>
+                <span className="text-xs font-semibold leading-tight">{MARKET_LABEL[m.key]}</span>
+              </OptionCard>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Step 2 (total_goals only): line ────────────────────── */}
+      {selectedMatch && needsLine && (
+        <section>
+          <SectionLabel step={2}>Linha de golos</SectionLabel>
+          <div className="grid grid-cols-3 gap-2.5">
+            {TOTAL_GOALS_LINES.map((l) => (
+              <OptionCard
+                key={l}
+                selected={line === l}
+                onSelect={() => {
+                  setLine(l);
+                  setPrediction(null);
+                }}
+                ariaLabel={`Linha ${l.toFixed(1)} golos`}
+                className="flex items-center justify-center p-3.5 text-center"
+              >
+                <span className="text-sm font-bold">{l.toFixed(1)}</span>
+              </OptionCard>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Step: prediction ───────────────────────────────────── */}
+      {selectedMatch && (!needsLine || line !== null) && (
+        <section>
+          <SectionLabel step={needsLine ? 3 : 2}>A tua previsão</SectionLabel>
+          {market === "1x2" && selectedMatch.isElimination && (
             <p className="mb-2.5 -mt-1 text-xs font-medium text-muted-foreground">
               Jogo de eliminação — não há opção de empate, há sempre um vencedor.
             </p>
@@ -175,7 +235,11 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
                 ariaLabel={predictionLabel(p.key)}
                 className="flex flex-col items-center gap-2 p-3.5 text-center"
               >
-                {p.key === "draw" ? (
+                {market !== "1x2" ? (
+                  <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
+                    {market === "total_goals" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
+                  </span>
+                ) : p.key === "draw" ? (
                   <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
                     <Handshake className="size-4" />
                   </span>
@@ -200,9 +264,9 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
         </section>
       )}
 
-      {/* ── Step 2: stake ──────────────────────────────────────── */}
+      {/* ── Step: stake ────────────────────────────────────────── */}
       <section>
-        <SectionLabel step={2} htmlFor="stake">Valor da aposta</SectionLabel>
+        <SectionLabel step={needsLine ? 4 : 3} htmlFor="stake">Valor da aposta</SectionLabel>
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 transition-colors focus-within:border-primary">
           <input
             id="stake"
