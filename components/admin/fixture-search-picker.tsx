@@ -10,6 +10,7 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { Spinner } from "@/components/ui/spinner";
 import { ActionButton } from "@/components/ui/action-button";
 import { leagueRank } from "@/lib/leagueTiers";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import type { FixtureSearchResult } from "@/lib/sportsData";
 
 /** "YYYY-MM-DD" in the browser's LOCAL date, `offsetDays` from today — same
@@ -247,7 +248,7 @@ export function FixtureSearchPicker() {
                         )}
                       </span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {fx.league} · {new Date(fx.kickoffAtIso).toLocaleTimeString("pt", { hour: "2-digit", minute: "2-digit" })}
+                        {fx.league} · {new Date(fx.kickoffAtIso).toLocaleTimeString("pt", { hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE })}
                       </span>
                     </label>
                   );

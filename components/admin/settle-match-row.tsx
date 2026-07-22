@@ -338,7 +338,7 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
         )}
         {match.liveUpdatedAt && (
           <span className="text-[11px] text-muted-foreground">
-            Última atualização: {new Date(match.liveUpdatedAt).toLocaleTimeString("pt", { hour: "2-digit", minute: "2-digit" })}
+            Última atualização: {new Date(match.liveUpdatedAt).toLocaleTimeString("pt", { hour: "2-digit", minute: "2-digit", timeZone: MOZAMBIQUE_TIMEZONE })}
           </span>
         )}
       </div>
