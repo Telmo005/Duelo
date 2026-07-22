@@ -1,11 +1,12 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { X, TrendingUp, Lock } from "lucide-react";
+import { X, TrendingUp, Lock, Target, Goal, Handshake } from "lucide-react";
 import { CancelBetButton } from "./cancel-bet-button";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCentsAsMt } from "@/lib/format";
+import { MARKET_ICON, type Market } from "@/lib/betMarkets";
 
 export type Duel = {
   id: string;
@@ -37,6 +38,11 @@ export type Duel = {
     homeLogoUrl?: string | null;
     awayLogoUrl?: string | null;
   };
+  /** Which market this bet is on — drives the small icon shown next to the
+   *  prediction text below (see MarketIcon), so a scrolling feed reads at a
+   *  glance which duels are golos/ambas-marcam/resultado without having to
+   *  parse the prediction text itself. */
+  market: Market;
   prediction: string;
   predictionCode: string;
   stake: number;
@@ -62,6 +68,22 @@ export type Duel = {
   score?: { home: number; away: number };
   minute?: string;
 };
+
+/** Small, muted glyph for which market a duel is on — target for 1x2, a
+ *  ball for total_goals, a handshake for btts (same mapping the market-
+ *  picker step in create-bet-form.tsx uses, via lib/betMarkets.ts's
+ *  MARKET_ICON, so the two never drift apart). Lets someone scanning a long
+ *  feed tell golos/ambas-marcam/resultado duels apart without reading the
+ *  full prediction text on every row. */
+const MARKET_ICON_COMPONENT: Record<"target" | "goal" | "handshake", typeof Target> = {
+  target: Target,
+  goal: Goal,
+  handshake: Handshake,
+};
+function MarketIcon({ market }: { market: Market }) {
+  const Icon = MARKET_ICON_COMPONENT[MARKET_ICON[market]];
+  return <Icon className="size-3 shrink-0 text-muted-foreground" aria-hidden />;
+}
 
 /** Dims the row and shows a spinner while its navigation is in flight —
  *  useLinkStatus reads pending state from the nearest enclosing Link. Split
@@ -246,9 +268,12 @@ export function DuelPost({
             </span>
           )}
         </div>
-        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-          {duel.a.name} · {duel.prediction}
-        </p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1">
+          <MarketIcon market={duel.market} />
+          <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+            {duel.a.name} · {duel.prediction}
+          </p>
+        </div>
       </div>
     </div>
   );

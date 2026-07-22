@@ -10,7 +10,7 @@ import { InfoRow } from "@/components/ui/info-row";
 import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
 import { groupByLeague } from "@/lib/leagueTiers";
-import { MARKET_LABEL, MARKET_DESCRIPTION, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
+import { MARKET_LABEL, MARKET_DESCRIPTION, MARKET_ICON, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
 
 export type MatchOption = {
   id: string;
@@ -52,11 +52,7 @@ type PredictionKey = string;
 type Step = "match" | "market" | "prediction" | "stake";
 const STEP_ORDER: Step[] = ["match", "market", "prediction", "stake"];
 
-const MARKETS: { key: Market; icon: "target" | "goal" | "handshake" }[] = [
-  { key: "1x2", icon: "target" },
-  { key: "total_goals", icon: "goal" },
-  { key: "btts", icon: "handshake" },
-];
+const MARKETS: Market[] = ["1x2", "total_goals", "btts"];
 
 const QUICK_STAKES = [10, 50, 100, 500, 1000];
 
@@ -302,17 +298,17 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
           <div className="grid grid-cols-3 gap-2.5">
             {MARKETS.map((m) => (
               <OptionCard
-                key={m.key}
-                selected={market === m.key}
-                onSelect={() => selectMarket(m.key)}
-                ariaLabel={`${MARKET_LABEL[m.key]} — ${MARKET_DESCRIPTION[m.key]}`}
+                key={m}
+                selected={market === m}
+                onSelect={() => selectMarket(m)}
+                ariaLabel={`${MARKET_LABEL[m]} — ${MARKET_DESCRIPTION[m]}`}
                 className="flex flex-col items-center gap-2 p-3.5 text-center"
               >
                 <span className="flex size-[30px] items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden>
-                  {m.icon === "target" ? <Target className="size-4" /> : m.icon === "goal" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
+                  {MARKET_ICON[m] === "target" ? <Target className="size-4" /> : MARKET_ICON[m] === "goal" ? <Goal className="size-4" /> : <Handshake className="size-4" />}
                 </span>
-                <span className="text-xs font-semibold leading-tight">{MARKET_LABEL[m.key]}</span>
-                <span className="text-[10px] leading-snug text-muted-foreground">{MARKET_DESCRIPTION[m.key]}</span>
+                <span className="text-xs font-semibold leading-tight">{MARKET_LABEL[m]}</span>
+                <span className="text-[10px] leading-snug text-muted-foreground">{MARKET_DESCRIPTION[m]}</span>
               </OptionCard>
             ))}
           </div>

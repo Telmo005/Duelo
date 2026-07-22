@@ -28,6 +28,18 @@ export const MARKET_LABEL: Record<Market, string> = {
   btts: "Ambas Marcam",
 };
 
+/** Which icon represents each market — shared between the market-picker
+ *  step (create-bet-form.tsx) and the small inline marker shown on every
+ *  feed row (duel-post.tsx), so the same market always reads as the same
+ *  icon everywhere instead of drifting between the two spots. Plain data,
+ *  no lucide-react import here on purpose — this file stays framework-free;
+ *  each consumer maps these keys to its own icon components. */
+export const MARKET_ICON: Record<Market, "target" | "goal" | "handshake"> = {
+  "1x2": "target",
+  total_goals: "goal",
+  btts: "handshake",
+};
+
 /** One-line plain-language explanation of each market — shown right under
  *  the market's name wherever it's picked, since the name alone ("Total de
  *  Golos", "Ambas Marcam") doesn't tell a first-time bettor what they're

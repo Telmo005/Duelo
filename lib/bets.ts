@@ -425,6 +425,7 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         creatorId: bet.creatorId,
         a: { name: creator.displayName, avatar: colorFor(creator.id), city: "" },
         b: opponent ? { name: opponent.displayName, avatar: colorFor(opponent.id), city: "" } : null,
+        market,
         match: {
           home: match.home,
           away: match.away,
