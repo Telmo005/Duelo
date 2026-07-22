@@ -15,6 +15,7 @@ const LEDGER_TYPE_LABELS: Record<string, string> = {
   withdrawal_hold: "Levantamento pedido",
   withdrawal_release: "Levantamento rejeitado",
   withdrawal_complete: "Levantamento processado",
+  refund_fee: "Reembolso (com taxa)",
 };
 
 /**

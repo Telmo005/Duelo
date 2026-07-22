@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { db } from "@/db";
-import { matches, bets, profiles, type MatchRow } from "@/db/schema";
+import { matches, bets, profiles, walletLedger, type MatchRow } from "@/db/schema";
 import { eq, asc, desc, inArray, gt, and, sql } from "drizzle-orm";
 import type { Duel } from "@/components/feed/duel-post";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
@@ -48,6 +48,12 @@ export type BetReceipt = {
    *  so the UI shouldn't show one blanket "sem adversário" message for all
    *  of them. */
   refundReason: "no_opponent" | "match_voided" | "no_correct_prediction" | null;
+  /** Only set when refundReason === 'no_correct_prediction' (migration
+   *  0036) — the fee retained from THIS bettor's own stake, read back from
+   *  the actual wallet_ledger row rather than recomputed from today's rate,
+   *  so a historical receipt never silently changes if the rate changes
+   *  later. Null for every other refund reason (those stay a full refund). */
+  refundFeeCents: number | null;
 };
 
 /** A single bet, shaped for the public receipt/share page (/d/[id]). Reads
@@ -118,6 +124,20 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
     else refundReason = "no_correct_prediction";
   }
 
+  // Read the fee actually retained back from the ledger (wallet_release_with_fee,
+  // migration 0036) rather than recomputing it from today's rate — both sides
+  // pay the same fee in cents (equal stakes), so any one row for this bet's
+  // reference tells us the number that applies to either party.
+  let refundFeeCents: number | null = null;
+  if (refundReason === "no_correct_prediction") {
+    const [feeRow] = await db
+      .select({ availableDeltaCents: walletLedger.availableDeltaCents, lockedDeltaCents: walletLedger.lockedDeltaCents })
+      .from(walletLedger)
+      .where(and(eq(walletLedger.reference, bet.id), eq(walletLedger.type, "refund_fee")))
+      .limit(1);
+    if (feeRow) refundFeeCents = -feeRow.lockedDeltaCents - feeRow.availableDeltaCents;
+  }
+
   return {
     id: bet.id,
     reference: bet.reference,
@@ -149,6 +169,7 @@ export async function getBetReceipt(idOrReference: string): Promise<BetReceipt |
     opponent: opponent ? { id: opponent.id, name: opponent.displayName } : null,
     winnerId,
     refundReason,
+    refundFeeCents,
   };
 }
 

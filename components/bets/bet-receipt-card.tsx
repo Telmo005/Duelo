@@ -21,10 +21,15 @@ const STATUS_LABEL: Record<BetReceipt["status"], { label: string; className: str
   refunded: { label: "Reembolsada", className: "bg-locked-10 text-locked" },
 };
 
+// no_correct_prediction is deliberately NOT "valor devolvido" like the other
+// two — since migration 0036 it's a partial refund (5% of the stake
+// retained as a fee), and this page shows the exact amount in the money
+// breakdown below. Saying "devolvido" here without qualifying it would read
+// as a full refund that never happened.
 const REFUND_MESSAGE: Record<NonNullable<BetReceipt["refundReason"]>, string> = {
   no_opponent: "Sem adversário — valor devolvido",
   match_voided: "Jogo adiado/abandonado — valor devolvido",
-  no_correct_prediction: "Nenhuma previsão acertou o resultado — valor devolvido",
+  no_correct_prediction: "Nenhuma previsão acertou o resultado",
 };
 
 type PredictionKey = string;
@@ -392,6 +397,21 @@ export function BetReceiptCard({
             value={`MT ${formatCentsAsMt(bet.payoutCents)}`}
             valueClassName="text-success"
           />
+        ) : bet.refundReason === "no_correct_prediction" && bet.refundFeeCents != null ? (
+          // Partial refund (migration 0036) — shown explicitly, not folded
+          // into the generic "devolvido" messaging below, so nobody is
+          // surprised their balance went up by less than the full stake.
+          <>
+            <ReceiptLine label="Entrada" value={`MT ${formatCentsAsMt(bet.stakeCents)}`} />
+            <ReceiptLine label="Taxa retida (5%)" value={`-MT ${formatCentsAsMt(bet.refundFeeCents)}`} muted />
+            <div className="my-1 border-t border-dashed border-border" />
+            <ReceiptLine
+              label="DEVOLVIDO"
+              emphasis
+              value={`MT ${formatCentsAsMt(bet.stakeCents - bet.refundFeeCents)}`}
+              valueClassName="text-locked"
+            />
+          </>
         ) : (
           <>
             <ReceiptLine label="Entrada" value={`MT ${formatCentsAsMt(bet.stakeCents)}`} />
