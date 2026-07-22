@@ -1,19 +1,63 @@
 /**
- * API-Football (api-sports.io) client. Settlement/lifecycle (bet_settle_match
- * / bet_void_match / match_advance_lifecycle, see
- * supabase/migrations/0028_match_live_lifecycle.sql) is purely time-based and
- * never calls this file — the live scoreboard (goals + minute) comes from
- * fetchFixtureById/fetchLiveFixtures below, called either by an admin
- * (updateLiveScoreFromApiAction / refreshAllLiveMatchesAction) or by the
- * automatic sync (lib/liveScoreSync.ts), which is itself gated against the
- * real vendor-reported daily quota — see lib/apiFootballClient.ts, which
- * every function here routes through. That gate (not "nothing calls the API
- * automatically") is what keeps this inside the Free-plan daily quota now;
- * see the 429s that motivated 0028_match_live_lifecycle.sql for why that
- * matters.
+ * football-data.org client — replaces the earlier API-Football integration
+ * (lib/apiFootballClient.ts is gone) after that account got suspended and,
+ * separately, its Free plan flatly refused current-season fixtures at all.
+ * football-data.org's Free tier: current-season fixtures DO work, live
+ * scores come through (goals, not a minute/clock — see FixtureUpdate.minute
+ * below, always null from this vendor; the app's existing kickoff-time
+ * fallback clock covers that gap, unchanged), and the rate limit is a flat
+ * 10 requests/minute with no daily cap at all — verified directly against
+ * production before this migration (see lib/liveScoreSync.ts for what that
+ * simplified).
+ *
+ * Settlement/lifecycle (bet_settle_match / bet_void_match /
+ * match_advance_lifecycle, see supabase/migrations/0028_match_live_lifecycle.sql)
+ * is purely time-based and never calls this file — the live scoreboard
+ * comes from fetchFixtureById/fetchLiveFixtures below, called either by an
+ * admin (updateLiveScoreFromApiAction / refreshAllLiveMatchesAction) or by
+ * the automatic sync (lib/liveScoreSync.ts).
  */
 
-import { apiFootballFetch } from "@/lib/apiFootballClient";
+import { footballDataFetch } from "@/lib/footballDataClient";
+import { unstable_cache } from "next/cache";
+
+/**
+ * Every competition this token has confirmed access to (verified directly
+ * against the live API before committing to this list) — Premier
+ * League/La Liga/Champions League are the three actually wired into
+ * automatic fixture import (lib/fixtures-import.ts); the rest just widen
+ * what the admin's manual "pesquisar equipa"/"procurar jogo real" pickers
+ * can find. Moçambola isn't here — no vendor has ever confirmed covering
+ * it; it stays 100% manual, same as always.
+ */
+export const FOOTBALL_DATA_COMPETITIONS = [
+  { code: "PL", id: 2021, name: "Premier League", country: "England" },
+  { code: "PD", id: 2014, name: "La Liga", country: "Spain" },
+  { code: "CL", id: 2001, name: "UEFA Champions League", country: null },
+  { code: "BSA", id: 2013, name: "Campeonato Brasileiro Série A", country: "Brazil" },
+  { code: "ELC", id: 2016, name: "Championship", country: "England" },
+  { code: "FL1", id: 2015, name: "Ligue 1", country: "France" },
+  { code: "BL1", id: 2002, name: "Bundesliga", country: "Germany" },
+  { code: "SA", id: 2019, name: "Serie A", country: "Italy" },
+  { code: "DED", id: 2003, name: "Eredivisie", country: "Netherlands" },
+  { code: "PPL", id: 2017, name: "Primeira Liga", country: "Portugal" },
+  { code: "CLI", id: 2152, name: "Copa Libertadores", country: null },
+  { code: "EC", id: 2018, name: "European Championship", country: null },
+  { code: "WC", id: 2000, name: "FIFA World Cup", country: null },
+] as const;
+
+/** external_id is prefixed for every match sourced from this vendor —
+ *  guarantees no collision with whatever numeric IDs were left behind by
+ *  the old API-Football integration (same column, different vendor's ID
+ *  space, unique constraint on the column) and makes provenance obvious at
+ *  a glance in the database. */
+const ID_PREFIX = "fd-";
+export function toExternalId(footballDataMatchId: number | string): string {
+  return `${ID_PREFIX}${footballDataMatchId}`;
+}
+function stripPrefix(externalId: string): string {
+  return externalId.startsWith(ID_PREFIX) ? externalId.slice(ID_PREFIX.length) : externalId;
+}
 
 export type FixtureSearchResult = {
   externalId: string;
@@ -23,89 +67,68 @@ export type FixtureSearchResult = {
   awayLogoUrl: string | null;
   league: string;
   leagueId: number;
-  /** API-Football's country name for the league (e.g. "England",
-   *  "Kazakhstan") — different countries can have identically-named
-   *  leagues, so this is what disambiguates them when grouping/displaying
-   *  (see lib/leagueTiers.ts groupByLeague). Null on the rare fixture where
-   *  the API omits it (e.g. some international/club-friendly entries). */
   country: string | null;
-  /** ISO instant — kept raw so the caller decides how to localize/display it
-   *  (matches the pattern the rest of the admin match forms already use). */
   kickoffAtIso: string;
-  /** Derived from the API's round name (see isEliminationRound below) — true
-   *  only for rounds that are always a single decisive match (a final),
-   *  never for multi-leg knockout rounds (Round of 16, Quarter/Semi-finals
-   *  in club competitions genuinely can and do draw leg-by-leg). Admins can
-   *  still correct this by hand after adding (Editar), same as any manually
-   *  typed match. */
   isElimination: boolean;
 };
 
-type RawFixture = {
-  fixture?: { id?: number; date?: string };
-  teams?: { home?: { name?: string; logo?: string }; away?: { name?: string; logo?: string } };
-  league?: { id?: number; name?: string; round?: string; country?: string };
+type RawArea = { name?: string };
+type RawCompetition = { id?: number; name?: string; code?: string };
+type RawTeam = { name?: string; crest?: string };
+type RawMatch = {
+  id?: number;
+  utcDate?: string;
+  status?: string;
+  stage?: string;
+  area?: RawArea;
+  competition?: RawCompetition;
+  homeTeam?: RawTeam;
+  awayTeam?: RawTeam;
+  score?: { fullTime?: { home?: number | null; away?: number | null } };
 };
 
-/** Round names API-Football uses that are ALWAYS a single, decisive match
- *  (extra time + penalties if needed, never left drawn) — as opposed to
- *  "Round of 16"/"Quarter-finals"/"Semi-finals" in two-legged club
- *  competitions, where an individual leg frequently DOES end in a draw
- *  (the tie is decided on aggregate, not that match alone). Getting this
- *  wrong in the other direction would be worse than not flagging it at all:
- *  bet_settle_match rejects entering a tied score for an elimination match
- *  (supabase/migrations/0003_settlement.sql), so wrongly marking a
- *  two-legged fixture as elimination would block the admin from recording a
- *  perfectly legitimate 1-1 result. Scoped deliberately narrow —
- *  false negatives just fall back to the existing manual checkbox, which is
- *  always available regardless. */
-const ELIMINATION_ROUND_NAMES = new Set(["final", "3rd place final", "final round"]);
-
-function isEliminationRound(round: string | undefined): boolean {
-  if (!round) return false;
-  return ELIMINATION_ROUND_NAMES.has(round.trim().toLowerCase());
+/** Stages football-data.org uses that are ALWAYS a single, decisive match —
+ *  mirrors the same reasoning the old API-Football round-name check used
+ *  (see git history): getting this wrong in the "too eager" direction is
+ *  worse than not flagging it, since bet_settle_match rejects a tied score
+ *  for an elimination match. Admins can always correct the checkbox by hand
+ *  regardless. */
+const ELIMINATION_STAGES = new Set(["FINAL", "THIRD_PLACE_PLAYOFF"]);
+function isEliminationStage(stage: string | undefined): boolean {
+  return stage != null && ELIMINATION_STAGES.has(stage.toUpperCase());
 }
 
 /**
- * Lists every real fixture on a single date, across every league
- * API-Football covers. The Free plan blocks fixture queries filtered by
- * `league`+`season` (see lib/fixtures-import.ts's importUpcomingFixtures —
- * that's why automated import is a no-op today), but a bare `date` query
- * IS allowed, within roughly a 3-day rolling window around today — the API
- * itself reports the exact allowed range if you ask outside it, which we
- * surface as `error` rather than guessing a window client-side.
- *
- * Powers the "Procurar jogo real" admin picker: a manual pick-and-autofill
- * flow, not automated import, so it's usable on the Free plan today. Since
- * the API won't let us filter by league without `season`, filtering down to
- * the leagues this product covers happens here, client-of-the-vendor-API
- * side, against `league.id` in the (unfiltered) response.
+ * Lists real fixtures across every competition this token can see, for a
+ * given date — powers the "Procurar jogo real" admin picker. No
+ * league/season restriction here (unlike the old vendor): football-data's
+ * Free plan simply returns current-season fixtures.
  */
 export async function searchFixturesByDate(date: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
-  const { body, error } = await apiFootballFetch<{ response?: RawFixture[] }>(`/fixtures?date=${encodeURIComponent(date)}`);
+  const { body, error } = await footballDataFetch<{ matches?: RawMatch[] }>(`/matches?dateFrom=${date}&dateTo=${date}`);
   if (error) return { fixtures: [], error };
 
-  const raw = body?.response ?? [];
+  const raw = body?.matches ?? [];
   const fixtures = raw
     .map((fx): FixtureSearchResult | null => {
-      const externalId = fx.fixture?.id != null ? String(fx.fixture.id) : null;
-      const home = fx.teams?.home?.name;
-      const away = fx.teams?.away?.name;
-      const kickoffAtIso = fx.fixture?.date;
-      const leagueId = fx.league?.id;
-      const league = fx.league?.name;
-      if (!externalId || !home || !away || !kickoffAtIso || leagueId == null || !league) return null;
+      const id = fx.id;
+      const home = fx.homeTeam?.name;
+      const away = fx.awayTeam?.name;
+      const kickoffAtIso = fx.utcDate;
+      const leagueId = fx.competition?.id;
+      const league = fx.competition?.name;
+      if (id == null || !home || !away || !kickoffAtIso || leagueId == null || !league) return null;
       return {
-        externalId,
+        externalId: toExternalId(id),
         home,
         away,
         league,
         leagueId,
-        country: fx.league?.country ?? null,
+        country: fx.area?.name ?? null,
         kickoffAtIso,
-        homeLogoUrl: fx.teams?.home?.logo ?? null,
-        awayLogoUrl: fx.teams?.away?.logo ?? null,
-        isElimination: isEliminationRound(fx.league?.round),
+        homeLogoUrl: fx.homeTeam?.crest ?? null,
+        awayLogoUrl: fx.awayTeam?.crest ?? null,
+        isElimination: isEliminationStage(fx.stage),
       };
     })
     .filter((fx): fx is FixtureSearchResult => fx !== null);
@@ -113,89 +136,57 @@ export async function searchFixturesByDate(date: string): Promise<{ fixtures: Fi
   return { fixtures };
 }
 
-/** API-Football fixture status codes for a match that's genuinely OVER —
- *  distinct from HALTED_STATUS_CODES below because the admin still needs to
- *  know "this is done, go liquidate" rather than "this paused, it'll
- *  resume". */
-const FINISHED_STATUS_CODES = new Set(["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"]);
+/** Match statuses that mean the fixture is genuinely OVER as scheduled —
+ *  distinct from HALTED below because the admin needs to know "this is
+ *  done" rather than "this paused, it'll resume". POSTPONED/CANCELLED have
+ *  no valid score at all (need Adiado/Abandonado — a refund — not
+ *  Liquidar); AWARDED is an administrative decision left for manual
+ *  review, same reasoning as the old vendor's w.o./awd codes. */
+const FINISHED_STATUS_CODES = new Set(["FINISHED", "POSTPONED", "CANCELLED", "AWARDED"]);
 
-/** Fixture status codes that mean "the clock is not running right now" but
- *  the match ISN'T over — half-time, the break between extra-time halves, a
- *  penalty shootout (no running minute makes sense there), or the match
- *  suspended/interrupted by the referee. Anything else returned while a
- *  fixture is still in progress ("1H", "2H", "ET") means the clock should
- *  keep ticking. */
-const HALTED_STATUS_CODES = new Set(["HT", "BT", "P", "SUSP", "INT"]);
+/** Paused but NOT over — the clock stops, but the match resumes. */
+const HALTED_STATUS_CODES = new Set(["PAUSED", "SUSPENDED"]);
 
 const STATUS_LABELS: Record<string, string> = {
-  NS: "Ainda não começou",
-  "1H": "1ª parte",
-  HT: "Intervalo",
-  "2H": "2ª parte",
-  ET: "Prolongamento",
-  BT: "Intervalo do prolongamento",
-  P: "Grandes penalidades",
-  SUSP: "Suspenso",
-  INT: "Interrompido",
-  FT: "Terminado",
-  AET: "Terminado (prolongamento)",
-  PEN: "Terminado (penalidades)",
-  PST: "Adiado",
-  CANC: "Cancelado",
-  ABD: "Abandonado",
-  AWD: "Decidido por w.o.",
-  WO: "Decidido por w.o.",
+  SCHEDULED: "Agendado",
+  TIMED: "Agendado",
+  IN_PLAY: "Em jogo",
+  PAUSED: "Intervalo",
+  FINISHED: "Terminado",
+  SUSPENDED: "Suspenso",
+  POSTPONED: "Adiado",
+  CANCELLED: "Cancelado",
+  AWARDED: "Decidido por w.o.",
 };
 
 export type FixtureUpdate = {
   homeGoals: number | null;
   awayGoals: number | null;
-  minute: number | null;
-  /** True for both "halted, will resume" (half-time, suspended) and
-   *  "finished" statuses — either way the ticking clock should freeze
-   *  exactly at `minute` instead of counting up in real time forever.
+  /** Always null from this vendor — football-data.org's match resource has
+   *  no live-minute/clock field at all (confirmed directly against a real
+   *  in-play match), only halftime/fulltime goal counts. The existing
+   *  kickoff-time-derived fallback clock (computeElapsedMinute /
+   *  computeLiveMinuteLabel in lib/bets.ts) already covers exactly this
+   *  case — nothing else needed to change for the display to keep working. */
+  minute: null;
+  /** True for both "halted, will resume" and "finished" statuses — either
+   *  way the ticking clock should freeze instead of counting up forever.
    *  Distinguish the two with `finished` below for what label to show. */
   paused: boolean;
-  /** True only for a genuinely-over match (FT/AET/PEN/PST/CANC/ABD/AWD/WO) —
-   *  the admin's cue to go liquidate with the final score, not just wait. */
+  /** True only for a genuinely-over match (FINISHED/POSTPONED/CANCELLED/
+   *  AWARDED) — the admin's cue to go liquidate or void, not just wait. */
   finished: boolean;
   statusCode: string;
   statusLabel: string;
 };
 
-/**
- * Single-fixture lookup by API-Football's own fixture ID — the cheapest
- * possible call against the vendor (one fixture, not a whole day/league),
- * used exclusively by the admin's per-match "Última atualização" button
- * (updateLiveScoreFromApiAction, lib/actions/matches.ts). Deliberately never
- * called automatically/on a schedule — that's precisely the polling pattern
- * 0028_match_live_lifecycle.sql moved away from after it exhausted the
- * Free-plan daily quota. An admin fetching only the specific match someone
- * actually bet on, only when they choose to, is the quota-safe middle ground
- * between "no live data at all" and "poll everything constantly".
- */
-export async function fetchFixtureById(externalId: string): Promise<{ data?: FixtureUpdate; error?: string }> {
-  const { body, error } = await apiFootballFetch<{ response?: RawLiveFixture[] }>(`/fixtures?id=${encodeURIComponent(externalId)}`);
-  if (error) return { error };
-
-  const fx = body?.response?.[0];
-  if (!fx) return { error: "Jogo não encontrado na API (verifica a ligação ao API-Football)" };
-
-  return { data: parseFixtureUpdate(fx) };
-}
-
-type RawLiveFixture = {
-  fixture?: { id?: number; status?: { short?: string; elapsed?: number } };
-  goals?: { home?: number | null; away?: number | null };
-};
-
-function parseFixtureUpdate(fx: RawLiveFixture): FixtureUpdate {
-  const statusCode: string = fx.fixture?.status?.short ?? "NS";
+function parseFixtureUpdate(fx: RawMatch): FixtureUpdate {
+  const statusCode = fx.status ?? "SCHEDULED";
   const finished = FINISHED_STATUS_CODES.has(statusCode);
   return {
-    homeGoals: fx.goals?.home ?? null,
-    awayGoals: fx.goals?.away ?? null,
-    minute: fx.fixture?.status?.elapsed ?? null,
+    homeGoals: fx.score?.fullTime?.home ?? null,
+    awayGoals: fx.score?.fullTime?.away ?? null,
+    minute: null,
     paused: finished || HALTED_STATUS_CODES.has(statusCode),
     finished,
     statusCode,
@@ -204,63 +195,70 @@ function parseFixtureUpdate(fx: RawLiveFixture): FixtureUpdate {
 }
 
 /**
- * Every fixture currently in play, worldwide, across every league —
- * API-Football's `live=all` filter — in exactly ONE request regardless of
- * how many matches that turns out to be. Backs the admin's "Atualizar todos
- * os jogos ao vivo" button (refreshAllLiveMatchesAction, lib/actions/
- * matches.ts): instead of clicking "Última atualização" once per match, one
- * request refreshes every live match this platform has bets on at once.
- *
- * Important asymmetry vs fetchFixtureById: a finished match has dropped OUT
- * of `live=all` — this endpoint can never report `finished`. Confirmed
- * empirically that SUSP (suspended) drops out too, not just terminal
- * statuses — so a tracked match missing from the response isn't always "it
- * ended", just "this bulk endpoint has nothing on it right now". The caller
- * surfaces that as "sem dados" without guessing the cause, and the admin
- * falls back to the single-fixture button (which sees every status,
- * including FT/SUSP) for that one match.
+ * Single-fixture lookup — the cheapest possible call against the vendor
+ * (one match), used by the admin's per-match "Última atualização" button
+ * (updateLiveScoreFromApiAction, lib/actions/matches.ts).
+ */
+export async function fetchFixtureById(externalId: string): Promise<{ data?: FixtureUpdate; error?: string }> {
+  const id = stripPrefix(externalId);
+  const { body, error } = await footballDataFetch<RawMatch>(`/matches/${encodeURIComponent(id)}`);
+  if (error) return { error };
+  if (!body) return { error: "Jogo não encontrado na API (verifica a ligação ao football-data.org)" };
+
+  return { data: parseFixtureUpdate(body) };
+}
+
+/**
+ * Every fixture currently in play, across every competition this token can
+ * see, in ONE request (status=LIVE, football-data's combined IN_PLAY +
+ * PAUSED filter) — backs the admin's "Atualizar jogos ao vivo" button and
+ * the automatic sync (lib/liveScoreSync.ts). Same one-request-covers-
+ * everything shape the old vendor's live=all had.
  */
 export async function fetchLiveFixtures(): Promise<{ data?: Map<string, FixtureUpdate>; error?: string }> {
-  const { body, error } = await apiFootballFetch<{ response?: RawLiveFixture[] }>("/fixtures?live=all");
+  const { body, error } = await footballDataFetch<{ matches?: RawMatch[] }>("/matches?status=LIVE");
   if (error) return { error };
 
-  const raw = body?.response ?? [];
+  const raw = body?.matches ?? [];
   const byExternalId = new Map<string, FixtureUpdate>();
   for (const fx of raw) {
-    const externalId = fx.fixture?.id != null ? String(fx.fixture.id) : null;
-    if (!externalId) continue;
-    byExternalId.set(externalId, parseFixtureUpdate(fx));
+    if (fx.id == null) continue;
+    byExternalId.set(toExternalId(fx.id), parseFixtureUpdate(fx));
   }
   return { data: byExternalId };
 }
 
-/**
- * Looks up a team's crest URL by name (API-Football team search). Used to
- * backfill matches.home_logo_url/away_logo_url — manually seeded matches
- * have no externalId to read a logo off of directly, so this is a
- * best-effort name match. Returns null on no-match or API failure (the UI
- * falls back to the coloured-shield placeholder either way).
- */
-export async function fetchTeamLogo(teamName: string): Promise<string | null> {
-  const { body, error } = await apiFootballFetch<{ response?: Array<{ team?: { logo?: string } }> }>(
-    `/teams?search=${encodeURIComponent(teamName)}`
-  );
-  if (error) return null;
-  return body?.response?.[0]?.team?.logo ?? null;
-}
-
 export type TeamSearchResult = { id: number; name: string; country: string; logo: string };
 
-/**
- * National teams are searched by their ENGLISH name in API-Football
- * ("France", not "França") — club names usually survive translation fine
- * (Barcelona, Manchester United, Ferroviário read the same or close enough
- * in both languages), but country names very often don't. This is a closed,
- * small set (world's footballing nations), so a lookup table is the right
- * fix — no ambiguity, no guessing, unlike club names which are too numerous
- * and varied to hand-map. Keys are ASCII-folded + lowercased (matches how
- * the query is normalised below) so "frança"/"França"/"FRANÇA" all hit it.
- */
+type CachedTeam = { id: number; name: string; crest: string; country: string };
+
+/** One competition's full team roster, cached a full day — team rosters
+ *  don't change minute to minute, and caching means a search never spends
+ *  more than the first request of the day per competition (13 competitions
+ *  fetched once every 24h each, not once per keystroke). Throws rather than
+ *  returning [] on a failed fetch — unstable_cache does NOT cache a thrown
+ *  error, only a returned value, so a transient failure (429, network blip)
+ *  gets retried on the next search instead of that competition silently
+ *  reading as "zero teams" for a full day (which returning [] here would
+ *  have cached as if it were a real, successful empty result). Callers
+ *  must catch per competition — see searchTeams. */
+const getCompetitionTeams = unstable_cache(
+  async (code: string): Promise<CachedTeam[]> => {
+    const { body, error } = await footballDataFetch<{ teams?: Array<{ id: number; name: string; crest?: string; area?: RawArea }> }>(
+      `/competitions/${code}/teams`
+    );
+    if (error || !body?.teams) throw new Error(error ?? `sem dados de equipas para ${code}`);
+    return body.teams.map((t) => ({ id: t.id, name: t.name, crest: t.crest ?? "", country: t.area?.name ?? "" }));
+  },
+  ["football-data-competition-teams"],
+  { revalidate: 86_400 }
+);
+
+/** National teams are searched by their ENGLISH name ("France", not
+ *  "França") — the two national-team competitions this token covers
+ *  (World Cup, Euro) list teams under their official English names, so a
+ *  Portuguese query needs the same translation the old vendor's search
+ *  needed. Club names usually survive translation fine and don't need it. */
 const PT_TO_EN_COUNTRY: Record<string, string> = {
   "africa do sul": "South Africa", "alemanha": "Germany", "arabia saudita": "Saudi Arabia",
   "argelia": "Algeria", "argentina": "Argentina", "australia": "Australia", "austria": "Austria",
@@ -291,46 +289,57 @@ function asciiFold(s: string): string {
 }
 
 /**
- * Live team search (API-Football /teams?search=), for the "pesquisar
- * equipa" picker in the manual add-match form. Exists because guessing a
- * crest from whatever name an admin typed (fetchTeamLogo above) silently
- * fails for two common cases: API-Football rejects non-ASCII characters
- * outright (e.g. "França"), and its database is keyed by English/official
- * names, so a Portuguese name like "Espanha" matches nothing even though
- * "Spain" returns instantly. Letting the admin search and pick the real
- * team sidesteps both — no translation guessing needed for CLUBS. National
- * teams need the extra PT_TO_EN_COUNTRY lookup above, tried first since it's
- * the more likely intent when the query is a bare country name (an admin
- * looking up "França" almost always wants the national team, not some club
- * that happens to be based in France). Free-plan-friendly: this is plain
- * team metadata, not fixture/season data, so it isn't gated behind a paid
- * plan the way current-season fixtures are.
+ * Team search for the "pesquisar equipa" admin picker — searches within the
+ * rosters of every competition this token can see (cached, see
+ * getCompetitionTeams) rather than a global vendor search endpoint, which
+ * football-data.org doesn't offer. Fetched sequentially, not in parallel:
+ * a cold cache (first search of the day) touches up to 13 endpoints, and
+ * spacing them out keeps comfortably clear of the 10-requests/minute limit
+ * even in that worst case; any single competition's request failing just
+ * means that one's roster is empty for this search, not a crash.
  */
 export async function searchTeams(query: string): Promise<TeamSearchResult[]> {
   if (query.trim().length < 3) return [];
 
-  const asciiQuery = asciiFold(query);
+  const asciiQuery = asciiFold(query).toLowerCase();
   if (asciiQuery.length < 3) return [];
 
-  const countryTranslation = PT_TO_EN_COUNTRY[asciiQuery.toLowerCase()];
-  const searchTerms = countryTranslation ? [countryTranslation, asciiQuery] : [asciiQuery];
+  const countryTranslation = PT_TO_EN_COUNTRY[asciiQuery];
+  const searchTerms = countryTranslation ? [asciiQuery, countryTranslation.toLowerCase()] : [asciiQuery];
 
   const seen = new Set<number>();
   const results: TeamSearchResult[] = [];
 
-  for (const term of searchTerms) {
-    const { body, error } = await apiFootballFetch<{
-      response?: Array<{ team: { id: number; name: string; country: string; logo: string } }>;
-    }>(`/teams?search=${encodeURIComponent(term)}`);
-    if (error) continue;
-
-    for (const r of body?.response ?? []) {
-      if (seen.has(r.team.id)) continue;
-      seen.add(r.team.id);
-      results.push({ id: r.team.id, name: r.team.name, country: r.team.country, logo: r.team.logo });
+  for (const comp of FOOTBALL_DATA_COMPETITIONS) {
+    let teams: CachedTeam[];
+    try {
+      teams = await getCompetitionTeams(comp.code);
+    } catch {
+      // getCompetitionTeams throws (never caches) on a failed fetch — skip
+      // this competition for this search; nothing was cached, so the next
+      // search retries it fresh instead of being stuck on a stale failure.
+      continue;
     }
-    if (results.length >= 8) break;
+    for (const team of teams) {
+      if (seen.has(team.id)) continue;
+      const nameLower = asciiFold(team.name).toLowerCase();
+      if (searchTerms.some((t) => nameLower.includes(t))) {
+        seen.add(team.id);
+        results.push({ id: team.id, name: team.name, country: team.country, logo: team.crest });
+        if (results.length >= 8) return results;
+      }
+    }
   }
 
-  return results.slice(0, 8);
+  return results;
+}
+
+/** Best-effort crest lookup by name — backfills matches.home_logo_url/
+ *  away_logo_url for manually-seeded matches with no externalId to read a
+ *  logo off of directly. Reuses searchTeams's cached rosters; returns null
+ *  on no-match rather than blocking (the UI falls back to the coloured-
+ *  shield placeholder either way). */
+export async function fetchTeamLogo(teamName: string): Promise<string | null> {
+  const results = await searchTeams(teamName);
+  return results[0]?.logo ?? null;
 }

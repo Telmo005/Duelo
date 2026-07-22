@@ -4,19 +4,12 @@ import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 import { logError } from "@/lib/errorLog";
 
 /**
- * Imports upcoming fixtures for the covered European leagues — see
+ * Imports upcoming fixtures for the covered European leagues (Premier
+ * League/La Liga/Champions League) from football-data.org — see
  * lib/fixtures-import.ts. Same Vercel Cron / CRON_SECRET pattern as the
- * other cron routes.
- *
- * Guaranteed no-op right now: importUpcomingFixtures short-circuits before
- * calling the API at all while lib/fixtures-import.ts's
- * CURRENT_SEASON_PLAN_ACTIVE is false (Free plan doesn't cover the current
- * season) — a real request here used to burn 3 of the shared daily quota
- * for a rejection every time this fired, whether or not anyone was
- * watching. Flip that flag once the account is upgraded (Pro tier,
- * ~$19/mo) — the rest of the code is ready and will start populating
- * `matches` automatically. Until then, use the manual "Adicionar jogo" form
- * in /admin/matches.
+ * other cron routes. Unlike the previous vendor (API-Football Free, which
+ * flatly refused current-season fixtures), this actually works on the free
+ * plan — verified directly before switching.
  *
  * Local dev: `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/import-fixtures`
  */

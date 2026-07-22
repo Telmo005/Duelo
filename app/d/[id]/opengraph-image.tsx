@@ -22,7 +22,7 @@ function teamColor(name: string) {
   return TEAM_COLORS[hash % TEAM_COLORS.length];
 }
 
-/** Real crest (from API-Football, hot-linked) when the match has one —
+/** Real crest (from football-data.org, hot-linked) when the match has one —
  *  set via the team-search picker in /admin/matches — otherwise the same
  *  coloured-initials placeholder the rest of the app falls back to. */
 function Crest({ name, logoUrl }: { name: string; logoUrl?: string | null }) {

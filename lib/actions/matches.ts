@@ -51,8 +51,8 @@ const updateMatchSchema = matchFieldsSchema;
 
 /** Search-as-you-type backing the "pesquisar equipa" picker in the add-match
  *  form (components/admin/team-search-picker.tsx). Admin-gated like every
- *  other matches action, even though it's read-only, to keep API-Football
- *  quota usage (100 req/day on Free) restricted to trusted callers. */
+ *  other matches action, even though it's read-only, to keep external API
+ *  calls (football-data.org, 10 req/min) restricted to trusted callers. */
 export async function searchTeamsAction(query: string): Promise<TeamSearchResult[]> {
   await requireAdmin();
   return searchTeams(query);
@@ -61,9 +61,9 @@ export async function searchTeamsAction(query: string): Promise<TeamSearchResult
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Backs the "Procurar jogo real" picker in the add-match form — see
- *  searchFixturesByDate for why this only works ~3 days out on the Free
- *  plan. Admin-gated for the same reason searchTeamsAction is: keeps quota
- *  usage (100 req/day) restricted to trusted callers. */
+ *  searchFixturesByDate for the exact date-range window it covers.
+ *  Admin-gated for the same reason searchTeamsAction is: keeps external API
+ *  calls restricted to trusted callers. */
 export async function searchFixturesAction(date: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
   await requireAdmin();
   if (!DATE_RE.test(date)) return { fixtures: [], error: "Data inválida" };
@@ -161,12 +161,9 @@ export async function addFixturesBulkAction(input: unknown[]): Promise<{ added: 
 
 /**
  * Manual fixture entry. This is the fallback for leagues no automated feed
- * covers (Moçambola — no vendor confirmed to cover it) and, until
- * API-Football is upgraded off its Free plan (which blocks every current
- * season outright — see lib/fixtures-import.ts), the ONLY source of real
- * matches at all. Crest logos are best-effort via the same team-name search
- * settlement already uses; a miss just leaves the placeholder shield, never
- * blocks creating the match.
+ * covers (Moçambola — no vendor confirmed to cover it yet). Crest logos are
+ * best-effort via the same team-name search settlement already uses; a miss
+ * just leaves the placeholder shield, never blocks creating the match.
  */
 export async function addMatchAction(input: Record<string, unknown>): Promise<ActionResult> {
   const admin = await requireAdmin();
@@ -352,10 +349,10 @@ type LiveScoreApiResult = ActionResult & {
   awayGoals?: number;
   minute?: number | null;
   statusLabel?: string;
-  /** True when API-Football reports the match as genuinely over
-   *  (FT/AET/PEN/PST/CANC/ABD/AWD/WO) — the client uses this to prefill the
-   *  "Resultado final" fields and prompt the admin to liquidate, instead of
-   *  just showing a toast that scrolls away. */
+  /** True when football-data.org reports the match as genuinely over
+   *  (FINISHED/POSTPONED/CANCELLED/AWARDED) — the client uses this to
+   *  prefill the "Resultado final" fields and prompt the admin to liquidate,
+   *  instead of just showing a toast that scrolls away. */
   finished?: boolean;
   /** True when this exact call auto-settled the match (the API confirmed the
    *  same score twice in a row — see attemptAutoSettleIfConfirmed). The
@@ -365,18 +362,17 @@ type LiveScoreApiResult = ActionResult & {
 };
 
 /**
- * Fetches THIS ONE match's current score/minute/status from API-Football
+ * Fetches THIS ONE match's current score/minute/status from football-data.org
  * (fetchFixtureById — a single-fixture lookup, never a day/league scan) and
  * writes it through the same path as a manual update. Requires the match to
- * have an externalId (API-Football fixture ID); a manually-seeded match with
- * no API link has nothing to fetch and uses the manual inputs instead.
+ * have an externalId (football-data.org match ID); a manually-seeded match
+ * with no API link has nothing to fetch and uses the manual inputs instead.
  *
  * This exists specifically to avoid re-introducing the polling pattern
- * 0028_match_live_lifecycle.sql moved away from (it was exhausting the
- * Free-plan daily quota): there's no cron here, no scanning every match in
+ * 0028_match_live_lifecycle.sql moved away from (it was exhausting the old
+ * vendor's daily quota): there's no cron here, no scanning every match in
  * the catalogue — an admin clicks "Última atualização" only for the specific
- * match someone actually bet on, only when they want a fresh read, so quota
- * usage scales with real bets, not with how many fixtures exist.
+ * match someone actually bet on, only when they want a fresh read.
  */
 export async function updateLiveScoreFromApiAction(matchId: string): Promise<LiveScoreApiResult> {
   await requireAdmin();
@@ -387,7 +383,7 @@ export async function updateLiveScoreFromApiAction(matchId: string): Promise<Liv
     return { error: "Este jogo já foi liquidado/anulado/fechado — o placar ao vivo já não é relevante." };
   }
   if (!match.externalId) {
-    return { error: "Este jogo não está ligado à API-Football — atualiza o placar manualmente." };
+    return { error: "Este jogo não está ligado a uma fonte de dados externa — atualiza o placar manualmente." };
   }
 
   const { data, error } = await fetchFixtureById(match.externalId);
@@ -418,11 +414,12 @@ export async function updateLiveScoreFromApiAction(matchId: string): Promise<Liv
 export type BulkLiveRefreshResult = LiveSyncResult;
 
 /**
- * Refreshes every tracked 'live'/'needs_review' match linked to the API in
- * ONE request (syncLiveMatchesFromApi — API-Football's live=all filter),
- * instead of clicking "Última atualização" once per match. Backs the
- * "Atualizar jogos ao vivo" button (app/(app)/admin/matches). The same core
- * also runs automatically off the live-score sync cron (see
+ * Refreshes every tracked 'live'/'needs_review' match linked to the API
+ * (syncLiveMatchesFromApi — one request for everything currently live, plus
+ * a per-match fallback for any that just finished, see that function's doc
+ * comment), instead of clicking "Última atualização" once per match. Backs
+ * the "Atualizar jogos ao vivo" button (app/(app)/admin/matches). The same
+ * core also runs automatically off the live-score sync cron (see
  * app/api/cron/live-score-sync) — this is just the admin-triggered,
  * on-demand path into it.
  */
@@ -438,8 +435,7 @@ export async function refreshAllLiveMatchesAction(): Promise<BulkLiveRefreshResu
 }
 
 /** Manual trigger for importUpcomingFixtures() — lets an admin test/force an
- *  import pass (e.g. right after upgrading the API-Football plan) without
- *  waiting for the next cron tick. */
+ *  import pass without waiting for the next cron tick. */
 export async function importFixturesAction(): Promise<ImportResult> {
   const admin = await requireAdmin();
 

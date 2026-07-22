@@ -41,26 +41,20 @@ function currentLiveMinute(match: MatchRow, now: number): number | null {
   return match.liveMinute + elapsed;
 }
 
-/** Mirrors lib/sportsData.ts's FINISHED_STATUS_CODES/STATUS_LABELS — same
- *  duplication reasoning as the two helpers above. Used to turn the raw
- *  live_status_code the API-refresh button persisted (migration 0030) into
- *  an unambiguous label: without this, a match stuck at "90'" reads exactly
- *  the same whether it just paused for a moment or ended twenty minutes ago. */
-const FINISHED_STATUS_CODES = new Set(["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"]);
+/** Mirrors lib/sportsData.ts's FINISHED_STATUS_CODES/STATUS_LABELS (now
+ *  football-data.org's vocabulary) — same duplication reasoning as the two
+ *  helpers above. Used to turn the raw live_status_code the API-refresh
+ *  button persisted (migration 0030) into an unambiguous label: without
+ *  this, a match stuck at "90'" reads exactly the same whether it just
+ *  paused for a moment or ended twenty minutes ago. */
+const FINISHED_STATUS_CODES = new Set(["FINISHED", "POSTPONED", "CANCELLED", "AWARDED"]);
 const STATUS_LABELS: Record<string, string> = {
-  HT: "Intervalo",
-  BT: "Intervalo do prolongamento",
-  P: "Grandes penalidades",
-  SUSP: "Suspenso",
-  INT: "Interrompido",
-  FT: "Terminado",
-  AET: "Terminado (prolongamento)",
-  PEN: "Terminado (penalidades)",
-  PST: "Adiado",
-  CANC: "Cancelado",
-  ABD: "Abandonado",
-  AWD: "Decidido por w.o.",
-  WO: "Decidido por w.o.",
+  PAUSED: "Intervalo",
+  SUSPENDED: "Suspenso",
+  FINISHED: "Terminado",
+  POSTPONED: "Adiado",
+  CANCELLED: "Cancelado",
+  AWARDED: "Decidido por w.o.",
 };
 
 /** Small "X-Y" pair of number inputs, reused for both the live-score
@@ -187,11 +181,11 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
     });
   }
 
-  // Fetches ONLY this match from API-Football (a single-fixture lookup, see
-  // fetchFixtureById) and writes it through the same path as a manual
-  // update — an admin who links a match to the API never needs to check
-  // another site for the score or leave the app running a poller: one
-  // click, one request, scoped to the one match someone actually bet on.
+  // Fetches ONLY this match from football-data.org (a single-fixture
+  // lookup, see fetchFixtureById) and writes it through the same path as a
+  // manual update — an admin who links a match to the API never needs to
+  // check another site for the score or leave the app running a poller:
+  // one click, one request, scoped to the one match someone actually bet on.
   function handleRefreshFromApi() {
     setActiveAction("api");
     startTransition(async () => {
@@ -308,7 +302,7 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
             type="button"
             onClick={handleRefreshFromApi}
             disabled={isPending}
-            title="Consulta só este jogo na API-Football — um único pedido"
+            title="Consulta só este jogo — um único pedido"
             className="press inline-flex items-center gap-1.5 rounded-lg border border-primary-30 bg-primary-10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {activeAction === "api" ? <Spinner className="size-3" /> : <RefreshCw className="size-3" aria-hidden />}
