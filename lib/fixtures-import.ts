@@ -2,18 +2,40 @@ import { db } from "@/db";
 import { matches } from "@/db/schema";
 import { isNotNull } from "drizzle-orm";
 import { footballDataFetch } from "@/lib/footballDataClient";
-import { toExternalId } from "@/lib/sportsData";
+import { toExternalId, FOOTBALL_DATA_COMPETITIONS } from "@/lib/sportsData";
 
-/** The 3 leagues this product automatically imports (per CLAUDE.md;
- *  Moçambola stays 100% manual — no vendor has ever confirmed covering
- *  it). Same competitions verified directly against football-data.org
- *  before this migration — unlike the previous vendor (API-Football Free),
- *  this one actually returns current-season fixtures on the free plan. */
-const LEAGUES = [
-  { code: "PL", name: "Premier League" },
-  { code: "PD", name: "La Liga" },
-  { code: "CL", name: "UEFA Champions League" },
-] as const;
+/** Every competition this token can see gets auto-imported daily — not
+ *  just a hand-picked few. Moçambola stays 100% manual regardless — no
+ *  vendor has ever confirmed covering it. Same 13 competitions verified
+ *  directly against football-data.org before the vendor migration; unlike
+ *  the previous vendor (API-Football Free), this one actually returns
+ *  current-season fixtures on the free plan. */
+const LEAGUES = FOOTBALL_DATA_COMPETITIONS;
+
+/**
+ * 13 sequential requests (one per league) land well within the same
+ * 60-second window — reliably enough over the vendor's 10-requests/minute
+ * limit that whichever competitions sit LAST in a fixed list order would
+ * systematically 429 on every single run, forever, never actually getting
+ * imported (same root cause fixed for the admin fixture picker, see
+ * searchFixturesInRange in lib/sportsData.ts — but a fixed per-request
+ * delay isn't safe here: 13 competitions × even a few seconds each risks
+ * exceeding Vercel's serverless function duration limit on this project's
+ * plan, see git history on vercel.json/Hobby-plan cron limits, turning a
+ * rate-limit inconvenience into an outright killed function).
+ *
+ * Instead, rotate which competition starts the list each day (by day-of-
+ * epoch modulo the list length) — whichever ~3 land last and risk a 429
+ * changes daily, so every competition gets its turn near the front of the
+ * queue (and a clean import) at least once every 13 days, rather than the
+ * same 2-3 competitions being permanently starved. A day or two of import
+ * staleness for a fixture calendar is a total non-issue — nothing here is
+ * time-critical the way live scores are.
+ */
+function rotatedLeagues(): (typeof LEAGUES)[number][] {
+  const dayIndex = Math.floor(Date.now() / 86_400_000) % LEAGUES.length;
+  return [...LEAGUES.slice(dayIndex), ...LEAGUES.slice(0, dayIndex)];
+}
 
 const ELIMINATION_STAGES = new Set(["FINAL", "THIRD_PLACE_PLAYOFF"]);
 
@@ -35,8 +57,8 @@ export type ImportResult = {
 };
 
 /**
- * Imports upcoming fixtures for the leagues above into `matches`, idempotent
- * per external_id (prefixed football-data.org match id, see
+ * Imports upcoming fixtures for every covered competition into `matches`,
+ * idempotent per external_id (prefixed football-data.org match id, see
  * lib/sportsData.ts toExternalId) via ON CONFLICT — a re-run only refreshes
  * kickoff time/team names for a fixture already on file (e.g. a
  * postponement), never touches match_status/result_* so it can never
@@ -57,7 +79,7 @@ export async function importUpcomingFixtures(windowDays = 14): Promise<ImportRes
   let updated = 0;
   const errors: string[] = [];
 
-  for (const league of LEAGUES) {
+  for (const league of rotatedLeagues()) {
     try {
       const { body, error } = await footballDataFetch<{ matches?: RawFixture[] }>(
         `/competitions/${league.code}/matches?dateFrom=${from}&dateTo=${to}`
