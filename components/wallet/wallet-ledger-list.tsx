@@ -17,6 +17,7 @@ const LEDGER_ICON: Record<string, { Icon: LucideIcon; tint: string }> = {
   withdrawal_hold: { Icon: ArrowUpFromLine, tint: "#9C98F7" },
   withdrawal_release: { Icon: RotateCcw, tint: "#3B82F6" },
   withdrawal_complete: { Icon: ArrowUpFromLine, tint: "#94A3B8" },
+  refund_fee: { Icon: RotateCcw, tint: "#3B82F6" },
 };
 
 function LedgerRow({ entry, bordered }: { entry: WalletLedgerEntry; bordered: boolean }) {

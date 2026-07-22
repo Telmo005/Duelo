@@ -5,6 +5,7 @@ import {
   timestamp,
   bigint,
   integer,
+  numeric,
   boolean,
   uniqueIndex,
   index,
@@ -287,13 +288,25 @@ export const bets = pgTable("bets", {
   matchId: uuid("match_id").notNull(),
   creatorId: uuid("creator_id").notNull(),
   opponentId: uuid("opponent_id"),
-  /** 'home' | 'draw' | 'away' — the creator's prediction (1X2) */
+  /** Which market this bet is on — see lib/betMarkets.ts for the single
+   *  source of truth on valid (market, prediction) pairs and how each
+   *  resolves from a final score. Defaults to '1x2' so every pre-existing
+   *  row is correctly classified with no backfill (migration 0035). */
+  market: text("market").notNull().default("1x2"),
+  /** Only set for market='total_goals' (one of 1.5/2.5/3.5) — null for
+   *  every other market. See lib/betMarkets.ts. */
+  line: numeric("line", { mode: "number", precision: 4, scale: 1 }),
+  /** The creator's prediction — domain depends on `market`: 'home'|'draw'|
+   *  'away' for 1x2, 'over'|'under' for total_goals, 'yes'|'no' for btts.
+   *  See lib/betMarkets.ts. */
   prediction: text("prediction").notNull(),
-  /** 'home' | 'draw' | 'away' — the opponent's own prediction, picked at
-   *  accept time from whichever outcomes the creator didn't call. Null
-   *  until matched. Always differs from `prediction` (enforced in
-   *  bet_accept and by a DB check constraint) — if the actual result
-   *  matches neither, bet_settle_match refunds both sides. */
+  /** The opponent's own prediction, picked at accept time from whichever
+   *  outcome(s) the creator didn't call — same domain as `prediction`
+   *  above, scoped to this bet's `market`. Null until matched. Always
+   *  differs from `prediction` (enforced in bet_accept and by a DB check
+   *  constraint) — if the actual result matches neither (1x2 only; the two
+   *  newer markets are binary and always produce a winner), bet_settle_match
+   *  refunds both sides. */
   opponentPrediction: text("opponent_prediction"),
   stakeCents: bigint("stake_cents", { mode: "number" }).notNull(),
   status: text("status").notNull().default("waiting"),
