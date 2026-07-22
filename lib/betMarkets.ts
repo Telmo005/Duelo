@@ -31,13 +31,31 @@ export const MARKET_LABEL: Record<Market, string> = {
 /** Which icon represents each market — shared between the market-picker
  *  step (create-bet-form.tsx) and the small inline marker shown on every
  *  feed row (duel-post.tsx), so the same market always reads as the same
- *  icon everywhere instead of drifting between the two spots. Plain data,
- *  no lucide-react import here on purpose — this file stays framework-free;
- *  each consumer maps these keys to its own icon components. */
-export const MARKET_ICON: Record<Market, "target" | "goal" | "handshake"> = {
-  "1x2": "target",
+ *  icon everywhere instead of drifting between the two spots. Trophy for
+ *  1x2 (it's fundamentally about who WINS, the same icon the app already
+ *  uses for a settled win elsewhere) rather than a generic crosshair — a
+ *  concrete "what this bet is about" glyph reads faster in a scrolling feed
+ *  than an abstract one. Plain data, no lucide-react import here on purpose
+ *  — this file stays framework-free; each consumer maps these keys to its
+ *  own icon components. */
+export const MARKET_ICON: Record<Market, "trophy" | "goal" | "handshake"> = {
+  "1x2": "trophy",
   total_goals: "goal",
   btts: "handshake",
+};
+
+/** Which accent colour represents each market — same sharing rationale as
+ *  MARKET_ICON above (feed row, market-picker step, and the "choose your
+ *  side" acceptance step all use this so a market reads as the same colour
+ *  everywhere). Semantic keys, not Tailwind classes, on purpose: this file
+ *  stays framework-free, and the concrete class needed differs by spot
+ *  (icon-only text colour in the feed vs. a tinted badge background in the
+ *  wizard) — each consumer maps these to its own classes. Reuses the app's
+ *  existing primary/success/locked tokens rather than introducing new ones. */
+export const MARKET_ACCENT: Record<Market, "primary" | "success" | "locked"> = {
+  "1x2": "primary",
+  total_goals: "success",
+  btts: "locked",
 };
 
 /** One-line plain-language explanation of each market — shown right under
