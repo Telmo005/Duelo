@@ -15,6 +15,7 @@ import { ChangePasswordForm } from "@/components/profile/change-password-form";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Wallet, Swords, MessageCircle } from "lucide-react";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Perfil | Duelo" };
 
@@ -31,7 +32,7 @@ export default async function ProfilePage() {
     getWalletBalance(user.id),
   ]);
 
-  const memberSince = new Date(profile.createdAt).toLocaleDateString("pt", { month: "long", year: "numeric" });
+  const memberSince = new Date(profile.createdAt).toLocaleDateString("pt", { month: "long", year: "numeric", timeZone: MOZAMBIQUE_TIMEZONE });
   // Never show a negative "how much have you won" number — a net loss
   // reads as 0, not red, since the point of this stat is bragging rights,
   // not a full accounting ledger (that's what the wallet/carteira is for).

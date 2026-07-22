@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { findUserByPhoneAction, adminResetPasswordAction } from "@/lib/actions/admin-users";
 import { Spinner } from "@/components/ui/spinner";
+import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 type FoundUser = { id: string; displayName: string; phone: string; createdAt: string };
 
@@ -80,7 +81,7 @@ export function UserPasswordReset() {
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-sm font-bold">{found.displayName}</p>
           <p className="text-xs text-muted-foreground">
-            {found.phone} · membro desde {new Date(found.createdAt).toLocaleDateString("pt", { day: "2-digit", month: "2-digit", year: "numeric" })}
+            {found.phone} · membro desde {new Date(found.createdAt).toLocaleDateString("pt", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: MOZAMBIQUE_TIMEZONE })}
           </p>
 
           <form onSubmit={handleReset} className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
