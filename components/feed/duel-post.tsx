@@ -1,7 +1,7 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { X, TrendingUp } from "lucide-react";
+import { X, TrendingUp, Lock } from "lucide-react";
 import { CancelBetButton } from "./cancel-bet-button";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -221,6 +221,12 @@ export function DuelPost({
   const isOwnBet = live && duel.creatorId === currentUserId;
   const hasKickedOff = new Date(duel.match.kickoffAtIso).getTime() <= Date.now();
   const canJoin = isWaiting && !hasKickedOff;
+  // "locked"/"live" both mean a second bettor already committed — nothing
+  // left to accept here. The dot colour in TimeSlot and the muted MoneySlot
+  // already hint at this, but both are subtle enough that a first-time
+  // visitor reliably misses them (real feedback) — this badge says it
+  // outright, in words, right on the line the eye hits first.
+  const isMatched = duel.status === "locked" || duel.status === "live";
 
   const info = (
     <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -229,9 +235,17 @@ export function DuelPost({
         <TeamBadge name={duel.match.away} logoUrl={duel.match.awayLogoUrl} size={18} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-bold leading-tight">
-          {duel.match.home} <span className="font-normal text-muted-foreground">vs</span> {duel.match.away}
-        </p>
+        <div className="flex min-w-0 items-center gap-1">
+          <p className="min-w-0 truncate text-[13px] font-bold leading-tight">
+            {duel.match.home} <span className="font-normal text-muted-foreground">vs</span> {duel.match.away}
+          </p>
+          {isMatched && (
+            <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-locked-10 px-1.5 py-[1px] text-[9px] font-bold text-locked">
+              <Lock className="size-2.5 shrink-0" aria-hidden />
+              Fechado
+            </span>
+          )}
+        </div>
         <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
           {duel.a.name} · {duel.prediction}
         </p>
