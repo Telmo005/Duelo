@@ -120,6 +120,8 @@ function parseFixtureSearchResult(fx: RawMatch): FixtureSearchResult | null {
   };
 }
 
+type FixtureSearchOutcome = { fixtures: FixtureSearchResult[]; error?: string };
+
 /**
  * Lists real fixtures across every competition this token can see, for a
  * given date — powers the "Procurar jogo real" admin picker.
@@ -131,38 +133,59 @@ function parseFixtureSearchResult(fx: RawMatch): FixtureSearchResult | null {
  * fixture existed for a given day; the unfiltered call for that exact day
  * returned zero matches, while `/competitions/BSA/matches` for the same day
  * returned it correctly). A Free-tier quirk of that endpoint, not a bug on
- * our side — looping per-competition sidesteps it entirely. Sequential, not
- * parallel, for the same 10-requests/minute reasoning as searchTeams; one
- * competition erroring just means it contributes no fixtures to this
- * search, not a failure of the whole picker.
+ * our side — looping per-competition sidesteps it entirely.
+ *
+ * This alone is 13 sequential requests in one call — already at/over the
+ * 10-requests/minute ceiling by itself if it ever needs to run twice close
+ * together (e.g. an admin re-clicking the same day, or two admins
+ * searching around the same time). Wrapped in unstable_cache per exact
+ * date (10 min) so the 13-request cost is paid at most once per date per
+ * cache window, no matter how many times it's clicked — the "Procurar jogo
+ * real" picker only ever offers 3 fixed dates (Hoje/Amanhã/Depois de
+ * amanhã), so there are at most 3 such cache entries alive at once. One
+ * competition erroring (including a 429 if the burst itself trips the
+ * limit) just means it contributes no fixtures to this search, not a
+ * failure of the whole picker — self-heals on the next cache refresh.
  */
-export async function searchFixturesByDate(date: string): Promise<{ fixtures: FixtureSearchResult[]; error?: string }> {
-  const fixtures: FixtureSearchResult[] = [];
-  const errors: string[] = [];
+const searchFixturesByDateCached = unstable_cache(
+  async (date: string): Promise<FixtureSearchOutcome> => {
+    const fixtures: FixtureSearchResult[] = [];
+    const errors: string[] = [];
 
-  for (const comp of FOOTBALL_DATA_COMPETITIONS) {
-    const { body, error } = await footballDataFetch<{ matches?: RawMatch[] }>(
-      `/competitions/${comp.code}/matches?dateFrom=${date}&dateTo=${date}`
-    );
-    if (error) {
-      errors.push(`${comp.name}: ${error}`);
-      continue;
+    for (const comp of FOOTBALL_DATA_COMPETITIONS) {
+      const { body, error } = await footballDataFetch<{ matches?: RawMatch[] }>(
+        `/competitions/${comp.code}/matches?dateFrom=${date}&dateTo=${date}`
+      );
+      if (error) {
+        errors.push(`${comp.name}: ${error}`);
+        continue;
+      }
+      for (const fx of body?.matches ?? []) {
+        const parsed = parseFixtureSearchResult(fx);
+        if (parsed) fixtures.push(parsed);
+      }
     }
-    for (const fx of body?.matches ?? []) {
-      const parsed = parseFixtureSearchResult(fx);
-      if (parsed) fixtures.push(parsed);
+
+    // Only surface an error if EVERY competition failed (e.g. token/network
+    // down) — a handful of individual failures among 13 calls is normal
+    // background noise, not something the admin needs to see as a blocking
+    // error when the search still turned up real results from the rest.
+    // Also deliberately NOT thrown (unlike getCompetitionTeams) — a mixed
+    // result (some fixtures found, some competitions failed) is exactly the
+    // kind of thing worth caching as-is; the next window's fresh attempt
+    // will pick up whatever the failed competitions would have had.
+    if (fixtures.length === 0 && errors.length === FOOTBALL_DATA_COMPETITIONS.length) {
+      return { fixtures: [], error: errors[0] };
     }
-  }
 
-  // Only surface an error if EVERY competition failed (e.g. token/network
-  // down) — a handful of individual failures among 13 calls is normal
-  // background noise, not something the admin needs to see as a blocking
-  // error when the search still turned up real results from the rest.
-  if (fixtures.length === 0 && errors.length === FOOTBALL_DATA_COMPETITIONS.length) {
-    return { fixtures: [], error: errors[0] };
-  }
+    return { fixtures };
+  },
+  ["football-data-fixtures-by-date"],
+  { revalidate: 600 }
+);
 
-  return { fixtures };
+export async function searchFixturesByDate(date: string): Promise<FixtureSearchOutcome> {
+  return searchFixturesByDateCached(date);
 }
 
 /** Match statuses that mean the fixture is genuinely OVER as scheduled —

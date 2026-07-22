@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { matches, profiles, notifications, liveSyncState } from "@/db/schema";
+import { matches, profiles, notifications, liveSyncState, bets } from "@/db/schema";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { fetchLiveFixtures, fetchFixtureById, type FixtureUpdate } from "@/lib/sportsData";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -130,6 +130,20 @@ export async function attemptAutoSettleIfConfirmed(
   return { settled: true };
 }
 
+/** Hard cap on fallback lookups (fetchFixtureById) spent in one call to
+ *  syncLiveMatchesFromApi. fetchLiveFixtures itself is always exactly ONE
+ *  request no matter how many matches are simultaneously live — that part
+ *  scales for free. The fallback is the only per-match cost (see doc
+ *  comment below), and this is the backstop against it ever growing
+ *  unbounded if many tracked matches happen to drop off the LIVE list in
+ *  the same tick: 1 (fetchLiveFixtures) + 7 (fallbacks) = 8, comfortably
+ *  under the 10/minute ceiling with headroom for a concurrent admin action.
+ *  Anything beyond the cap just waits for the next tick (60s later,
+ *  MIN_POLL_INTERVAL_SECONDS below) — never a correctness issue, since
+ *  attemptAutoSettleIfConfirmed only needs two reads EVENTUALLY, not
+ *  instantly. */
+const MAX_FALLBACK_LOOKUPS_PER_TICK = 7;
+
 /**
  * Fetches every fixture currently live across every competition this token
  * can see in ONE request (fetchLiveFixtures — football-data.org's
@@ -137,21 +151,30 @@ export async function attemptAutoSettleIfConfirmed(
  * every tracked 'live'/'needs_review' match linked to the vendor. Shared
  * core behind both the admin's "Atualizar jogos ao vivo" button
  * (refreshAllLiveMatchesAction) and the automatic sync cron
- * (runLiveScoreAutoSync).
+ * (runLiveScoreAutoSync). This one request covers however many matches are
+ * simultaneously live — 1 or 50, same cost — so raw match count is never
+ * the scaling risk here.
  *
  * status=LIVE structurally EXCLUDES FINISHED — the instant a match's real
  * status flips to FINISHED it drops out of that filter entirely (confirmed
- * against the live API before this fix), so a tracked match not found in
- * the LIVE map is not necessarily "the vendor has nothing to say" — it's
- * very often exactly the tick where the match just ended. Falling back to a
- * single-fixture lookup (fetchFixtureById) for each such match is what makes
- * attemptAutoSettleIfConfirmed ever actually see a FINISHED status through
- * this path at all — without it, the LIVE-only request would never
- * transition a match out of 'live'/'needs_review' automatically, silently
- * defeating the whole point of automatic settlement (it would still fall
- * back fine to the admin's manual per-match button, just never on its own).
- * Extra cost is one request per match that just dropped off the live list —
- * negligible given AUTO_SYNC_ELIGIBLE_MINUTES keeps the tracked set tiny.
+ * against the live API), so a tracked match not found in the LIVE map is
+ * very often exactly the tick where it just ended. Falling back to a
+ * single-fixture lookup (fetchFixtureById) is what makes
+ * attemptAutoSettleIfConfirmed ever actually see FINISHED through this path
+ * — but unlike the bulk call, THIS part genuinely costs one request per
+ * affected match, so it's the one place that could scale with how many
+ * matches are live at once.
+ *
+ * Two safeguards keep that bounded regardless of catalogue size: (1) only
+ * matches with at least one 'matched' bet get the fallback at all — a match
+ * nobody has real money on doesn't need a prompt automatic result, since
+ * match_advance_lifecycle (0028_match_live_lifecycle.sql) closes it purely
+ * by kickoff time regardless of whether its final score was ever confirmed
+ * here; its live score just goes stale until an admin looks or the next
+ * import refreshes it, which is a cosmetic gap, not a financial one. (2)
+ * MAX_FALLBACK_LOOKUPS_PER_TICK caps even the bet-carrying ones per call —
+ * same "quota usage scales with real bets, not with how many fixtures
+ * exist" principle as the admin's per-match refresh button.
  */
 export async function syncLiveMatchesFromApi(): Promise<LiveSyncResult> {
   const tracked = await db
@@ -175,26 +198,45 @@ export async function syncLiveMatchesFromApi(): Promise<LiveSyncResult> {
   if (error) return { updated: 0, missing: [], error: `Falha ao consultar a API: ${error}` };
   if (!liveByExternalId) return { updated: 0, missing: [], error: "Sem dados da API." };
 
+  const matchedBetMatchIds = await db
+    .selectDistinct({ matchId: bets.matchId })
+    .from(bets)
+    .where(
+      and(
+        inArray(
+          bets.matchId,
+          tracked.map((m) => m.id)
+        ),
+        eq(bets.status, "matched")
+      )
+    );
+  const hasMatchedBet = new Set(matchedBetMatchIds.map((b) => b.matchId));
+
   let updated = 0;
   const missing: string[] = [];
+  let fallbacksSpent = 0;
 
   for (const match of tracked) {
     let live = liveByExternalId.get(match.externalId!);
 
-    // Not in the LIVE map — could genuinely be "vendor has nothing yet", but
-    // is very often "just finished" (see doc comment above). One targeted
-    // lookup settles which, at the cost of a single extra request.
     if (!live || live.homeGoals == null || live.awayGoals == null) {
-      const fallback = await fetchFixtureById(match.externalId!);
-      if (fallback.error) {
-        // Swallowed into "missing" below either way (never blocks the rest
-        // of the batch), but logged so a real recurring cause (bad
-        // external_id, vendor hiccup) is visible on /admin/errors instead
-        // of silently looking identical to "vendor genuinely has nothing
-        // yet" forever.
-        await logError("live_score_sync_fallback", new Error(fallback.error), { matchId: match.id, externalId: match.externalId });
+      // Not in the LIVE map — could genuinely be "vendor has nothing yet",
+      // but is very often "just finished" (see doc comment above). Only
+      // worth spending a real request on it if there's actual money
+      // waiting on the result, and only while under the per-tick cap.
+      if (hasMatchedBet.has(match.id) && fallbacksSpent < MAX_FALLBACK_LOOKUPS_PER_TICK) {
+        fallbacksSpent++;
+        const fallback = await fetchFixtureById(match.externalId!);
+        if (fallback.error) {
+          // Swallowed into "missing" below either way (never blocks the
+          // rest of the batch), but logged so a real recurring cause (bad
+          // external_id, vendor hiccup) is visible on /admin/errors instead
+          // of silently looking identical to "vendor genuinely has nothing
+          // yet" forever.
+          await logError("live_score_sync_fallback", new Error(fallback.error), { matchId: match.id, externalId: match.externalId });
+        }
+        live = fallback.data;
       }
-      live = fallback.data;
     }
 
     if (!live || live.homeGoals == null || live.awayGoals == null) {
