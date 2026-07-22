@@ -23,19 +23,16 @@ export function TeamBadge({ name, logoUrl, size = 44 }: { name: string; logoUrl?
         className="flex shrink-0 items-center justify-center rounded-full bg-white/95 p-1.5 ring-2 ring-white/25"
         style={{ width: size + 6, height: size + 6, boxShadow: "0 3px 8px rgba(0,0,0,0.45)" }}
       >
-        {/* Routed through Next's image optimizer (media.api-sports.io is
-         *  allowlisted in next.config.ts specifically for this) rather than
-         *  `unoptimized` — every crest gets converted to WebP/AVIF and
+        {/* Routed through Next's image optimizer (crests.football-data.org
+         *  is allowlisted in next.config.ts specifically for this) rather
+         *  than `unoptimized` — every crest gets converted to WebP/AVIF and
          *  cached at the edge on first request, so every user AFTER the
          *  first to load a given team's badge gets it from a nearby cache
-         *  instead of a fresh round-trip to api-sports.io's own origin.
-         *  With only ~30-60 distinct teams in play across the covered
-         *  leagues, that shared edge cache is what actually matters for load
-         *  time on a slow connection — a previous version of this component
-         *  bypassed it (reasoning that the source images were "already
-         *  small"), which meant literally every visitor's browser re-fetched
-         *  every crest straight from the vendor, uncompressed, with no
-         *  shared caching benefit at all. */}
+         *  instead of a fresh round-trip to the vendor's own, measurably
+         *  slow origin (confirmed directly: ~1-1.7s time-to-first-byte per
+         *  crest, not a proper CDN). With only ~30-60 distinct teams in play
+         *  across the covered leagues, that shared edge cache is what
+         *  actually matters for load time on a slow connection. */}
         <Image src={logoUrl} alt={name} width={size} height={size} className="size-full object-contain" />
       </div>
     );
