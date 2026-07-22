@@ -30,36 +30,60 @@ const DAY_OPTIONS = [
 const RESULTS_CAP = 150;
 
 /**
- * "Procurar jogo real" — an optional search (football-data.org, unfiltered
- * `/matches?dateFrom=&dateTo=`) that lists every real match on a given day so
- * an admin can tick the ones they want and add them all in one go, instead of
- * typing teams/league/kickoff by hand one match at a time. Only offers
- * Hoje/Amanhã/Depois de amanhã — a deliberate UI choice to keep the picker
- * simple, not a vendor limitation. Purely additive/self-contained: it inserts
- * the matches itself (via addFixturesBulkAction) and never touches the manual
- * form below it — Moçambola/anything the API doesn't cover still goes
- * through manual entry exactly as before this existed.
+ * "Procurar jogo real" — an optional search (football-data.org) that lists
+ * every real match on a given day so an admin can tick the ones they want
+ * and add them all in one go, instead of typing teams/league/kickoff by
+ * hand one match at a time. Only offers Hoje/Amanhã/Depois de amanhã — a
+ * deliberate UI choice to keep the picker simple, not a vendor limitation.
+ *
+ * Fetches the WHOLE 3-day window in one request (searchFixturesAction/
+ * searchFixturesInRange), on the first tab click, then filters it locally
+ * per day — switching tabs after that costs nothing. An earlier version
+ * fetched per single tab, which meant every tab click was its own
+ * expensive search and clicking through all 3 could trip the vendor's
+ * 10-requests/minute limit (confirmed in production).
+ *
+ * Purely additive/self-contained: it inserts the matches itself (via
+ * addFixturesBulkAction) and never touches the manual form below it —
+ * Moçambola/anything the API doesn't cover still goes through manual entry
+ * exactly as before this existed.
  */
 export function FixtureSearchPicker() {
   const [dayOffset, setDayOffset] = useState<number | null>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<FixtureSearchResult[]>([]);
+  // All fixtures across the whole Hoje→Depois-de-amanhã window, fetched
+  // ONCE (see loadRange) — switching day tabs below just filters this by
+  // date, never triggers a new request. Fetching per-tab used to mean 13
+  // requests EACH, so clicking through all 3 tabs could burn ~39 requests
+  // and trip the API's 10/minute limit (this happened in production).
+  const [allResults, setAllResults] = useState<FixtureSearchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isAdding, startAdding] = useTransition();
 
-  async function loadDay(offset: number) {
-    setDayOffset(offset);
-    setQuery("");
-    setSelected(new Set());
+  async function loadRange() {
     setLoading(true);
     setError(null);
-    const { fixtures, error: fetchError } = await searchFixturesAction(localDateStr(offset));
-    setResults(fixtures);
+    const lastOffset = DAY_OPTIONS[DAY_OPTIONS.length - 1].offset;
+    const { fixtures, error: fetchError } = await searchFixturesAction(localDateStr(0), localDateStr(lastOffset));
+    setAllResults(fixtures);
     setError(fetchError ?? null);
     setLoading(false);
   }
+
+  function selectDay(offset: number) {
+    setDayOffset(offset);
+    setQuery("");
+    setSelected(new Set());
+    if (allResults === null && !loading) loadRange();
+  }
+
+  const targetDate = dayOffset !== null ? localDateStr(dayOffset) : null;
+  const results = useMemo(
+    () => (allResults ?? []).filter((fx) => fx.kickoffAtIso.slice(0, 10) === targetDate),
+    [allResults, targetDate]
+  );
 
   const needle = query.trim().toLowerCase();
   const filtered = needle
@@ -135,7 +159,7 @@ export function FixtureSearchPicker() {
             key={d.offset}
             type="button"
             disabled={isAdding}
-            onClick={() => loadDay(d.offset)}
+            onClick={() => selectDay(d.offset)}
             className={`press shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
               dayOffset === d.offset ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-accent"
             }`}
