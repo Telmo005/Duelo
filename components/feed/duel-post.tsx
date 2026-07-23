@@ -187,12 +187,15 @@ function MoneySlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
 
   // Already a real, locked-in duel (matched — "locked" or "live") — the
   // stake is committed either way, so what's actually interesting now is
-  // what it turns into, not what went in. Muted grey (not the success green
-  // used for the still-joinable preview below) — this isn't a "come join"
-  // hook anymore, just an informational amount.
+  // what it turns into, not what went in. Same two-line layout as the
+  // still-joinable preview below (stake on top, payout underneath) so the
+  // entry amount never disappears just because a duel found its opponent —
+  // muted grey throughout (not the success green used for the joinable
+  // preview) since this isn't a "come join" hook anymore, just information.
   if (duel.status === "locked" || duel.status === "live") {
     return (
-      <div className="flex w-[76px] shrink-0 items-center justify-end">
+      <div className="flex w-[76px] shrink-0 flex-col items-end leading-tight">
+        <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{stakeLabel} MT</span>
         <span className="flex items-center gap-1 text-[15px] font-bold tabular-nums text-muted-foreground">
           <TrendingUp className="size-3.5 shrink-0" aria-hidden />+{payoutLabel}
         </span>
