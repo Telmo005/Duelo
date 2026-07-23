@@ -106,8 +106,49 @@ function isStarted(m: CatalogMatch, now: number): boolean {
   return m.matchStatus !== "scheduled" || new Date(m.kickoffAtIso).getTime() <= now;
 }
 
+/** One row — a live/started match renders as StartedRow (not tappable,
+ *  bet_create would just reject it), everything else links straight into
+ *  bet creation with this match preselected. Pulled out of the render loop
+ *  so both sort modes below (grouped by league, or one flat chronological
+ *  list) can share it without duplicating the row markup. */
+function MatchRow({ match: m, now }: { match: CatalogMatch; now: number }) {
+  if (isStarted(m, now)) return <StartedRow match={m} />;
+  return (
+    <Link
+      href={`/bets/new?matchId=${m.id}`}
+      prefetch={false}
+      className="press relative flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-card)] transition-colors hover:border-primary-30"
+    >
+      <span className="flex shrink-0 items-center gap-1">
+        <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={22} />
+        <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={22} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-bold leading-tight">
+          {m.home} <span className="font-normal text-muted-foreground">vs</span> {m.away}
+          {m.isElimination && <span className="ml-1.5 text-[10px] font-semibold text-locked">· Eliminação</span>}
+        </p>
+      </span>
+      <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{m.kickoffLabel}</span>
+      <RowPendingOverlay />
+    </Link>
+  );
+}
+
+type SortMode = "league" | "soon";
+const SORT_OPTIONS: { key: SortMode; label: string }[] = [
+  { key: "league", label: "Melhores campeonatos" },
+  { key: "soon", label: "Mais próximos" },
+];
+
 export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
   const [query, setQuery] = useState("");
+  // "league" (default) groups by competition prestige — same ranking the
+  // feed's own duel groups use (lib/leagueTiers.ts). "soon" drops the
+  // grouping entirely and lists every match in one flat queue ordered by
+  // kickoff — a live/already-started match's kickoff is in the past, so it
+  // naturally sorts to the very top, then whatever's next, and so on.
+  const [sort, setSort] = useState<SortMode>("league");
 
   // Re-checked every 30s so a match that kicks off while this tab is just
   // sitting open flips from "vs kickoff time" to "started" without a full
@@ -127,6 +168,13 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
     [filtered]
   );
 
+  const chronological = useMemo(
+    () => [...filtered].sort((a, b) => new Date(a.kickoffAtIso).getTime() - new Date(b.kickoffAtIso).getTime()),
+    [filtered]
+  );
+
+  const isEmpty = sort === "league" ? groups.length === 0 : chronological.length === 0;
+
   return (
     <div className="flex flex-col gap-3">
       <div className="relative">
@@ -134,7 +182,22 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
         <Search className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
       </div>
 
-      {groups.length === 0 ? (
+      <div className="flex gap-1.5 overflow-x-auto">
+        {SORT_OPTIONS.map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => setSort(opt.key)}
+            className={`press shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+              sort === opt.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {isEmpty ? (
         <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-6 py-12 text-center">
           <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground" aria-hidden>
             <CalendarX className="size-7" />
@@ -148,37 +211,21 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
               : "Tenta outra equipa ou liga."}
           </p>
         </div>
-      ) : (
+      ) : sort === "league" ? (
         <div className="flex flex-col gap-4">
           {groups.map(([league, leagueMatches]) => (
             <div key={league} className="flex flex-col gap-1.5">
               <SectionLabel className="mb-0 px-0.5">{league}</SectionLabel>
-              {leagueMatches.map((m) =>
-                isStarted(m, now) ? (
-                  <StartedRow key={m.id} match={m} />
-                ) : (
-                  <Link
-                    key={m.id}
-                    href={`/bets/new?matchId=${m.id}`}
-                    prefetch={false}
-                    className="press relative flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-card)] transition-colors hover:border-primary-30"
-                  >
-                    <span className="flex shrink-0 items-center gap-1">
-                      <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={22} />
-                      <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={22} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-bold leading-tight">
-                        {m.home} <span className="font-normal text-muted-foreground">vs</span> {m.away}
-                        {m.isElimination && <span className="ml-1.5 text-[10px] font-semibold text-locked">· Eliminação</span>}
-                      </p>
-                    </span>
-                    <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{m.kickoffLabel}</span>
-                    <RowPendingOverlay />
-                  </Link>
-                )
-              )}
+              {leagueMatches.map((m) => (
+                <MatchRow key={m.id} match={m} now={now} />
+              ))}
             </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {chronological.map((m) => (
+            <MatchRow key={m.id} match={m} now={now} />
           ))}
         </div>
       )}
