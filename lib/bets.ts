@@ -344,6 +344,17 @@ export async function getUnsettledMatches(): Promise<MatchRow[]> {
     .orderBy(asc(matches.kickoffAt));
 }
 
+/** Caps how many processed matches /admin/matches renders — a display/
+ *  cleanup-tool concern, not the ledger of record (settlement itself reads
+ *  nothing from this list). Without a limit this grows unbounded with every
+ *  match that's ever finished/been voided — real incident: a large batch of
+ *  leftover rows from a since-decommissioned data vendor sat in 'closed'
+ *  status here, and rendering all of them at once is a plausible cause of a
+ *  since-observed Server Components render failure on /admin. Newest-first
+ *  ordering means the cap only ever hides genuinely old, already-handled
+ *  matches — nothing an admin still needs to act on. */
+const PROCESSED_MATCHES_LIMIT = 50;
+
 /** Matches already in a terminal state (finished/postponed/abandoned/closed)
  *  — shown in /admin/matches purely so a stale one (e.g. voided by mistake,
  *  or just clutter) can still be removed from the catalogue. Settlement
@@ -353,7 +364,8 @@ export async function getProcessedMatches(): Promise<MatchRow[]> {
     .select()
     .from(matches)
     .where(inArray(matches.matchStatus, ["finished", "postponed", "abandoned", "closed"]))
-    .orderBy(desc(matches.kickoffAt));
+    .orderBy(desc(matches.kickoffAt))
+    .limit(PROCESSED_MATCHES_LIMIT);
 }
 
 const AVATAR_COLORS = ["#F2C22A", "#9C98F7", "#34D399", "#F0455B", "#8B7CFF"];

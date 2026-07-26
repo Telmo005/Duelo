@@ -41,7 +41,16 @@ export async function writeLiveScore(
     .where(eq(matches.id, matchId));
 }
 
-export type LiveSyncResult = { updated: number; missing: string[]; error?: string };
+/** `skipped` distinguishes "nothing to do" (no live/needs_review match
+ *  linked to the API right now — a totally normal, frequent state) from a
+ *  genuine failure (`error` without `skipped` — the API call itself failed
+ *  or returned nothing). Both still populate `error` with the same
+ *  human-readable message, since the admin's manual "Atualizar jogos ao
+ *  vivo" button shows it as a toast either way — only the automatic cron
+ *  (app/api/cron/live-score-sync) uses `skipped` to decide whether it's
+ *  worth persisting to error_log; logging "nothing was live" as an ERROR
+ *  every few minutes buried the rare real failures under routine noise. */
+export type LiveSyncResult = { updated: number; missing: string[]; error?: string; skipped?: boolean };
 
 /** Only a genuinely-played-to-completion result is safe to auto-settle with
  *  a score — POSTPONED/CANCELLED have no valid score at all (they need
@@ -191,7 +200,7 @@ export async function syncLiveMatchesFromApi(): Promise<LiveSyncResult> {
     .where(and(inArray(matches.matchStatus, ["live", "needs_review"]), isNotNull(matches.externalId)));
 
   if (tracked.length === 0) {
-    return { updated: 0, missing: [], error: "Não há jogos ao vivo ligados à API para atualizar." };
+    return { updated: 0, missing: [], error: "Não há jogos ao vivo ligados à API para atualizar.", skipped: true };
   }
 
   const { data: liveByExternalId, error } = await fetchLiveFixtures();

@@ -3,6 +3,29 @@ import { errorLog } from "@/db/schema";
 import { desc } from "drizzle-orm";
 
 /**
+ * Pulls a real message (and whatever other fields are useful) out of
+ * whatever a caller happened to pass in. Several cron routes pass a
+ * Supabase/Postgrest error straight through (e.g. `const { error } =
+ * await supabase.rpc(...); logError(source, error)`) — that's a plain
+ * object (`{ message, details, hint, code }`), never an `Error` instance,
+ * so `String(error)` on it degrades to the useless literal "[object
+ * Object]" — exactly what several /admin/errors entries showed instead of
+ * the actual Postgres error. Anything with a string `.message` gets that
+ * extracted, with its other fields (details/hint/code) kept in `extra` for
+ * the detail column instead of silently dropped.
+ */
+function extractErrorInfo(error: unknown): { message: string; extra: Record<string, unknown> | null } {
+  if (error instanceof Error) {
+    return { message: error.message, extra: error.stack ? { stack: error.stack } : null };
+  }
+  if (typeof error === "object" && error !== null && "message" in error && typeof (error as Record<string, unknown>).message === "string") {
+    const { message, ...rest } = error as Record<string, unknown>;
+    return { message: message as string, extra: Object.keys(rest).length > 0 ? rest : null };
+  }
+  return { message: String(error), extra: null };
+}
+
+/**
  * Persists a server-side failure to the error_log table — the durable trail
  * console.error alone never gave us (Vercel's function logs are ephemeral
  * and nobody's watching them at 3am). Best-effort, same contract as
@@ -13,9 +36,8 @@ import { desc } from "drizzle-orm";
  * itself fails, so a total DB outage doesn't leave literally zero trace.
  */
 export async function logError(source: string, error: unknown, context?: Record<string, unknown>): Promise<void> {
-  const message = error instanceof Error ? error.message : String(error);
-  const stack = error instanceof Error ? (error.stack ?? null) : null;
-  const detail = context || stack ? JSON.stringify({ ...context, stack }) : null;
+  const { message, extra } = extractErrorInfo(error);
+  const detail = context || extra ? JSON.stringify({ ...context, ...extra }) : null;
 
   try {
     await db.insert(errorLog).values({ source, message, detail });

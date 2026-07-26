@@ -32,7 +32,12 @@ export async function GET(request: Request) {
 
   try {
     const result = await runLiveScoreAutoSync();
-    if (result.error) {
+    // `skipped` means there was simply nothing to sync right now (no live
+    // match linked to the API) — routine, not a failure. Only a real error
+    // (API unreachable, no data back) is worth a durable log entry; logging
+    // the routine case buried genuine failures under noise every few
+    // minutes (see lib/liveScoreSync.ts's LiveSyncResult doc comment).
+    if (result.error && !result.skipped) {
       await logError("cron_live_score_sync", new Error(result.error));
     }
     return NextResponse.json(result);
