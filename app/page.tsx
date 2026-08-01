@@ -62,6 +62,7 @@ export default async function LandingPage() {
     homeLogoUrl: m.homeLogoUrl,
     awayLogoUrl: m.awayLogoUrl,
     isElimination: m.isElimination,
+    featured: m.featured,
     matchStatus: m.matchStatus,
     score: m.score,
     minute: m.minute,

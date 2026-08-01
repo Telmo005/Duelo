@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link, { useLinkStatus } from "next/link";
 import { toast } from "sonner";
-import { Search, CalendarX, Flame } from "lucide-react";
+import { Search, CalendarX, Flame, Pin } from "lucide-react";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Input } from "@/components/ui/input";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -31,6 +31,9 @@ export type CatalogMatch = {
   homeLogoUrl: string | null;
   awayLogoUrl: string | null;
   isElimination: boolean;
+  /** Admin-pinned into the Destaques strip regardless of what the
+   *  automatic pick would have chosen — see pickFeatured below. */
+  featured: boolean;
   /** 'scheduled' | 'live' | 'needs_review' — see getFeedMatchCatalog. */
   matchStatus: string;
   score?: { home: number; away: number };
@@ -147,31 +150,48 @@ const FEATURED_COUNT = 6;
  *  live matches always included regardless of how that clock reads. */
 const FEATURED_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** live-first, then league prestige (lib/leagueTiers.ts), then soonest
+ *  kickoff — the shared ordering both an admin's manual picks and the
+ *  automatic fill-in use, so even hand-picked matches land in a sensible
+ *  order relative to each other rather than whatever order they happen to
+ *  come in. */
+function compareFeaturePriority(a: CatalogMatch, b: CatalogMatch): number {
+  const liveA = a.matchStatus !== "scheduled" ? 0 : 1;
+  const liveB = b.matchStatus !== "scheduled" ? 0 : 1;
+  if (liveA !== liveB) return liveA - liveB;
+  const rankA = leagueRank(a.league, a.country);
+  const rankB = leagueRank(b.league, b.country);
+  if (rankA !== rankB) return rankA - rankB;
+  return new Date(a.kickoffAtIso).getTime() - new Date(b.kickoffAtIso).getTime();
+}
+
 /** Picks the small "best right now" set for the spotlight strip at the top
- *  of the tab — blends the two signals a "good match" actually means
- *  instead of forcing a choice between them: a live match always leads
- *  (nothing beats "happening this second"), then competition prestige
- *  (lib/leagueTiers.ts — Primeira Liga now explicitly outranks Brasileirão,
- *  a correction, not an omission), and soonest kickoff as the tiebreaker
- *  within the same prestige tier. Ignores the search box on purpose — this
- *  is a discovery aid, not a filtered result, so it only shows up when
- *  nobody's already looking for something specific. */
+ *  of the tab. Admin-pinned matches (m.featured, toggled from
+ *  SettleMatchRow) always win a slot first, regardless of what the
+ *  algorithm below would have picked on its own — competition prestige and
+ *  kickoff time can't know about a local derby getting real attention or a
+ *  match the admin specifically wants pushed. Remaining slots fill from the
+ *  automatic pick: a live match always leads (nothing beats "happening
+ *  this second"), then competition prestige (Primeira Liga now explicitly
+ *  outranks Brasileirão, a correction, not an omission), then soonest
+ *  kickoff as the tiebreaker — scoped to the next 7 days so a top-tier
+ *  match still weeks away doesn't crowd out today's. Manual pins are NOT
+ *  scoped to that window — pinning one further out is the whole point of
+ *  overriding the algorithm. Ignores the search box on purpose — this is a
+ *  discovery aid, not a filtered result, so it only shows up when nobody's
+ *  already looking for something specific. */
 function pickFeatured(matches: CatalogMatch[], now: number): CatalogMatch[] {
-  const candidates = matches.filter((m) => {
-    if (m.matchStatus !== "scheduled") return true;
-    return new Date(m.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
-  });
-  return [...candidates]
-    .sort((a, b) => {
-      const liveA = a.matchStatus !== "scheduled" ? 0 : 1;
-      const liveB = b.matchStatus !== "scheduled" ? 0 : 1;
-      if (liveA !== liveB) return liveA - liveB;
-      const rankA = leagueRank(a.league, a.country);
-      const rankB = leagueRank(b.league, b.country);
-      if (rankA !== rankB) return rankA - rankB;
-      return new Date(a.kickoffAtIso).getTime() - new Date(b.kickoffAtIso).getTime();
+  const manual = matches.filter((m) => m.featured).sort(compareFeaturePriority);
+
+  const auto = matches
+    .filter((m) => {
+      if (m.featured) return false;
+      if (m.matchStatus !== "scheduled") return true;
+      return new Date(m.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
     })
-    .slice(0, FEATURED_COUNT);
+    .sort(compareFeaturePriority);
+
+  return [...manual, ...auto].slice(0, FEATURED_COUNT);
 }
 
 /** One spotlight card — bigger crests, a gold glow (the same
@@ -186,6 +206,9 @@ function FeaturedCard({ match: m, now }: { match: CatalogMatch; now: number }) {
   const isLive = m.matchStatus !== "scheduled";
   const inner = (
     <>
+      {m.featured && (
+        <Pin className="absolute right-2 top-2 size-2.5 rotate-45 fill-primary text-primary" aria-hidden />
+      )}
       <p className="truncate text-center text-[9px] font-bold uppercase tracking-wider text-primary/90">{m.league}</p>
       <div className="my-2.5 flex items-center justify-center gap-2">
         <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={32} />

@@ -235,6 +235,12 @@ export const matches = pgTable("matches", {
    *  prediction or a valid settlement result for one. Enforced both in
    *  bet_create and bet_settle_match (see 0019_elimination_matches.sql). */
   isElimination: boolean("is_elimination").notNull().default(false),
+  /** Admin-pinned into the feed's "Destaques" strip regardless of what the
+   *  automatic pick (live-first, then league prestige, then soonest
+   *  kickoff — see lib/leagueTiers.ts and components/feed/match-catalog.tsx)
+   *  would have chosen on its own. False for everything by default — this
+   *  is an override, not a replacement for the algorithm. */
+  featured: boolean("featured").notNull().default(false),
 
   /** In-play score + minute (migration 0007) — display-only, deliberately
    *  separate from result_home/result_away so tracking a live score can
