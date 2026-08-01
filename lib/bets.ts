@@ -452,7 +452,6 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
           kickoffAtIso: new Date(match.kickoffAt).toISOString(),
           homeLogoUrl: match.homeLogoUrl,
           awayLogoUrl: match.awayLogoUrl,
-          featured: match.featured,
         },
         prediction: predictionText,
         predictionCode,

@@ -161,18 +161,30 @@ function compareFeaturePriority(a: FeaturePriorityInfo, b: FeaturePriorityInfo):
  * so a top-tier match still weeks away doesn't crowd out something worth
  * tapping into today. Manual pins are NOT scoped to that window — reaching
  * further out is the whole point of overriding the algorithm by hand.
+ *
+ * `count` bounds the AUTOMATIC fill-in only — every manual pin always
+ * shows, even past that number. An admin pinning 8 matches and only
+ * seeing 6 (the rest silently dropped because they landed after the slice)
+ * is a real, already-hit failure mode: the whole point of pinning by hand
+ * is "this one should definitely be there," not "this one competes for a
+ * slot with the algorithm."
  */
 export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => FeaturePriorityInfo, count = 6): T[] {
   const manual = items.filter((item) => getInfo(item).featured).sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)));
 
-  const auto = items
-    .filter((item) => {
-      const info = getInfo(item);
-      if (info.featured) return false;
-      if (info.matchStatus && info.matchStatus !== "scheduled") return true;
-      return new Date(info.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
-    })
-    .sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)));
+  const remainingSlots = Math.max(0, count - manual.length);
+  const auto =
+    remainingSlots === 0
+      ? []
+      : items
+          .filter((item) => {
+            const info = getInfo(item);
+            if (info.featured) return false;
+            if (info.matchStatus && info.matchStatus !== "scheduled") return true;
+            return new Date(info.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
+          })
+          .sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)))
+          .slice(0, remainingSlots);
 
-  return [...manual, ...auto].slice(0, count);
+  return [...manual, ...auto];
 }
