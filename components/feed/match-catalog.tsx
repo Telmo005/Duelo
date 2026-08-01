@@ -8,7 +8,7 @@ import { TeamBadge } from "@/components/match/team-badge";
 import { Input } from "@/components/ui/input";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Spinner } from "@/components/ui/spinner";
-import { groupByLeague, leagueRank } from "@/lib/leagueTiers";
+import { groupByLeague, pickFeatured, type FeaturePriorityInfo } from "@/lib/leagueTiers";
 
 export type CatalogMatch = {
   id: string;
@@ -144,54 +144,13 @@ function MatchRow({ match: m, now }: { match: CatalogMatch; now: number }) {
   );
 }
 
-const FEATURED_COUNT = 6;
-/** A top-tier match three weeks out shouldn't crowd out things actually
- *  worth tapping into today — scope "featured" to what's genuinely close,
- *  live matches always included regardless of how that clock reads. */
-const FEATURED_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
-
-/** live-first, then league prestige (lib/leagueTiers.ts), then soonest
- *  kickoff — the shared ordering both an admin's manual picks and the
- *  automatic fill-in use, so even hand-picked matches land in a sensible
- *  order relative to each other rather than whatever order they happen to
- *  come in. */
-function compareFeaturePriority(a: CatalogMatch, b: CatalogMatch): number {
-  const liveA = a.matchStatus !== "scheduled" ? 0 : 1;
-  const liveB = b.matchStatus !== "scheduled" ? 0 : 1;
-  if (liveA !== liveB) return liveA - liveB;
-  const rankA = leagueRank(a.league, a.country);
-  const rankB = leagueRank(b.league, b.country);
-  if (rankA !== rankB) return rankA - rankB;
-  return new Date(a.kickoffAtIso).getTime() - new Date(b.kickoffAtIso).getTime();
-}
-
-/** Picks the small "best right now" set for the spotlight strip at the top
- *  of the tab. Admin-pinned matches (m.featured, toggled from
- *  SettleMatchRow) always win a slot first, regardless of what the
- *  algorithm below would have picked on its own — competition prestige and
- *  kickoff time can't know about a local derby getting real attention or a
- *  match the admin specifically wants pushed. Remaining slots fill from the
- *  automatic pick: a live match always leads (nothing beats "happening
- *  this second"), then competition prestige (Primeira Liga now explicitly
- *  outranks Brasileirão, a correction, not an omission), then soonest
- *  kickoff as the tiebreaker — scoped to the next 7 days so a top-tier
- *  match still weeks away doesn't crowd out today's. Manual pins are NOT
- *  scoped to that window — pinning one further out is the whole point of
- *  overriding the algorithm. Ignores the search box on purpose — this is a
- *  discovery aid, not a filtered result, so it only shows up when nobody's
- *  already looking for something specific. */
-function pickFeatured(matches: CatalogMatch[], now: number): CatalogMatch[] {
-  const manual = matches.filter((m) => m.featured).sort(compareFeaturePriority);
-
-  const auto = matches
-    .filter((m) => {
-      if (m.featured) return false;
-      if (m.matchStatus !== "scheduled") return true;
-      return new Date(m.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
-    })
-    .sort(compareFeaturePriority);
-
-  return [...manual, ...auto].slice(0, FEATURED_COUNT);
+/** Shared ranking algorithm (live-first → league prestige → soonest
+ *  kickoff, admin manual pins always winning a slot first) lives in
+ *  lib/leagueTiers.ts's pickFeatured — the bet-creation wizard's match step
+ *  (create-bet-form.tsx) uses the exact same function on its own MatchOption
+ *  shape, so "featured" means the same selection in both places. */
+function featuredInfo(m: CatalogMatch): FeaturePriorityInfo {
+  return { league: m.league, country: m.country, kickoffAtIso: m.kickoffAtIso, matchStatus: m.matchStatus, featured: m.featured };
 }
 
 /** One spotlight card — bigger crests, a gold glow (the same
@@ -254,7 +213,7 @@ function FeaturedCard({ match: m, now }: { match: CatalogMatch; now: number }) {
  *  sort toggle below. Hidden entirely once there's nothing worth
  *  featuring (empty catalogue) rather than rendering an empty shelf. */
 function FeaturedStrip({ matches, now }: { matches: CatalogMatch[]; now: number }) {
-  const featured = useMemo(() => pickFeatured(matches, now), [matches, now]);
+  const featured = useMemo(() => pickFeatured(matches, now, featuredInfo), [matches, now]);
   if (featured.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">
