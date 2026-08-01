@@ -37,9 +37,6 @@ export type Duel = {
     kickoffAtIso: string;
     homeLogoUrl?: string | null;
     awayLogoUrl?: string | null;
-    /** Admin manual pin into the "Destaques" strip — see
-     *  toggleMatchFeaturedAction and lib/leagueTiers.ts's pickFeatured. */
-    featured: boolean;
   };
   /** Which market this bet is on — drives the small icon shown next to the
    *  prediction text below (see MarketIcon), so a scrolling feed reads at a

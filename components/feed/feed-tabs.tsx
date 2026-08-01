@@ -98,7 +98,7 @@ export function FeedTabs({
         duels.length === 0 ? (
           emptyFeed
         ) : (
-          <DuelFeed duels={duels} live={live} currentUserId={currentUserId} />
+          <DuelFeed duels={duels} matches={matches} live={live} currentUserId={currentUserId} />
         )
       ) : (
         <MatchCatalog matches={matches} />

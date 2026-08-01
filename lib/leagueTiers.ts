@@ -161,18 +161,28 @@ function compareFeaturePriority(a: FeaturePriorityInfo, b: FeaturePriorityInfo):
  * so a top-tier match still weeks away doesn't crowd out something worth
  * tapping into today. Manual pins are NOT scoped to that window — reaching
  * further out is the whole point of overriding the algorithm by hand.
+ *
+ * No cap on how many can show — Destaques is a horizontally-scrollable
+ * strip, not a fixed set of slots, so there's nothing to ration. `count` is
+ * still there as an escape hatch for a future spot that genuinely needs a
+ * hard ceiling, but no current caller passes one.
  */
-export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => FeaturePriorityInfo, count = 6): T[] {
+export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => FeaturePriorityInfo, count = Infinity): T[] {
   const manual = items.filter((item) => getInfo(item).featured).sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)));
 
-  const auto = items
-    .filter((item) => {
-      const info = getInfo(item);
-      if (info.featured) return false;
-      if (info.matchStatus && info.matchStatus !== "scheduled") return true;
-      return new Date(info.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
-    })
-    .sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)));
+  const remainingSlots = Math.max(0, count - manual.length);
+  const auto =
+    remainingSlots === 0
+      ? []
+      : items
+          .filter((item) => {
+            const info = getInfo(item);
+            if (info.featured) return false;
+            if (info.matchStatus && info.matchStatus !== "scheduled") return true;
+            return new Date(info.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
+          })
+          .sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)))
+          .slice(0, remainingSlots);
 
-  return [...manual, ...auto].slice(0, count);
+  return [...manual, ...auto];
 }

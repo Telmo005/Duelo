@@ -207,12 +207,16 @@ function FeaturedCard({ match: m, now }: { match: CatalogMatch; now: number }) {
   );
 }
 
-/** Horizontal-scroll spotlight strip — the "atrativa" answer to a tab that
- *  used to be just a plain sorted list: a handful of the best matches
- *  right now, browsable at a glance before ever touching search or the
- *  sort toggle below. Hidden entirely once there's nothing worth
- *  featuring (empty catalogue) rather than rendering an empty shelf. */
-function FeaturedStrip({ matches, now }: { matches: CatalogMatch[]; now: number }) {
+/** Horizontal-scroll spotlight strip of BETTABLE matches — exported for
+ *  reuse by duel-feed.tsx's "Apostas" tab too, which shares this exact
+ *  strip rather than featuring already-placed duels: what belongs in
+ *  Destaques is "matches you can bet on," the same thing in both tabs, not
+ *  "matches someone already bet on" (most manually-pinned matches have no
+ *  bet on them yet, so a duel-based version would leave them stuck showing
+ *  as pinned with nothing to show for it). Hidden entirely once there's
+ *  nothing worth featuring (empty catalogue) rather than rendering an
+ *  empty shelf. */
+export function FeaturedStrip({ matches, now }: { matches: CatalogMatch[]; now: number }) {
   const featured = useMemo(() => pickFeatured(matches, now, featuredInfo), [matches, now]);
   if (featured.length === 0) return null;
   return (
