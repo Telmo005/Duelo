@@ -12,6 +12,7 @@ export type AdminAction =
   | "add_match"
   | "edit_match"
   | "delete_match"
+  | "toggle_match_featured"
   | "import_fixtures"
   | "complete_withdrawal"
   | "reject_withdrawal"

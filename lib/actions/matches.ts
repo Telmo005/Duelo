@@ -305,6 +305,30 @@ export async function deleteMatchAction(matchId: string): Promise<ActionResult> 
   return {};
 }
 
+/** Pins/unpins a match into the feed's "Destaques" strip (see
+ *  pickFeatured in components/feed/match-catalog.tsx) — a manual override
+ *  that always wins a slot ahead of whatever the automatic live/prestige/
+ *  kickoff pick would have chosen on its own. */
+export async function toggleMatchFeaturedAction(matchId: string, next: boolean): Promise<ActionResult> {
+  const admin = await requireAdmin();
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!match) return { error: "Jogo não encontrado." };
+
+  await db.update(matches).set({ featured: next }).where(eq(matches.id, matchId));
+
+  await logAdminAction(
+    admin.id,
+    "toggle_match_featured",
+    null,
+    `${next ? "Destacado" : "Retirado dos destaques"}: ${match.home} vs ${match.away} (${match.league})`
+  );
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/");
+  return {};
+}
+
 const liveScoreSchema = z.object({
   homeGoals: z.coerce.number().int().min(0, "Golos não podem ser negativos").max(50),
   awayGoals: z.coerce.number().int().min(0, "Golos não podem ser negativos").max(50),

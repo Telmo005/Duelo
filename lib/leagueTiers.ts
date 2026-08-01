@@ -38,6 +38,11 @@ const LEAGUE_TIERS: TierEntry[][] = [
   [{ name: "Premier League", country: "England" }],
   [{ name: "La Liga", country: "Spain" }],
   ["Serie A", "Bundesliga", "Ligue 1"],
+  // Explicit correction: Portugal's Primeira Liga sits below the "big 5"
+  // domestic leagues above but ahead of everything else with no tier of its
+  // own — including Brasileirão, which otherwise ranks identically to it
+  // (both fall to FALLBACK_RANK with no entry here at all).
+  [{ name: "Primeira Liga", country: "Portugal" }],
   ["UEFA Europa League", "Europa League", "UEFA Europa Conference League", "Europa Conference League"],
   ["Copa Libertadores", "CAF Champions League"],
 ];

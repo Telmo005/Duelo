@@ -279,6 +279,9 @@ export type FeedCatalogMatch = {
   homeLogoUrl: string | null;
   awayLogoUrl: string | null;
   isElimination: boolean;
+  /** Admin-pinned into the feed's "Destaques" strip — see
+   *  components/feed/match-catalog.tsx's pickFeatured. */
+  featured: boolean;
   /** 'scheduled' | 'live' | 'needs_review' — this list never includes a
    *  terminal status (see getFeedMatchCatalog); used client-side to decide
    *  whether tapping the row opens bet creation or shows the "already
@@ -323,6 +326,7 @@ export async function getFeedMatchCatalog(): Promise<FeedCatalogMatch[]> {
       homeLogoUrl: m.homeLogoUrl,
       awayLogoUrl: m.awayLogoUrl,
       isElimination: m.isElimination,
+      featured: m.featured,
       matchStatus: m.matchStatus,
       score: isStarted && live?.live_home != null && live?.live_away != null ? { home: live.live_home, away: live.live_away } : undefined,
       minute: isStarted ? `${computeLiveMinuteLabel(m.kickoffAt, live)}'${live?.live_paused ? " ⏸" : ""}` : undefined,

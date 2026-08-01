@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link, { useLinkStatus } from "next/link";
 import { toast } from "sonner";
-import { Search, CalendarX } from "lucide-react";
+import { Search, CalendarX, Flame, Pin } from "lucide-react";
 import { TeamBadge } from "@/components/match/team-badge";
 import { Input } from "@/components/ui/input";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Spinner } from "@/components/ui/spinner";
-import { groupByLeague } from "@/lib/leagueTiers";
+import { groupByLeague, leagueRank } from "@/lib/leagueTiers";
 
 export type CatalogMatch = {
   id: string;
@@ -31,6 +31,9 @@ export type CatalogMatch = {
   homeLogoUrl: string | null;
   awayLogoUrl: string | null;
   isElimination: boolean;
+  /** Admin-pinned into the Destaques strip regardless of what the
+   *  automatic pick would have chosen — see pickFeatured below. */
+  featured: boolean;
   /** 'scheduled' | 'live' | 'needs_review' — see getFeedMatchCatalog. */
   matchStatus: string;
   score?: { home: number; away: number };
@@ -49,6 +52,16 @@ function RowPendingOverlay() {
   );
 }
 
+/** Shared between StartedRow and FeaturedCard below — both need the exact
+ *  same explanation for the same reason (bet_create rejects an
+ *  already-started match server-side regardless), so it shouldn't drift
+ *  into two slightly different wordings. */
+function notifyAlreadyStarted() {
+  toast("Este jogo já começou", {
+    description: "Já não é possível criar apostas nele — só antes do apito inicial.",
+  });
+}
+
 /**
  * A match that already kicked off — shown (never hidden, see isStarted)
  * with its live score/minute instead of a kickoff time, but not a link:
@@ -60,11 +73,7 @@ function StartedRow({ match: m }: { match: CatalogMatch }) {
   return (
     <button
       type="button"
-      onClick={() =>
-        toast("Este jogo já começou", {
-          description: "Já não é possível criar apostas nele — só antes do apito inicial.",
-        })
-      }
+      onClick={notifyAlreadyStarted}
       className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 text-left opacity-80 transition-colors hover:bg-accent"
     >
       <span className="flex shrink-0 items-center gap-1">
@@ -135,6 +144,133 @@ function MatchRow({ match: m, now }: { match: CatalogMatch; now: number }) {
   );
 }
 
+const FEATURED_COUNT = 6;
+/** A top-tier match three weeks out shouldn't crowd out things actually
+ *  worth tapping into today — scope "featured" to what's genuinely close,
+ *  live matches always included regardless of how that clock reads. */
+const FEATURED_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** live-first, then league prestige (lib/leagueTiers.ts), then soonest
+ *  kickoff — the shared ordering both an admin's manual picks and the
+ *  automatic fill-in use, so even hand-picked matches land in a sensible
+ *  order relative to each other rather than whatever order they happen to
+ *  come in. */
+function compareFeaturePriority(a: CatalogMatch, b: CatalogMatch): number {
+  const liveA = a.matchStatus !== "scheduled" ? 0 : 1;
+  const liveB = b.matchStatus !== "scheduled" ? 0 : 1;
+  if (liveA !== liveB) return liveA - liveB;
+  const rankA = leagueRank(a.league, a.country);
+  const rankB = leagueRank(b.league, b.country);
+  if (rankA !== rankB) return rankA - rankB;
+  return new Date(a.kickoffAtIso).getTime() - new Date(b.kickoffAtIso).getTime();
+}
+
+/** Picks the small "best right now" set for the spotlight strip at the top
+ *  of the tab. Admin-pinned matches (m.featured, toggled from
+ *  SettleMatchRow) always win a slot first, regardless of what the
+ *  algorithm below would have picked on its own — competition prestige and
+ *  kickoff time can't know about a local derby getting real attention or a
+ *  match the admin specifically wants pushed. Remaining slots fill from the
+ *  automatic pick: a live match always leads (nothing beats "happening
+ *  this second"), then competition prestige (Primeira Liga now explicitly
+ *  outranks Brasileirão, a correction, not an omission), then soonest
+ *  kickoff as the tiebreaker — scoped to the next 7 days so a top-tier
+ *  match still weeks away doesn't crowd out today's. Manual pins are NOT
+ *  scoped to that window — pinning one further out is the whole point of
+ *  overriding the algorithm. Ignores the search box on purpose — this is a
+ *  discovery aid, not a filtered result, so it only shows up when nobody's
+ *  already looking for something specific. */
+function pickFeatured(matches: CatalogMatch[], now: number): CatalogMatch[] {
+  const manual = matches.filter((m) => m.featured).sort(compareFeaturePriority);
+
+  const auto = matches
+    .filter((m) => {
+      if (m.featured) return false;
+      if (m.matchStatus !== "scheduled") return true;
+      return new Date(m.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
+    })
+    .sort(compareFeaturePriority);
+
+  return [...manual, ...auto].slice(0, FEATURED_COUNT);
+}
+
+/** One spotlight card — bigger crests, a gold glow (the same
+ *  --shadow-elevated token the bet receipt's ticket uses for its own
+ *  "special" moments), and the league name up front since prestige is
+ *  exactly why this match earned its spot here. Same tap behaviour as
+ *  MatchRow (into bet creation, or the "already started" explanation),
+ *  just built as its own component rather than a MatchRow variant — the
+ *  layout genuinely doesn't share markup with the compact list row. */
+function FeaturedCard({ match: m, now }: { match: CatalogMatch; now: number }) {
+  const started = isStarted(m, now);
+  const isLive = m.matchStatus !== "scheduled";
+  const inner = (
+    <>
+      {m.featured && (
+        <Pin className="absolute right-2 top-2 size-2.5 rotate-45 fill-primary text-primary" aria-hidden />
+      )}
+      <p className="truncate text-center text-[9px] font-bold uppercase tracking-wider text-primary/90">{m.league}</p>
+      <div className="my-2.5 flex items-center justify-center gap-2">
+        <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={32} />
+        <span className="text-[9px] font-semibold text-muted-foreground">vs</span>
+        <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={32} />
+      </div>
+      <p className="line-clamp-2 text-center text-[11px] font-bold leading-tight">
+        {m.home} <span className="font-normal text-muted-foreground">vs</span> {m.away}
+      </p>
+      <div className="mt-2 flex items-center justify-center">
+        {isLive ? (
+          <span className="flex items-center gap-1 text-[10px] font-extrabold tabular-nums text-live">
+            <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
+            {m.score ? `${m.score.home}-${m.score.away}` : m.matchStatus === "needs_review" ? "Terminado" : "AO VIVO"}
+          </span>
+        ) : (
+          <span className="text-[10px] font-semibold text-muted-foreground">{m.kickoffLabel}</span>
+        )}
+      </div>
+    </>
+  );
+  const className =
+    "press relative flex w-[128px] shrink-0 flex-col rounded-2xl border border-primary-40 bg-card px-3 py-3 shadow-[var(--shadow-elevated)]";
+
+  if (started) {
+    return (
+      <button type="button" onClick={notifyAlreadyStarted} className={`${className} text-left`}>
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <Link href={`/bets/new?matchId=${m.id}`} prefetch={false} className={className}>
+      {inner}
+      <RowPendingOverlay />
+    </Link>
+  );
+}
+
+/** Horizontal-scroll spotlight strip — the "atrativa" answer to a tab that
+ *  used to be just a plain sorted list: a handful of the best matches
+ *  right now, browsable at a glance before ever touching search or the
+ *  sort toggle below. Hidden entirely once there's nothing worth
+ *  featuring (empty catalogue) rather than rendering an empty shelf. */
+function FeaturedStrip({ matches, now }: { matches: CatalogMatch[]; now: number }) {
+  const featured = useMemo(() => pickFeatured(matches, now), [matches, now]);
+  if (featured.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5 px-0.5">
+        <Flame className="size-3.5 text-primary" aria-hidden />
+        <SectionLabel className="mb-0">Destaques</SectionLabel>
+      </div>
+      <div className="flex gap-2.5 overflow-x-auto pb-1">
+        {featured.map((m) => (
+          <FeaturedCard key={m.id} match={m} now={now} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type SortMode = "league" | "soon";
 const SORT_OPTIONS: { key: SortMode; label: string }[] = [
   { key: "league", label: "Melhores campeonatos" },
@@ -177,6 +313,8 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {!needle && <FeaturedStrip matches={matches} now={now} />}
+
       <div className="relative">
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar equipa ou liga..." className="pr-8" />
         <Search className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />

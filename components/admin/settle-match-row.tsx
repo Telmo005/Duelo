@@ -2,15 +2,15 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2, Pencil, Radio, Pause, Play, RefreshCw } from "lucide-react";
+import { Trash2, Pencil, Radio, Pause, Play, RefreshCw, Pin } from "lucide-react";
 import { settleMatchAction, voidMatchAction } from "@/lib/actions/settlement";
-import { deleteMatchAction, updateLiveScoreAction, updateLiveScoreFromApiAction } from "@/lib/actions/matches";
+import { deleteMatchAction, updateLiveScoreAction, updateLiveScoreFromApiAction, toggleMatchFeaturedAction } from "@/lib/actions/matches";
 import { EditMatchForm } from "@/components/admin/edit-match-form";
 import type { MatchRow } from "@/db/schema";
 import { Spinner } from "@/components/ui/spinner";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
-type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | "live" | "api" | null;
+type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | "live" | "api" | "featured" | null;
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   live: { label: "● Ao vivo", className: "bg-primary-10 text-primary" },
@@ -124,6 +124,16 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
 
   if (editing) {
     return <EditMatchForm match={match} onDone={() => setEditing(false)} />;
+  }
+
+  function handleToggleFeatured() {
+    setActiveAction("featured");
+    startTransition(async () => {
+      const result = await toggleMatchFeaturedAction(match.id, !match.featured);
+      if (result?.error) toast.error(result.error);
+      else toast.success(match.featured ? "Retirado dos destaques" : "Destacado no feed");
+      setActiveAction(null);
+    });
   }
 
   function handleDelete() {
@@ -387,6 +397,18 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
         >
           {activeAction === "abandoned" && <Spinner className="size-3" />}
           {activeAction === "abandoned" ? "A processar…" : "Abandonado"}
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleFeatured}
+          disabled={isPending}
+          title="Fixa este jogo na faixa 'Destaques' do feed, independentemente da liga/data"
+          className={`press inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            match.featured ? "border-primary bg-primary-10 text-primary" : "border-border text-muted-foreground hover:bg-accent"
+          }`}
+        >
+          {activeAction === "featured" ? <Spinner className="size-3" /> : <Pin className={`size-3 ${match.featured ? "fill-primary" : ""}`} aria-hidden />}
+          {activeAction === "featured" ? "A processar…" : match.featured ? "Destacado" : "Destacar"}
         </button>
         <button
           type="button"
