@@ -39,6 +39,7 @@ export default async function NewBetPage({ searchParams }: { searchParams: Promi
     homeLogoUrl: m.homeLogoUrl,
     awayLogoUrl: m.awayLogoUrl,
     isElimination: m.isElimination,
+    featured: m.featured,
   }));
 
   return (

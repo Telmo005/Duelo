@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ChevronLeft, Lock, CalendarX, Search } from "lucide-react";
+import { ChevronLeft, Lock, CalendarX, Search, Flame, Pin } from "lucide-react";
 import { createBetAction } from "@/lib/actions/bets";
 import { TeamBadge } from "@/components/match/team-badge";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -9,7 +9,7 @@ import { OptionCard } from "@/components/ui/option-card";
 import { InfoRow } from "@/components/ui/info-row";
 import { ActionButton } from "@/components/ui/action-button";
 import { Input } from "@/components/ui/input";
-import { groupByLeague } from "@/lib/leagueTiers";
+import { groupByLeague, pickFeatured, type FeaturePriorityInfo } from "@/lib/leagueTiers";
 import { MARKET_LABEL, MARKET_DESCRIPTION, MARKET_EMOJI, MARKET_EMOJI_GRAYSCALE, MARKET_ACCENT, TOTAL_GOALS_LINES, marketPredictions, marketLabel, marketShortCode, type Market } from "@/lib/betMarkets";
 
 export type MatchOption = {
@@ -36,6 +36,9 @@ export type MatchOption = {
   /** Knockout fixture — extra time/penalties always produce a winner, so
    *  "Empate" is never offered as a prediction for one. */
   isElimination: boolean;
+  /** Admin manual pin into the "Destaques" strip below — see
+   *  toggleMatchFeaturedAction and lib/leagueTiers.ts's pickFeatured. */
+  featured: boolean;
 };
 
 type PredictionKey = string;
@@ -118,6 +121,36 @@ function SelectedMatchSummary({ match }: { match: MatchOption }) {
         </p>
       </div>
     </div>
+  );
+}
+
+function featuredInfo(m: MatchOption): FeaturePriorityInfo {
+  return { league: m.league, country: m.country, kickoffAtIso: m.kickoffAtIso, featured: m.featured };
+}
+
+/** One spotlight card in the match step's "Destaques" strip — same visual
+ *  language as the feed's own FeaturedCard (components/feed/match-catalog.tsx)
+ *  but a plain button calling selectMatch instead of a Link, since picking
+ *  a match here advances the wizard in place rather than navigating. */
+function FeaturedMatchCard({ match: m, onSelect }: { match: MatchOption; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="press relative flex w-[128px] shrink-0 flex-col rounded-2xl border border-primary-40 bg-card px-3 py-3 text-left shadow-[var(--shadow-elevated)]"
+    >
+      {m.featured && <Pin className="absolute right-2 top-2 size-2.5 rotate-45 fill-primary text-primary" aria-hidden />}
+      <p className="truncate text-center text-[9px] font-bold uppercase tracking-wider text-primary/90">{m.league}</p>
+      <div className="my-2.5 flex items-center justify-center gap-2">
+        <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={32} />
+        <span className="text-[9px] font-semibold text-muted-foreground">vs</span>
+        <TeamBadge name={m.away} logoUrl={m.awayLogoUrl} size={32} />
+      </div>
+      <p className="line-clamp-2 text-center text-[11px] font-bold leading-tight">
+        {m.home} <span className="font-normal text-muted-foreground">vs</span> {m.away}
+      </p>
+      <p className="mt-2 text-center text-[10px] font-semibold text-muted-foreground">{m.kickoffLabel}</p>
+    </button>
   );
 }
 
@@ -236,6 +269,16 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
     [searchedMatches]
   );
 
+  // Same selection the feed's own Destaques strip uses (lib/leagueTiers.ts's
+  // pickFeatured) — a match featured there reads as featured here too,
+  // instead of two separate "best matches" concepts. Hidden during an
+  // active search for the same reason as the feed: this is a discovery
+  // shortcut, not a filtered result.
+  const featuredMatches = useMemo(
+    () => (matchNeedle ? [] : pickFeatured(openMatches, now, featuredInfo)),
+    [openMatches, now, matchNeedle]
+  );
+
   if (openMatches.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-5 py-8 text-center">
@@ -251,6 +294,21 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
       {step === "match" && (
         <section className="flex flex-col gap-4">
           <StepHeader title="Escolhe o jogo" stepIndex={stepIndex} stepCount={STEP_ORDER.length} onBack={null} />
+
+          {featuredMatches.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 px-0.5">
+                <Flame className="size-3.5 text-primary" aria-hidden />
+                <SectionLabel className="mb-0">Destaques</SectionLabel>
+              </div>
+              <div className="flex gap-2.5 overflow-x-auto pb-1">
+                {featuredMatches.map((m) => (
+                  <FeaturedMatchCard key={m.id} match={m} onSelect={() => selectMatch(m.id)} />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="relative">
             <Input
               value={matchQuery}

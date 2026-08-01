@@ -117,3 +117,62 @@ export function groupByLeague<T>(items: T[], getInfo: (item: T) => LeagueGroupab
     .sort((a, b) => a.rank - b.rank)
     .map(({ label, group }): [string, T[]] => [label, group]);
 }
+
+export type FeaturePriorityInfo = {
+  league: string;
+  country?: string | null;
+  kickoffAtIso: string;
+  /** Absent or 'scheduled' counts as not-live. Matches the bet-creation
+   *  picker's own list (getUpcomingMatches only ever returns 'scheduled'
+   *  fixtures — a match that's kicked off is no longer offered there at
+   *  all), so this field is optional rather than forcing every caller to
+   *  carry a status they'll never actually vary. */
+  matchStatus?: string;
+  /** Admin manual pin — see toggleMatchFeaturedAction. */
+  featured?: boolean;
+};
+
+const FEATURED_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
+
+function compareFeaturePriority(a: FeaturePriorityInfo, b: FeaturePriorityInfo): number {
+  const liveA = a.matchStatus && a.matchStatus !== "scheduled" ? 0 : 1;
+  const liveB = b.matchStatus && b.matchStatus !== "scheduled" ? 0 : 1;
+  if (liveA !== liveB) return liveA - liveB;
+  const rankA = leagueRank(a.league, a.country);
+  const rankB = leagueRank(b.league, b.country);
+  if (rankA !== rankB) return rankA - rankB;
+  return new Date(a.kickoffAtIso).getTime() - new Date(b.kickoffAtIso).getTime();
+}
+
+/**
+ * Picks the small "best right now" set — shared by the feed's Destaques
+ * strip (components/feed/match-catalog.tsx) and the bet-creation wizard's
+ * match step (components/bets/create-bet-form.tsx), so "featured" means
+ * exactly the same selection in both places instead of two ranking
+ * algorithms quietly drifting apart. Same `getInfo` extractor pattern as
+ * groupByLeague above, for the same reason: a feed CatalogMatch and a
+ * wizard MatchOption don't share a common shape.
+ *
+ * Admin manual pins (info.featured) always win a slot first, in whatever
+ * order compareFeaturePriority puts them in relative to each other; the
+ * remaining slots fill from the automatic pick — live first (only ever
+ * relevant for the feed; the wizard's own list is always 'scheduled'),
+ * then league prestige, then soonest kickoff — scoped to the next 7 days
+ * so a top-tier match still weeks away doesn't crowd out something worth
+ * tapping into today. Manual pins are NOT scoped to that window — reaching
+ * further out is the whole point of overriding the algorithm by hand.
+ */
+export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => FeaturePriorityInfo, count = 6): T[] {
+  const manual = items.filter((item) => getInfo(item).featured).sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)));
+
+  const auto = items
+    .filter((item) => {
+      const info = getInfo(item);
+      if (info.featured) return false;
+      if (info.matchStatus && info.matchStatus !== "scheduled") return true;
+      return new Date(info.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
+    })
+    .sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)));
+
+  return [...manual, ...auto].slice(0, count);
+}
