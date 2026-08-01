@@ -106,6 +106,8 @@ export async function importUpcomingFixtures(windowDays = 14): Promise<ImportRes
             home,
             away,
             league: league.name,
+            leagueId: league.id,
+            country: league.country,
             kickoffAt,
             externalId,
             homeLogoUrl: fx.homeTeam?.crest ?? null,
@@ -114,7 +116,13 @@ export async function importUpcomingFixtures(windowDays = 14): Promise<ImportRes
           })
           .onConflictDoUpdate({
             target: matches.externalId,
-            set: { kickoffAt, home, away },
+            // leagueId/country included here too, not just on insert — so a
+            // row imported before this fix (both columns null, see the real
+            // incident that surfaced this: Primeira Liga never outranking
+            // Copa Libertadores because the country-qualified tier lookup
+            // in lib/leagueTiers.ts had nothing to match against) self-heals
+            // on the next import cycle instead of needing a backfill.
+            set: { kickoffAt, home, away, leagueId: league.id, country: league.country },
           });
 
         if (wasExisting) updated++;
