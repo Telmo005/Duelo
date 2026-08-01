@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { SettleMatchRow } from "@/components/admin/settle-match-row";
 import { ProcessedMatchRow } from "@/components/admin/processed-match-row";
+import { ScheduledMatchesList } from "@/components/admin/scheduled-matches-list";
 import { RefundExpiredBetsButton } from "@/components/admin/refund-expired-bets-button";
 import { AddMatchForm } from "@/components/admin/add-match-form";
 import { ImportFixturesButton } from "@/components/admin/import-fixtures-button";
 import { RefreshLiveMatchesButton } from "@/components/admin/refresh-live-matches-button";
 import { getUnsettledMatches, getProcessedMatches } from "@/lib/bets";
+import { pickFeatured } from "@/lib/leagueTiers";
 import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
@@ -38,6 +40,19 @@ export default async function AdminMatchesPage() {
   const live = unsettled.filter((m) => m.matchStatus === "live");
   const inProgress = [...needsReview, ...live];
   const scheduled = unsettled.filter((m) => m.matchStatus === "scheduled");
+
+  // Same selection the public feed's own Destaques strip uses (see
+  // pickFeatured in lib/leagueTiers.ts) — computed here so the admin can see
+  // WHICH scheduled matches are currently earning a spot there on the
+  // algorithm's own merit, not just the ones they've manually pinned (see
+  // ScheduledMatchesList / SettleMatchRow's isAutoFeatured).
+  const autoFeaturedIds = pickFeatured(scheduled, Date.now(), (m) => ({
+    league: m.league,
+    country: m.country,
+    kickoffAtIso: m.kickoffAt.toISOString(),
+    matchStatus: m.matchStatus,
+    featured: m.featured,
+  })).map((m) => m.id);
 
   return (
     <AppShell active="feed" displayName={profile.displayName} availableCents={availableCents} currentUserId={profile.id}>
@@ -83,11 +98,7 @@ export default async function AdminMatchesPage() {
         {scheduled.length === 0 ? (
           <p className="text-sm text-muted-foreground">Não há jogos agendados.</p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
-            {scheduled.map((match) => (
-              <SettleMatchRow key={match.id} match={match} />
-            ))}
-          </div>
+          <ScheduledMatchesList matches={scheduled} autoFeaturedIds={autoFeaturedIds} />
         )}
       </section>
 

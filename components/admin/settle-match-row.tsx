@@ -100,7 +100,7 @@ function ScoreInputs({
   );
 }
 
-export function SettleMatchRow({ match }: { match: MatchRow }) {
+export function SettleMatchRow({ match, isAutoFeatured = false }: { match: MatchRow; isAutoFeatured?: boolean }) {
   const [isPending, startTransition] = useTransition();
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
   const [home, setHome] = useState("");
@@ -433,6 +433,13 @@ export function SettleMatchRow({ match }: { match: MatchRow }) {
           {activeAction === "delete" ? "A remover…" : confirmDelete ? "Confirmar remoção?" : "Remover"}
         </button>
       </div>
+
+      {isAutoFeatured && (
+        <p className="flex items-center gap-1.5 text-[11px] font-medium text-primary/80">
+          🔥 Já aparece nos Destaques do feed por escolha automática (liga/data) — "Destacar" acima fixa-o manualmente
+          por cima disso, não é preciso para continuar a aparecer.
+        </p>
+      )}
     </div>
   );
 }
