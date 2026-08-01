@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Suspense, useState, useTransition } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { registerUser } from "@/lib/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Input } from "@/components/ui/input";
@@ -11,9 +12,25 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 export default function RegisterPage() {
+  // useSearchParams needs a Suspense boundary to not block the rest of the
+  // route from prerendering — the form itself has no server data, only the
+  // ?ref= prefill depends on it.
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+function RegisterForm() {
   const [isPending, startTransition] = useTransition();
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Manual entry always wins over the link-prefilled value — someone who
+  // was dictated a code over WhatsApp/voice, with no link involved, needs
+  // to be able to type over whatever (if anything) is here.
+  const searchParams = useSearchParams();
+  const [referralCode, setReferralCode] = useState(() => searchParams.get("ref") ?? "");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,6 +42,7 @@ export default function RegisterPage() {
         phone: fd.get("phone"),
         password: fd.get("password"),
         ageConfirmed,
+        referralCode: referralCode.trim() || undefined,
       });
       if (result?.error) setError(result.error);
     });
@@ -66,6 +84,17 @@ export default function RegisterPage() {
             id="password" name="password" type="password" placeholder="Mínimo 4 caracteres"
             required disabled={isPending} maxLength={72}
             className="h-11 rounded-xl px-4 text-[15px]"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="referralCode">Código de convite (opcional)</Label>
+          <Input
+            id="referralCode" name="referralCode" type="text" placeholder="Ex: K7M2QRX"
+            disabled={isPending} maxLength={20}
+            value={referralCode}
+            onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+            className="h-11 rounded-xl px-4 text-[15px] uppercase"
           />
         </div>
 

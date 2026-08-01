@@ -4,6 +4,12 @@ import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { logError } from "@/lib/errorLog";
+import { generateReferralCode } from "@/lib/referral";
+
+function isReferralCodeCollision(err: unknown): boolean {
+  const pgErr = err as { code?: string; constraint_name?: string } | undefined;
+  return pgErr?.code === "23505" && pgErr?.constraint_name === "profiles_referral_code_uq";
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -31,17 +37,33 @@ export async function GET(request: Request) {
           user.email?.split("@")[0] ||
           "Jogador";
 
-        try {
-          await db.insert(profiles).values({
-            id: user.id,
-            email: user.email ?? "",
-            displayName,
-            phone: null,
-            ageConfirmedAt: new Date(),
-          }).onConflictDoNothing();
-        } catch (err) {
-          console.error("auth/callback: failed to create profile for", user.id, err);
-          await logError("auth_callback", err, { userId: user.id });
+        // Same referral_code retry-on-collision as registerUser
+        // (lib/actions/auth.ts) — this OAuth path shares the same
+        // profiles.referral_code NOT NULL/unique constraint, so it needs
+        // its own code generated too, just with no referrer to resolve
+        // (Google sign-in carries no ?ref= today).
+        const MAX_CODE_ATTEMPTS = 5;
+        let lastErr: unknown;
+        let created = false;
+        for (let attempt = 1; attempt <= MAX_CODE_ATTEMPTS && !created; attempt++) {
+          try {
+            await db.insert(profiles).values({
+              id: user.id,
+              email: user.email ?? "",
+              displayName,
+              phone: null,
+              ageConfirmedAt: new Date(),
+              referralCode: generateReferralCode(),
+            }).onConflictDoNothing();
+            created = true;
+          } catch (err) {
+            lastErr = err;
+            if (!isReferralCodeCollision(err)) break;
+          }
+        }
+        if (!created) {
+          console.error("auth/callback: failed to create profile for", user.id, lastErr);
+          await logError("auth_callback", lastErr, { userId: user.id });
           return NextResponse.redirect(new URL("/login?error=profile", request.url));
         }
       }

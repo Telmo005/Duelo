@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { wallets, walletLedger, platformLedger, bets, profiles, matches, deposits } from "@/db/schema";
+import { wallets, walletLedger, platformLedger, bets, profiles, matches, deposits, affiliateLedger, platformSettings } from "@/db/schema";
 import { eq, desc, sql, isNotNull, inArray } from "drizzle-orm";
 
 export async function getFinancialSummary() {
@@ -20,6 +20,10 @@ export async function getFinancialSummary() {
     .select({ total: sql<number>`coalesce(sum(${platformLedger.amountCents}), 0)` })
     .from(platformLedger);
 
+  const [affiliateTotals] = await db
+    .select({ total: sql<number>`coalesce(sum(${affiliateLedger.payoutCents}), 0)` })
+    .from(affiliateLedger);
+
   const [betCounts] = await db
     .select({
       waiting: sql<number>`count(*) filter (where ${bets.status} = 'waiting')`,
@@ -34,6 +38,7 @@ export async function getFinancialSummary() {
     walletCount: Number(walletTotals?.walletCount ?? 0),
     totalDepositsCents: Number(depositTotals?.total ?? 0),
     totalCommissionCents: Number(commissionTotals?.total ?? 0),
+    totalAffiliatePayoutsCents: Number(affiliateTotals?.total ?? 0),
     betsWaiting: Number(betCounts?.waiting ?? 0),
     betsMatched: Number(betCounts?.matched ?? 0),
     betsSettled: Number(betCounts?.settled ?? 0),
@@ -113,4 +118,59 @@ export async function getWalletOverview(limit = 30) {
     availableCents: r.wallet.availableCents,
     lockedCents: r.wallet.lockedCents,
   }));
+}
+
+/** The two admin-configurable rates bet_settle_match reads at settlement
+ *  time (migration 0038_affiliate_program.sql). Falls back to the same
+ *  defaults as the platform_settings table itself if the singleton row is
+ *  somehow missing — it's seeded by the migration, so this is defensive
+ *  only. */
+export async function getPlatformSettings() {
+  const [row] = await db.select().from(platformSettings).limit(1);
+  return {
+    commissionRateBps: row?.commissionRateBps ?? 1000,
+    referralShareBps: row?.referralShareBps ?? 3000,
+  };
+}
+
+/** One row per user who has ever earned an affiliate payout — name,
+ *  phone, code, how many people they referred, total earned via
+ *  affiliate_ledger, and their current wallet balance side by side. This
+ *  is the "saldo dos usuários + saldo que acumulam via links" view. */
+export async function getAffiliateOverview() {
+  const rows = await db
+    .select({
+      referrerId: affiliateLedger.referrerId,
+      totalEarnedCents: sql<number>`coalesce(sum(${affiliateLedger.payoutCents}), 0)`,
+      referredCount: sql<number>`count(distinct ${affiliateLedger.referredUserId})`,
+    })
+    .from(affiliateLedger)
+    .groupBy(affiliateLedger.referrerId);
+
+  if (rows.length === 0) return [];
+
+  const referrerIds = rows.map((r) => r.referrerId);
+  const profileRows = await db
+    .select({ profile: profiles, wallet: wallets })
+    .from(profiles)
+    .innerJoin(wallets, eq(wallets.userId, profiles.id))
+    .where(inArray(profiles.id, referrerIds));
+  const byId = new Map(profileRows.map((r) => [r.profile.id, r]));
+
+  return rows
+    .map((r) => {
+      const match = byId.get(r.referrerId);
+      if (!match) return null;
+      return {
+        userId: r.referrerId,
+        displayName: match.profile.displayName,
+        phone: match.profile.phone,
+        referralCode: match.profile.referralCode,
+        referredCount: Number(r.referredCount),
+        totalEarnedCents: Number(r.totalEarnedCents),
+        availableCents: match.wallet.availableCents,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.totalEarnedCents - a.totalEarnedCents);
 }

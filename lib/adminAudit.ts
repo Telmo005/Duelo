@@ -16,7 +16,8 @@ export type AdminAction =
   | "import_fixtures"
   | "complete_withdrawal"
   | "reject_withdrawal"
-  | "clear_errors";
+  | "clear_errors"
+  | "update_platform_settings";
 
 /** Records an admin action against the append-only audit trail. Best-effort:
  *  a logging failure must never block the underlying admin action, which has
