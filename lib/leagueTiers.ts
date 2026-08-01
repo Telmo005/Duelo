@@ -162,14 +162,12 @@ function compareFeaturePriority(a: FeaturePriorityInfo, b: FeaturePriorityInfo):
  * tapping into today. Manual pins are NOT scoped to that window — reaching
  * further out is the whole point of overriding the algorithm by hand.
  *
- * `count` bounds the AUTOMATIC fill-in only — every manual pin always
- * shows, even past that number. An admin pinning 8 matches and only
- * seeing 6 (the rest silently dropped because they landed after the slice)
- * is a real, already-hit failure mode: the whole point of pinning by hand
- * is "this one should definitely be there," not "this one competes for a
- * slot with the algorithm."
+ * No cap on how many can show — Destaques is a horizontally-scrollable
+ * strip, not a fixed set of slots, so there's nothing to ration. `count` is
+ * still there as an escape hatch for a future spot that genuinely needs a
+ * hard ceiling, but no current caller passes one.
  */
-export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => FeaturePriorityInfo, count = 6): T[] {
+export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => FeaturePriorityInfo, count = Infinity): T[] {
   const manual = items.filter((item) => getInfo(item).featured).sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)));
 
   const remainingSlots = Math.max(0, count - manual.length);
