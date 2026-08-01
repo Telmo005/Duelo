@@ -134,55 +134,37 @@ export type FeaturePriorityInfo = {
 
 const FEATURED_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
 
-function compareFeaturePriority(a: FeaturePriorityInfo, b: FeaturePriorityInfo): number {
-  const liveA = a.matchStatus && a.matchStatus !== "scheduled" ? 0 : 1;
-  const liveB = b.matchStatus && b.matchStatus !== "scheduled" ? 0 : 1;
-  if (liveA !== liveB) return liveA - liveB;
-  const rankA = leagueRank(a.league, a.country);
-  const rankB = leagueRank(b.league, b.country);
-  if (rankA !== rankB) return rankA - rankB;
-  return new Date(a.kickoffAtIso).getTime() - new Date(b.kickoffAtIso).getTime();
-}
-
 /**
- * Picks the small "best right now" set — shared by the feed's Destaques
- * strip (components/feed/match-catalog.tsx) and the bet-creation wizard's
- * match step (components/bets/create-bet-form.tsx), so "featured" means
- * exactly the same selection in both places instead of two ranking
- * algorithms quietly drifting apart. Same `getInfo` extractor pattern as
- * groupByLeague above, for the same reason: a feed CatalogMatch and a
- * wizard MatchOption don't share a common shape.
+ * Picks the "worth featuring right now" set — shared by the feed's
+ * Destaques strip (components/feed/match-catalog.tsx), the "Apostas" tab
+ * (duel-feed.tsx), and the bet-creation wizard's match step
+ * (create-bet-form.tsx), so "featured" means exactly the same selection
+ * everywhere instead of several ranking algorithms quietly drifting apart.
+ * Same `getInfo` extractor pattern as groupByLeague above, for the same
+ * reason: a feed CatalogMatch and a wizard MatchOption don't share a
+ * common shape.
  *
- * Admin manual pins (info.featured) always win a slot first, in whatever
- * order compareFeaturePriority puts them in relative to each other; the
- * remaining slots fill from the automatic pick — live first (only ever
- * relevant for the feed; the wizard's own list is always 'scheduled'),
- * then league prestige, then soonest kickoff — scoped to the next 7 days
- * so a top-tier match still weeks away doesn't crowd out something worth
- * tapping into today. Manual pins are NOT scoped to that window — reaching
- * further out is the whole point of overriding the algorithm by hand.
+ * Included: every admin manual pin (info.featured — no horizon limit,
+ * reaching further out is the whole point of overriding the algorithm by
+ * hand), plus anything live/needs_review, plus anything scheduled within
+ * the next 7 days (so a top-tier match still weeks away doesn't crowd out
+ * something worth tapping into today). No cap on how many can show —
+ * Destaques is a horizontally-scrollable strip, not a fixed set of slots.
  *
- * No cap on how many can show — Destaques is a horizontally-scrollable
- * strip, not a fixed set of slots, so there's nothing to ration. `count` is
- * still there as an escape hatch for a future spot that genuinely needs a
- * hard ceiling, but no current caller passes one.
+ * Ordered purely by kickoff time — a live/already-started match's kickoff
+ * is already in the past, so it naturally sorts to the front on its own,
+ * without needing a separate "live first" rule. League prestige plays no
+ * role in the order (only lib/leagueTiers.ts's groupByLeague uses it) —
+ * Destaques is meant to read as "what's on today and next," not "what's
+ * the most prestigious."
  */
-export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => FeaturePriorityInfo, count = Infinity): T[] {
-  const manual = items.filter((item) => getInfo(item).featured).sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)));
-
-  const remainingSlots = Math.max(0, count - manual.length);
-  const auto =
-    remainingSlots === 0
-      ? []
-      : items
-          .filter((item) => {
-            const info = getInfo(item);
-            if (info.featured) return false;
-            if (info.matchStatus && info.matchStatus !== "scheduled") return true;
-            return new Date(info.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
-          })
-          .sort((a, b) => compareFeaturePriority(getInfo(a), getInfo(b)))
-          .slice(0, remainingSlots);
-
-  return [...manual, ...auto];
+export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => FeaturePriorityInfo): T[] {
+  return items
+    .filter((item) => {
+      const info = getInfo(item);
+      if (info.featured) return true;
+      if (info.matchStatus && info.matchStatus !== "scheduled") return true;
+      return new Date(info.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
+    })
+    .sort((a, b) => new Date(getInfo(a).kickoffAtIso).getTime() - new Date(getInfo(b).kickoffAtIso).getTime());
 }
