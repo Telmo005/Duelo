@@ -221,7 +221,7 @@ function FeaturedStrip({ matches, now }: { matches: CatalogMatch[]; now: number 
         <Flame className="size-3.5 text-primary" aria-hidden />
         <SectionLabel className="mb-0">Destaques</SectionLabel>
       </div>
-      <div className="flex gap-2.5 overflow-x-auto pb-1">
+      <div data-no-swipe className="flex gap-2.5 overflow-x-auto pb-1">
         {featured.map((m) => (
           <FeaturedCard key={m.id} match={m} now={now} />
         ))}
@@ -279,7 +279,7 @@ export function MatchCatalog({ matches }: { matches: CatalogMatch[] }) {
         <Search className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto">
+      <div data-no-swipe className="flex gap-1.5 overflow-x-auto">
         {SORT_OPTIONS.map((opt) => (
           <button
             key={opt.key}
