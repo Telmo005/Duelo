@@ -32,6 +32,10 @@ export const registerSchema = z.object({
     .refine((val) => val === true, {
       message: "Deves confirmar que tens 18 anos ou mais",
     }),
+
+  // Optional — an invalid/unknown code never blocks registration (see
+  // registerUser), it just means no referrer gets linked.
+  referralCode: z.string().trim().max(20).optional(),
 });
 
 export const signInSchema = z.object({

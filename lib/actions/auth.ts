@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { eq, sql } from "drizzle-orm";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
@@ -9,6 +10,16 @@ import { normalizePhone } from "@/lib/phone";
 import { getRequestFingerprint } from "@/lib/requestInfo";
 import { checkLoginRateLimit, recordLoginAttempt, checkRegisterRateLimit, recordRegisterAttempt } from "@/lib/rateLimit";
 import { logError } from "@/lib/errorLog";
+import { generateReferralCode } from "@/lib/referral";
+
+/** postgres-js surfaces the raw libpq error fields directly on the thrown
+ *  error (code = SQLSTATE, constraint_name) — used to tell "referral_code
+ *  collision, just retry with a new code" apart from "phone already
+ *  registered, tell the user" below, instead of guessing from the message. */
+function isUniqueViolationOn(err: unknown, constraintName: string): boolean {
+  const pgErr = err as { code?: string; constraint_name?: string } | undefined;
+  return pgErr?.code === "23505" && pgErr?.constraint_name === constraintName;
+}
 
 type ActionResult = { error?: string };
 
@@ -41,10 +52,24 @@ export async function registerUser(
     return { error: firstError ?? "Dados inválidos" };
   }
 
-  const { displayName, password, ageConfirmed } = parsed.data;
+  const { displayName, password, ageConfirmed, referralCode } = parsed.data;
   const phone = normalizePhone(parsed.data.phone);
   const syntheticEmail = phoneToSyntheticEmail(phone);
   const { ip } = await getRequestFingerprint();
+
+  // Resolve the submitted invite code to a referrer BEFORE creating any
+  // account — an unknown/mistyped code is never fatal to registration, it
+  // just means nobody gets linked (fail-open, same spirit as the rate
+  // limiter below).
+  let referredBy: string | null = null;
+  if (referralCode) {
+    const [referrer] = await db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(sql`upper(${profiles.referralCode}) = upper(${referralCode})`)
+      .limit(1);
+    referredBy = referrer?.id ?? null;
+  }
 
   // 2. Enforce 18+ server-side — belt AND suspenders (client also disables the button)
   if (!ageConfirmed) {
@@ -98,24 +123,46 @@ export async function registerUser(
     return { error: "Erro inesperado. Tenta novamente." };
   }
 
-  // 4. Insert profiles row (service-role bypasses RLS — required for inserts)
-  try {
-    await db.insert(profiles).values({
-      id: userId,
-      phone,
-      displayName,
-      ageConfirmedAt: new Date(),
-    });
-  } catch (err: unknown) {
-    // Check for unique constraint violation (phone already used)
-    const message = err instanceof Error ? err.message : "";
-    if (message.includes("unique") || message.includes("duplicate")) {
+  // 4. Insert profiles row (service-role bypasses RLS — required for inserts).
+  //    Own referral_code is generated here and retried on the rare
+  //    collision (see isUniqueViolationOn) — distinct from a phone
+  //    collision, which is a real "already registered" error, not a retry.
+  const MAX_CODE_ATTEMPTS = 5;
+  let insertError: unknown;
+  for (let attempt = 1; attempt <= MAX_CODE_ATTEMPTS; attempt++) {
+    try {
+      await db.insert(profiles).values({
+        id: userId,
+        phone,
+        displayName,
+        ageConfirmedAt: new Date(),
+        referralCode: generateReferralCode(),
+        referredBy,
+      });
+      insertError = undefined;
+      break;
+    } catch (err: unknown) {
+      if (isUniqueViolationOn(err, "profiles_referral_code_uq")) {
+        insertError = err;
+        continue; // retry with a freshly generated code
+      }
+      insertError = err;
+      break;
+    }
+  }
+
+  if (insertError) {
+    const message = insertError instanceof Error ? insertError.message : "";
+    if (isUniqueViolationOn(insertError, "profiles_phone_key") || message.includes("unique") || message.includes("duplicate")) {
       // Clean up auth user to avoid orphaned account
       await supabase.auth.admin.deleteUser(userId);
       return { error: "Este número já está registado. Tenta entrar." };
     }
-    // Clean up auth user on any insert failure
+    // Clean up auth user on any insert failure (including exhausting the
+    // referral_code retry budget — astronomically unlikely, but must still
+    // fail cleanly rather than leave an orphaned auth user)
     await supabase.auth.admin.deleteUser(userId);
+    await logError("auth_register", insertError, { stage: "insert_profile", phone });
     return { error: "Erro ao guardar o perfil. Tenta novamente." };
   }
 

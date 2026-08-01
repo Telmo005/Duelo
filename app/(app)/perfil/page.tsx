@@ -14,7 +14,7 @@ import { EditableDisplayName } from "@/components/profile/editable-display-name"
 import { ChangePasswordForm } from "@/components/profile/change-password-form";
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { Wallet, Swords, MessageCircle } from "lucide-react";
+import { Wallet, Swords, MessageCircle, Gift } from "lucide-react";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Perfil | Duelo" };
@@ -104,6 +104,18 @@ export default async function ProfilePage() {
               <LinkPendingSpinner className="size-3" />
             </p>
             <p className="text-xs text-muted-foreground">{stats.totalBets} no total</p>
+          </div>
+        </Link>
+        <Link href="/afiliados" className="press flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-accent">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-locked-10 text-locked" aria-hidden>
+            <Gift className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5 text-sm font-bold">
+              Afiliados
+              <LinkPendingSpinner className="size-3" />
+            </p>
+            <p className="text-xs text-muted-foreground">Recomenda e ganha</p>
           </div>
         </Link>
       </section>

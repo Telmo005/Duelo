@@ -35,6 +35,7 @@ const ADMIN_ACTION_LABELS: Record<string, string> = {
   import_fixtures: "Importação de jogos",
   complete_withdrawal: "Levantamento concluído",
   reject_withdrawal: "Levantamento rejeitado",
+  update_platform_settings: "Percentagens de afiliado atualizadas",
 };
 
 export default async function AdminPage() {
@@ -66,6 +67,10 @@ export default async function AdminPage() {
             Liquidar jogos →
             <LinkPendingSpinner />
           </Link>
+          <Link href="/admin/afiliados" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
+            Afiliados →
+            <LinkPendingSpinner />
+          </Link>
           <Link href="/admin/withdrawals" className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-accent">
             Levantamentos {pendingWithdrawals.length > 0 ? `(${pendingWithdrawals.length}) ` : ""}→
             <LinkPendingSpinner />
@@ -80,12 +85,13 @@ export default async function AdminPage() {
       {/* Financial summary */}
       <section className="mb-7">
         <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Resumo financeiro</h2>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {[
             { label: "Disponível (total)", value: formatCentsAsMt(summary.totalAvailableCents) },
             { label: "Bloqueado (total)", value: formatCentsAsMt(summary.totalLockedCents) },
             { label: "Depositado (total)", value: formatCentsAsMt(summary.totalDepositsCents) },
-            { label: "Comissão ganha", value: formatCentsAsMt(summary.totalCommissionCents) },
+            { label: "Comissão ganha (bruta)", value: formatCentsAsMt(summary.totalCommissionCents) },
+            { label: "Pago a afiliados", value: formatCentsAsMt(summary.totalAffiliatePayoutsCents) },
           ].map((s) => (
             <div key={s.label} className="rounded-2xl border border-border bg-card p-4">
               <p className="mb-1 text-xs text-muted-foreground">{s.label}</p>

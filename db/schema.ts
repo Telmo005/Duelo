@@ -40,7 +40,21 @@ export const profiles = pgTable("profiles", {
 
   /** No RBAC system yet — a single boolean gate for /admin/* (Phase 5 MVP scope). */
   isAdmin: boolean("is_admin").notNull().default(false),
-});
+
+  /** Short shareable code (e.g. "K7M2QRX"), generated once at registration
+   *  (lib/referral.ts) — never regenerated, never user-chosen. Used both as
+   *  a /r/[code] link and for verbal/WhatsApp-text sharing. */
+  referralCode: text("referral_code").notNull(),
+
+  /** Who referred this user — set once at registration, never changed
+   *  afterwards (see migration 0038_affiliate_program.sql). Null for users
+   *  who registered without a referral code. Drives the per-side affiliate
+   *  payout in bet_settle_match. */
+  referredBy: uuid("referred_by"),
+}, (t) => [
+  uniqueIndex("profiles_referral_code_uq").on(t.referralCode),
+  index("profiles_referred_by_idx").on(t.referredBy),
+]);
 
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
@@ -351,6 +365,53 @@ export const platformLedger = pgTable("platform_ledger", {
 });
 
 export type PlatformLedgerEntry = typeof platformLedger.$inferSelect;
+
+/**
+ * platform_settings — singleton row (id pinned to 1, same shape as
+ * live_sync_state) holding the two admin-configurable rates: the house
+ * commission and the affiliate share of it. bet_settle_match reads these
+ * at the top of every settlement call instead of a hardcoded literal.
+ * Internal-only (no RLS policies) — read/written exclusively via
+ * lib/actions/platform-settings.ts using the service-role client.
+ */
+export const platformSettings = pgTable("platform_settings", {
+  id: integer("id").primaryKey().default(1),
+  /** Basis points, e.g. 1000 = 10.00% */
+  commissionRateBps: integer("commission_rate_bps").notNull().default(1000),
+  /** Basis points of the commission above, e.g. 3000 = 30.00% */
+  referralShareBps: integer("referral_share_bps").notNull().default(3000),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type PlatformSettings = typeof platformSettings.$inferSelect;
+
+/**
+ * affiliate_ledger — one row per referral commission payout. Written
+ * exclusively inside affiliate_pay_if_referred (migration
+ * 0038_affiliate_program.sql), called from bet_settle_match once per side
+ * of a settled bet whose participant has a referrer. `unique (bet_id,
+ * side)` makes a payout idempotent — never double-paid for the same side
+ * of the same bet. `referral_rate_bps` snapshots the rate at payout time,
+ * so a later admin change to platform_settings never rewrites history.
+ */
+export const affiliateLedger = pgTable("affiliate_ledger", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  referrerId: uuid("referrer_id").notNull(),
+  referredUserId: uuid("referred_user_id").notNull(),
+  betId: uuid("bet_id").notNull(),
+  matchId: uuid("match_id").notNull(),
+  side: text("side").notNull(), // 'creator' | 'opponent'
+  sourceCommissionCents: bigint("source_commission_cents", { mode: "number" }).notNull(),
+  referralRateBps: integer("referral_rate_bps").notNull(),
+  payoutCents: bigint("payout_cents", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("affiliate_ledger_bet_side_uq").on(t.betId, t.side),
+  index("affiliate_ledger_referrer_id_idx").on(t.referrerId),
+  index("affiliate_ledger_referred_user_id_idx").on(t.referredUserId),
+]);
+
+export type AffiliateLedgerEntry = typeof affiliateLedger.$inferSelect;
 
 /**
  * auth_attempts — sliding-window login attempt log backing the signIn
