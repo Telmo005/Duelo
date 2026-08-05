@@ -9,7 +9,7 @@
 ### Pitfall 1: Check-then-act race condition on wallet balance (double-spend)
 
 **What goes wrong:**
-Two concurrent requests (e.g., user creates a bet while accepting another, or two devices simultaneously try to use the same "available" balance) both read the same balance, both pass the "sufficient funds" check against the stale value, and both proceed to lock/debit — over-committing funds that don't exist. This is the single most damaging bug class for Duelo because the whole product promise ("dinheiro protegido em custódia") depends on it never happening.
+Two concurrent requests (e.g., user creates a bet while accepting another, or two devices simultaneously try to use the same "available" balance) both read the same balance, both pass the "sufficient funds" check against the stale value, and both proceed to lock/debit — over-committing funds that don't exist. This is the single most damaging bug class for DueloBet because the whole product promise ("dinheiro protegido em custódia") depends on it never happening.
 
 **Why it happens:**
 Naive implementations read balance → validate in application code → write new balance, with no locking between read and write. Under low load this never surfaces; it only appears under concurrency, which is exactly when a growing user base with many simultaneous bet creations/acceptances hits it — often first noticed in production, not in dev/testing.
@@ -84,7 +84,7 @@ Bet creation/acceptance phase and settlement phase — enforce as a standing API
 The MVP happy path (match kicks off, finishes, result comes back 1X2, winner is paid) is easy. What breaks products is the long tail: a match is postponed before kickoff, abandoned mid-game, has its result overturned after an initial feed, or the results API is late/unavailable at the scheduled settlement time. If these states aren't modeled, escrowed funds get stuck indefinitely, or worse, a bet gets force-settled on incomplete/wrong data.
 
 **Why it happens:**
-Teams design the settlement engine around "wait for result → pay winner" and don't build the state machine for "no result yet," "match won't happen as scheduled," or "result was corrected." Duelo's own design decision — the opponent always bets "against" the creator's prediction rather than picking a specific outcome — already eliminates the 3-way-push ambiguity, but does **not** eliminate the postponed/abandoned/void case, which the current requirements don't yet mention.
+Teams design the settlement engine around "wait for result → pay winner" and don't build the state machine for "no result yet," "match won't happen as scheduled," or "result was corrected." DueloBet's own design decision — the opponent always bets "against" the creator's prediction rather than picking a specific outcome — already eliminates the 3-way-push ambiguity, but does **not** eliminate the postponed/abandoned/void case, which the current requirements don't yet mention.
 
 **How to avoid:**
 - Define an explicit match/bet-pair state machine: `OPEN → MATCHED → AWAITING_RESULT → SETTLED` plus side-states `POSTPONED`, `ABANDONED`, `VOID/REFUNDED`, `SETTLEMENT_DISPUTED`.
@@ -94,7 +94,7 @@ Teams design the settlement engine around "wait for result → pay winner" and d
 - Build a scheduled reconciliation job that finds `AWAITING_RESULT` bet pairs whose match kickoff+typical duration has passed with no result, and pages an operator rather than silently leaving funds locked forever.
 
 **Warning signs:**
-- No requirement or design doc mentions postponed/abandoned/void handling (currently true for Duelo's Active Requirements list — this is a gap to close before/during the settlement phase).
+- No requirement or design doc mentions postponed/abandoned/void handling (currently true for DueloBet's Active Requirements list — this is a gap to close before/during the settlement phase).
 - Settlement logic has no "grace/confirmation window" before paying out.
 - No visibility for admins into bets stuck in `AWAITING_RESULT` past expected settlement time.
 
@@ -106,7 +106,7 @@ Settlement/results-integration phase. This should be treated as core scope, not 
 ### Pitfall 5: Sports-results API latency, incorrect data, or unavailability driving wrong/delayed settlement
 
 **What goes wrong:**
-Automatic settlement is only as trustworthy as the results feed. Real-world data providers have latency windows, occasional incorrect data pushed and later corrected, and outages. If Duelo settles the instant it sees *a* result with no cross-check or correction window, an initial wrong score can trigger incorrect payouts that then have to be clawed back — which is far more damaging to trust (and legally messier) than a short settlement delay.
+Automatic settlement is only as trustworthy as the results feed. Real-world data providers have latency windows, occasional incorrect data pushed and later corrected, and outages. If DueloBet settles the instant it sees *a* result with no cross-check or correction window, an initial wrong score can trigger incorrect payouts that then have to be clawed back — which is far more damaging to trust (and legally messier) than a short settlement delay.
 
 **Why it happens:**
 "Automatic settlement" is treated as a single API call + trust, rather than a pipeline with staleness/consistency checks, because building the corrective path is unglamorous and doesn't show up in a demo.
@@ -136,7 +136,7 @@ Mozambique regulates gambling under Law 1/2010 (revised 2022/2024) through the I
 "We're just an intermediary, not the house" feels like it sidesteps gambling regulation, but regulators generally look at the underlying activity (real-money wagering on uncertain sports outcomes) rather than the intermediation structure. Early-stage teams also deprioritize this because it's not a coding task and doesn't block writing the app.
 
 **How to avoid:**
-- Treat licensing as a **parallel workstream from day one**, not a post-launch concern — engage a local gambling-law advisor early to confirm whether Duelo's custodian/P2P model needs the Sports Betting License, and what the realistic cost/timeline is (secondary sources found conflicting investment-threshold figures — do not rely on web search results for this number; get it from counsel or the regulator directly).
+- Treat licensing as a **parallel workstream from day one**, not a post-launch concern — engage a local gambling-law advisor early to confirm whether DueloBet's custodian/P2P model needs the Sports Betting License, and what the realistic cost/timeline is (secondary sources found conflicting investment-threshold figures — do not rely on web search results for this number; get it from counsel or the regulator directly).
 - Keep the 18+ age gate (already scoped) but be aware the current MVP plan explicitly defers document-based KYC — flag this as a regulatory risk to revisit the moment transaction volume or scrutiny increases, not as a permanent decision.
 - Design the audit/traceability requirements (already scoped in Active Requirements — "Auditoria e rastreabilidade completa") to also satisfy whatever reporting a license/regulator would require (transaction logs, user identity records, dispute records) so compliance isn't a rebuild later.
 - Do not present this section's findings as legal advice to the product owner — flag explicitly that a local specialized advisor must confirm applicability before/at launch.
@@ -153,13 +153,13 @@ Should be raised at the milestone/roadmap level as a non-engineering parallel tr
 ### Pitfall 7: Collusion / self-betting via linked accounts undermining "P2P" integrity
 
 **What goes wrong:**
-Because Duelo pays the winner (pote - 10% commissão) and the loser simply loses their stake, a bad actor can create two accounts, have one "create" a bet and the other "accept" it, and effectively launder/cycle funds while draining only 10% each round — or worse, exploit promotional balances or referral bonuses this way if those are added later. Left undetected, this also lets the same person guarantee a "win" against themselves in edge cases (e.g., manipulating which account times the acceptance) or simply pollutes stats/leaderboards.
+Because DueloBet pays the winner (pote - 10% commissão) and the loser simply loses their stake, a bad actor can create two accounts, have one "create" a bet and the other "accept" it, and effectively launder/cycle funds while draining only 10% each round — or worse, exploit promotional balances or referral bonuses this way if those are added later. Left undetected, this also lets the same person guarantee a "win" against themselves in edge cases (e.g., manipulating which account times the acceptance) or simply pollutes stats/leaderboards.
 
 **Why it happens:**
-Teams build the "prevent double balance usage" heuristic (already scoped for Duelo) but stop at single-account level rather than cross-account device/IP correlation, since the latter requires additional data collection and review tooling that's easy to defer.
+Teams build the "prevent double balance usage" heuristic (already scoped for DueloBet) but stop at single-account level rather than cross-account device/IP correlation, since the latter requires additional data collection and review tooling that's easy to defer.
 
 **How to avoid:**
-- Duelo's own requirements already flag "deteção de padrões suspeitos (mesmo dispositivo/IP apostando contra si mesmo)" as in-scope for MVP — implement this as: capture device fingerprint + IP on bet creation and acceptance, and flag (don't necessarily auto-block) same-device/same-IP pairs matched against each other for manual admin review before payout, consistent with the "hold for review" pattern used industry-wide rather than instant auto-block (which creates false-positive friction for e.g. two friends on the same home WiFi).
+- DueloBet's own requirements already flag "deteção de padrões suspeitos (mesmo dispositivo/IP apostando contra si mesmo)" as in-scope for MVP — implement this as: capture device fingerprint + IP on bet creation and acceptance, and flag (don't necessarily auto-block) same-device/same-IP pairs matched against each other for manual admin review before payout, consistent with the "hold for review" pattern used industry-wide rather than instant auto-block (which creates false-positive friction for e.g. two friends on the same home WiFi).
 - Log enough data (device ID, IP, timestamps of create/accept) from day one even if the review process is manual in MVP — retrofitting this after volume grows is much harder than collecting it from the start.
 - Explicitly defer advanced ML-based collusion detection (already correctly marked Out of Scope) but make sure the schema/logging groundwork doesn't preclude adding it later.
 
@@ -226,7 +226,7 @@ Common user experience mistakes in this domain.
 | Heavy JS bundle / rich animations assuming fast, stable connections | Slow or failed loads on 3G/entry-level Android devices common in the target market, users abandon before completing a deposit or bet | Aggressively minimize bundle size, lazy-load non-critical UI, text-first rendering with progressive enhancement |
 | No visible retry/offline handling on deposit/withdrawal or bet-creation flows | A dropped connection mid-flow leaves the user unsure if their money moved or their bet was placed, causing support load and distrust | Explicit pending/processing states, visible retry actions, and idempotent submission so retrying never double-charges or double-bets |
 | Silent long waits with no feedback during PaySuite payment confirmation | Users assume the app is broken and force-close, potentially retrying and causing duplicate payment attempts | Clear "waiting for confirmation from M-Pesa/e-Mola" state with expected wait time and a safe retry/cancel path |
-| Assuming users can complete complex flows (e.g., choosing a market before a bet) in one pass | Contradicts Duelo's own stated goal of sub-30-second bet creation for very small stakes (e.g., 5 MT) | Ruthlessly minimize steps/taps in the create-bet flow; pre-fill defaults (1X2 already fixed as the only market) and optimize for thumb-reachable, single-screen creation |
+| Assuming users can complete complex flows (e.g., choosing a market before a bet) in one pass | Contradicts DueloBet's own stated goal of sub-30-second bet creation for very small stakes (e.g., 5 MT) | Ruthlessly minimize steps/taps in the create-bet flow; pre-fill defaults (1X2 already fixed as the only market) and optimize for thumb-reachable, single-screen creation |
 | Over-polishing visuals (custom animations, heavy imagery, elaborate onboarding) before validating core loop | Slows MVP delivery, adds surface area for bugs, doesn't move the metric that matters (successful matched + settled bets) | Prioritize a clean, trustworthy, but simple visual language (clear balance display, clear bet state, clear win/loss feedback) over decorative polish; add motion/detail after the core loop is validated |
 
 ## "Looks Done But Isn't" Checklist

@@ -14,7 +14,7 @@ import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 
-export const metadata: Metadata = { title: "Liquidar jogos | Duelo" };
+export const metadata: Metadata = { title: "Liquidar jogos | DueloBet" };
 
 /**
  * Manual settlement worklist — the SETL-01 fallback for fixtures no

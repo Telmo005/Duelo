@@ -3,7 +3,7 @@ phase: 1
 slug: identity-funded-wallet
 status: draft
 shadcn_initialized: false
-preset: custom-duelo-dark (see Design System — no live codebase/preset picker session existed at spec time; exact tokens specified below)
+preset: custom-DueloBet-dark (see Design System — no live codebase/preset picker session existed at spec time; exact tokens specified below)
 created: 2026-07-09
 ---
 
@@ -62,7 +62,7 @@ If any of these are wrong, correct them here before Phase 1 planning locks — t
 }
 ```
 
-After `npx shadcn init` scaffolds the default `neutral` theme into `app/globals.css`, override the generated CSS variables with the Duelo palette from the Color section below (dark values go directly on `:root` since there is no light theme in v1 — do not gate them behind `.dark`).
+After `npx shadcn init` scaffolds the default `neutral` theme into `app/globals.css`, override the generated CSS variables with the DueloBet palette from the Color section below (dark values go directly on `:root` since there is no light theme in v1 — do not gate them behind `.dark`).
 
 Components needed for Phase 1 (all shadcn official — no third-party registry): `button`, `input`, `label`, `form`, `checkbox`, `card`, `badge`, `tabs`, `dialog`, `sheet` (deposit bottom-sheet on mobile), `sonner` (toast), `skeleton`, `separator`, `avatar`.
 
@@ -112,9 +112,9 @@ Dark-mode-only palette (no light theme in v1 — see Assumption 1). Values given
 
 | Role | Value | Usage |
 |------|-------|-------|
-| Dominant (60%) | `#0D0E12` ("Duelo Ink") | App background, page canvas |
-| Secondary (30%) | `#1A1C24` ("Duelo Slate") | Cards, bottom nav, sheets/modals, input fields |
-| Accent (10%) | `#F2B807` ("Duelo Gold") | Reserved for: primary CTA buttons (Criar conta / Entrar / Depositar / Confirmar depósito), active tab/nav indicator, input focus ring, the brand logotype accent stroke, and the "Saldo Disponível" numeral emphasis on the wallet home hero |
+| Dominant (60%) | `#0D0E12` ("DueloBet Ink") | App background, page canvas |
+| Secondary (30%) | `#1A1C24` ("DueloBet Slate") | Cards, bottom nav, sheets/modals, input fields |
+| Accent (10%) | `#F2B807` ("DueloBet Gold") | Reserved for: primary CTA buttons (Criar conta / Entrar / Depositar / Confirmar depósito), active tab/nav indicator, input focus ring, the brand logotype accent stroke, and the "Saldo Disponível" numeral emphasis on the wallet home hero |
 | Destructive | `#F0455B` | Form validation errors, error toasts/banners, failed-deposit state, logout confirmation button |
 
 Accent reserved for: primary CTA buttons, active nav/tab indicator, focus rings, brand logo accent — **nowhere else**. Do not use gold for decorative accents, illustrations, or secondary buttons; if gold appears more than once per screen outside this list, that's a violation of the 10% budget.

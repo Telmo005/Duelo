@@ -42,7 +42,7 @@ export async function AppShell({
       <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:justify-between lg:border-r lg:border-border lg:bg-card lg:p-6">
         <div>
           <Link href="/" className="text-lg font-extrabold tracking-tight text-primary">
-            Duelo
+            DueloBet
           </Link>
 
           <div className="mt-5 flex items-center gap-2">
@@ -61,7 +61,7 @@ export async function AppShell({
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors",
                     isActive
-                      ? "bg-primary-10 text-primary"
+                      ? "bg-primary-10 text-primary-text"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
                 >
@@ -99,7 +99,7 @@ export async function AppShell({
         {/* Top bar (mobile) */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-card px-4 lg:hidden">
           <Link href="/" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
-            Duelo
+            DueloBet
           </Link>
           <div className="flex items-center gap-2">
             <WalletChip availableCents={availableCents} compact />

@@ -72,7 +72,7 @@ export function AffiliateOverviewList({ rows }: { rows: Row[] }) {
                 </p>
               </div>
               <div className="shrink-0 text-right text-xs">
-                <p><span className="font-bold text-success">{formatCentsAsMt(r.totalEarnedCents)} MT</span> ganho</p>
+                <p><span className="font-bold text-success-text">{formatCentsAsMt(r.totalEarnedCents)} MT</span> ganho</p>
                 <p className="text-muted-foreground">{formatCentsAsMt(r.availableCents)} MT em saldo</p>
               </div>
             </div>

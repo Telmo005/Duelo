@@ -305,5 +305,5 @@ Additional edge: `open` → `cancelled` (manual, creator-initiated) is allowed o
 - [Peer-to-Peer Sports Betting: The Model Behind Modern Exchanges (SX Bet Blog)](https://blog.sx.bet/sports-betting/guides/peer-to-peer-sports-betting/) — LOW confidence
 
 ---
-*Architecture research for: P2P sports betting platform (Duelo)*
+*Architecture research for: P2P sports betting platform (DueloBet)*
 *Researched: 2026-07-09*

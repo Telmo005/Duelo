@@ -5,7 +5,7 @@ import { UserPasswordReset } from "@/components/admin/user-password-reset";
 import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
 
-export const metadata: Metadata = { title: "Recuperação de conta | Duelo" };
+export const metadata: Metadata = { title: "Recuperação de conta | DueloBet" };
 
 /**
  * Support-assisted password reset (ADMIN-05 equivalent). With no SMS/email

@@ -53,7 +53,7 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
       amount: parsed.data.amountMt,
       method: parsed.data.method,
       currency: "MZN",
-      description: "Depósito Duelo",
+      description: "Depósito DueloBet",
       returnUrl: process.env.NEXT_PUBLIC_APP_URL
         ? `${process.env.NEXT_PUBLIC_APP_URL}/wallet/deposit`
         : undefined,

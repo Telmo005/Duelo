@@ -1,4 +1,4 @@
-# Walking Skeleton — Duelo
+# Walking Skeleton — DueloBet
 
 **Phase:** 1
 **Generated:** 2026-07-09
@@ -9,7 +9,7 @@
 
 A new user can register (phone + email + password, confirming 18+), the app writes a `profiles`
 row to Supabase Postgres, and after login the deployed app reads that row back and renders the
-user's display name and a live (zero) wallet balance on a Duelo-themed dashboard — proving
+user's display name and a live (zero) wallet balance on a DueloBet-themed dashboard — proving
 Next.js → server action → Supabase Auth → Postgres write → Postgres read → themed UI → deployed
 dev environment are all wired correctly.
 
@@ -23,7 +23,7 @@ dev environment are all wired correctly.
 | Ledger model | Append-only double-entry `wallet_ledger` + cached `wallets` balance row updated in the same tx | Auditability (WALLET-02) and reconstructable balances are hard requirements; never a lone mutable balance column. (ARCHITECTURE.md Anti-Pattern 1) |
 | Auth | Supabase Auth email + password (native bcrypt hashing, email-based password reset); phone captured as first-class profile identity; session via `@supabase/ssr` httpOnly cookies | Email+password is the fully-verifiable path with native secure reset and no dependency on unverified Mozambique SMS/OTP deliverability (STACK.md flags SMS as MEDIUM confidence). Phone is stored as the mobile-money identity and accepted as a login identifier (resolved server-side to the account). SMS OTP verification is deferred until deliverability is validated. |
 | Payments | PaySuite REST API v1 for deposits (M-Pesa / e-Mola); signed idempotent webhook is the only source of truth for crediting | Only Mozambique mobile-money aggregator with public API docs. Contract is LOW confidence (single-source) → integration is built defensively: env-configurable endpoints/field names, HMAC-SHA256 signature verification, idempotency key stored in the same DB tx as the ledger write, plus a server-side status-poll fallback. (STACK.md, PITFALLS.md Pitfall 2) |
-| UI / design system | Tailwind CSS v4 (`@theme` OKLCH) + shadcn/ui (new-york, neutral base, dark-only) + Plus Jakarta Sans + Motion (scoped) | Establishes Duelo's own dark "stadium-at-night" visual identity per 01-UI-SPEC.md, serving DESIGN-01. Motion (JS) used only for the tab indicator and deposit-success checkmark; everything else is CSS/Tailwind to keep the bundle light. |
+| UI / design system | Tailwind CSS v4 (`@theme` OKLCH) + shadcn/ui (new-york, neutral base, dark-only) + Plus Jakarta Sans + Motion (scoped) | Establishes DueloBet's own dark "stadium-at-night" visual identity per 01-UI-SPEC.md, serving DESIGN-01. Motion (JS) used only for the tab indicator and deposit-success checkmark; everything else is CSS/Tailwind to keep the bundle light. |
 | Deployment target | Vercel (preview/dev deploy) | Native Next.js host; serverless route handlers receive PaySuite webhooks. Managed Redis (Upstash) for BullMQ reconciliation is deferred until Phase 4 withdrawal / scheduled jobs. |
 | Directory layout | Root `app/` (routes), `components/` (ui + feature), `lib/` (supabase, paysuite, wallet, actions), `db/` (Drizzle schema), `supabase/migrations/` (raw SQL: functions + RLS) | Matches the `@/` aliases and `app/globals.css` in 01-UI-SPEC.md's `components.json`. Money-moving PL/pgSQL + RLS live as raw SQL migrations (Drizzle owns table shape + typed reads). |
 

@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/admin";
 import { getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 
-export const metadata: Metadata = { title: "Levantamentos | Duelo" };
+export const metadata: Metadata = { title: "Levantamentos | DueloBet" };
 
 /**
  * Manual withdrawal worklist. Every row here already has its funds locked

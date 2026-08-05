@@ -11,7 +11,7 @@ import { getUserWithdrawals } from "@/lib/withdrawals";
 import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import { BackLink } from "@/components/ui/back-link";
 
-export const metadata: Metadata = { title: "Levantar | Duelo" };
+export const metadata: Metadata = { title: "Levantar | DueloBet" };
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   pending: { label: "Pendente", className: "bg-primary-10 text-primary" },

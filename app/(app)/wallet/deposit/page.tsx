@@ -9,7 +9,7 @@ import { DepositForm } from "@/components/wallet/deposit-form";
 import { getWalletBalance } from "@/lib/wallet";
 import { BackLink } from "@/components/ui/back-link";
 
-export const metadata: Metadata = { title: "Depositar | Duelo" };
+export const metadata: Metadata = { title: "Depositar | DueloBet" };
 
 export default async function DepositPage() {
   const supabase = await createClient();

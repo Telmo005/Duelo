@@ -16,7 +16,7 @@ export function FeedSidebarRight({ loggedIn = false }: { loggedIn?: boolean }) {
           <ol className="flex flex-col gap-3">
             {STEPS.map((s) => (
               <li key={s.n} className="flex items-start gap-2.5 text-sm">
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary-10 text-xs font-bold text-primary">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary-10 text-xs font-bold text-primary-text">
                   {s.n}
                 </span>
                 <span className="text-muted-foreground">{s.text}</span>
@@ -56,7 +56,7 @@ export function FeedSidebarRight({ loggedIn = false }: { loggedIn?: boolean }) {
         )}
 
         <p className="px-2 text-xs leading-relaxed text-muted-foreground">
-          Duelo — apostas P2P entre pessoas reais. Disponível em Moçambique.
+          DueloBet — apostas P2P entre pessoas reais. Disponível em Moçambique.
         </p>
       </div>
     </aside>

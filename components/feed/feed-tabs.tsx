@@ -84,7 +84,7 @@ export function FeedTabs({
               onClick={() => setTab(t.key)}
               aria-pressed={isActive}
               className={`press relative pb-2 text-[13px] font-semibold transition-colors ${
-                isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                isActive ? "text-primary-text" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t.label}

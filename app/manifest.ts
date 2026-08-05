@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Duelo — Apostas P2P",
-    short_name: "Duelo",
+    name: "DueloBet — Apostas P2P",
+    short_name: "DueloBet",
     description: "Apostas desportivas P2P entre pessoas reais, com dinheiro em custódia e liquidação automática.",
     start_url: "/",
     display: "standalone",

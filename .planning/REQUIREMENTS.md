@@ -1,4 +1,4 @@
-# Requirements: Duelo
+# Requirements: DueloBet
 
 **Defined:** 2026-07-09
 **Core Value:** Dois utilizadores conseguem apostar um contra o outro, com o dinheiro de ambos protegido em custódia e a liquidação do vencedor totalmente automática e confiável após o resultado oficial — sem que a plataforma corra qualquer risco financeiro.

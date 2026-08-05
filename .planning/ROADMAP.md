@@ -1,8 +1,8 @@
-# Roadmap: Duelo
+# Roadmap: DueloBet
 
 ## Overview
 
-Duelo is a peer-to-peer sports-betting wallet: two users stake against each other on a
+DueloBet is a peer-to-peer sports-betting wallet: two users stake against each other on a
 1X2 football outcome, the platform holds both stakes in escrow, and the winner is settled
 automatically after the official result — the platform never takes a side. The roadmap is
 built money-first, then the bet loop, then automatic settlement, deliberately front-loading a
@@ -48,9 +48,9 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. A logged-in user can deposit MT via M-Pesa or e-Mola and, once PaySuite confirms, sees their available balance increase.
   3. The wallet screen shows available, locked, and total balance as distinct values, plus a full transaction history where every entry has a reason (deposit, lock, release, payout, commission, refund).
   4. Every balance change is an atomic, append-only ledger entry — a duplicated or replayed PaySuite deposit webhook (signature-verified) credits the wallet exactly once, with no direct balance mutation.
-  5. The interface presents Duelo's own visual identity (color, typography, micro-interactions) and renders cleanly on a low-end mobile device.
+  5. The interface presents DueloBet's own visual identity (color, typography, micro-interactions) and renders cleanly on a low-end mobile device.
 **Plans**: 4 plans
-- [ ] 01-01-PLAN.md — Walking skeleton: Next.js scaffold + Duelo design system + register/login/session + deployed (AUTH-01/02/03, DESIGN-01)
+- [ ] 01-01-PLAN.md — Walking skeleton: Next.js scaffold + DueloBet design system + register/login/session + deployed (AUTH-01/02/03, DESIGN-01)
 - [ ] 01-02-PLAN.md — Wallet foundation: append-only ledger + row-locked atomic credit/hold/release (concurrency-tested) + wallet screen (WALLET-01/02/03)
 - [ ] 01-03-PLAN.md — Deposit slice: M-Pesa/e-Mola via PaySuite, signed idempotent webhook, transaction history (PAY-01/02/03, WALLET-04)
 - [ ] 01-04-PLAN.md — Password reset: enumeration-safe recover → email link → set new password (AUTH-04)

@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { getBetReceipt } from "@/lib/bets";
 import { formatCentsAsMt, MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
-export const alt = "Duelo — aposta P2P";
+export const alt = "DueloBet — aposta P2P";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -80,7 +80,7 @@ export default async function OpengraphImage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const bet = await getBetReceipt(id);
 
-  const home = bet?.match.home ?? "Duelo";
+  const home = bet?.match.home ?? "DueloBet";
   const away = bet?.match.away ?? "Aposta P2P";
   const league = bet?.match.league ?? "Moçambique";
   const stakeLabel = bet ? `${formatCentsAsMt(bet.potCents)} MT em jogo` : "Apostas P2P entre pessoas reais";
@@ -171,7 +171,7 @@ export default async function OpengraphImage({ params }: { params: Promise<{ id:
             >
               D
             </div>
-            <span style={{ fontSize: 26, fontWeight: 800, color: "#F2C22A", letterSpacing: -0.5 }}>Duelo</span>
+            <span style={{ fontSize: 26, fontWeight: 800, color: "#F2C22A", letterSpacing: -0.5 }}>DueloBet</span>
             <span
               style={{
                 display: "flex",

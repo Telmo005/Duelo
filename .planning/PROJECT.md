@@ -1,8 +1,8 @@
-# Duelo
+# DueloBet
 
 ## What This Is
 
-Duelo é uma plataforma de apostas desportivas P2P (peer-to-peer) onde utilizadores apostam uns contra os outros — nunca contra a casa. Um utilizador cria uma aposta sobre um evento desportivo (partida de futebol) prevendo um resultado (vitória da casa / empate / vitória do visitante) e define um valor. Outro utilizador aceita, apostando exatamente contra essa previsão pelo mesmo valor. A plataforma bloqueia o dinheiro de ambos, aguarda o resultado oficial (via API de dados desportivos), e paga automaticamente ao vencedor o pote total menos a comissão da plataforma. A plataforma atua apenas como intermediária/custodiante — nunca assume risco financeiro nem participa como contraparte.
+DueloBet é uma plataforma de apostas desportivas P2P (peer-to-peer) onde utilizadores apostam uns contra os outros — nunca contra a casa. Um utilizador cria uma aposta sobre um evento desportivo (partida de futebol) prevendo um resultado (vitória da casa / empate / vitória do visitante) e define um valor. Outro utilizador aceita, apostando exatamente contra essa previsão pelo mesmo valor. A plataforma bloqueia o dinheiro de ambos, aguarda o resultado oficial (via API de dados desportivos), e paga automaticamente ao vencedor o pote total menos a comissão da plataforma. A plataforma atua apenas como intermediária/custodiante — nunca assume risco financeiro nem participa como contraparte.
 
 ## Core Value
 

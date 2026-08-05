@@ -12,7 +12,7 @@ import { getWalletBalance } from "@/lib/wallet";
 import { BackLink } from "@/components/ui/back-link";
 import { Bell } from "lucide-react";
 
-export const metadata: Metadata = { title: "Notificações | Duelo" };
+export const metadata: Metadata = { title: "Notificações | DueloBet" };
 
 export default async function NotificationsPage() {
   const supabase = await createClient();

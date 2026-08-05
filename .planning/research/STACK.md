@@ -65,7 +65,7 @@
 
 ```bash
 # Core app
-npx create-next-app@latest duelo --typescript --tailwind --app
+npx create-next-app@latest DueloBet --typescript --tailwind --app
 
 # Database / ORM
 npm install drizzle-orm postgres
@@ -158,5 +158,5 @@ npm install -D vitest @playwright/test
 - [PWA vs React Native vs Flutter for low-bandwidth — dev.to, pixelplex.io](https://dev.to/sajan_kumarsingh_b556129/cross-platform-mobile-development-react-native-vs-flutter-vs-progressive-web-apps-in-2025-50am) — WEB, MEDIUM confidence
 
 ---
-*Stack research for: P2P sports betting wallet platform (Duelo)*
+*Stack research for: P2P sports betting wallet platform (DueloBet)*
 *Researched: 2026-07-09*

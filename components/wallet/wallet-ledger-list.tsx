@@ -41,7 +41,7 @@ function LedgerRow({ entry, bordered }: { entry: WalletLedgerEntry; bordered: bo
           {entry.description ? ` · ${entry.description}` : ""}
         </p>
       </div>
-      <p className={`shrink-0 text-sm font-extrabold tabular-nums ${isPositive ? "text-success" : "text-muted-foreground"}`}>
+      <p className={`shrink-0 text-sm font-extrabold tabular-nums ${isPositive ? "text-success-text" : "text-muted-foreground"}`}>
         {isPositive ? "+" : ""}
         {formatCentsAsMt(netCents)} MT
       </p>

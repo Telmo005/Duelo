@@ -8,7 +8,7 @@ import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { ClearErrorsButton } from "@/components/admin/clear-errors-button";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Erros | Duelo" };
+export const metadata: Metadata = { title: "Erros | DueloBet" };
 
 /** Source labels shown as small badges — kept in sync by hand with the
  *  `source` string each logError() call site passes (see lib/errorLog.ts
