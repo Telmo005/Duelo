@@ -209,7 +209,7 @@ export function FixtureSearchPicker() {
                   </span>
                   Selecionar todos ({shown.length})
                 </button>
-                {selected.size > 0 && <span className="text-xs font-semibold text-primary">{selected.size} selecionado(s)</span>}
+                {selected.size > 0 && <span className="text-xs font-semibold text-primary-text">{selected.size} selecionado(s)</span>}
               </div>
 
               <div className="max-h-64 overflow-y-auto rounded-xl border border-border">

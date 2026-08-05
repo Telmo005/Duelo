@@ -17,7 +17,7 @@ function WinnerChip({ winner, duplicate }: { winner: RecentWinner; duplicate?: b
       <p className="text-xs">
         <span className="font-bold">{winner.name}</span>
         <span className="text-muted-foreground"> ganhou </span>
-        <span className="font-extrabold text-success">MT {(winner.payoutCents / 100).toLocaleString("pt")}</span>
+        <span className="font-extrabold text-success-text">MT {(winner.payoutCents / 100).toLocaleString("pt")}</span>
         <span className="text-muted-foreground">
           {" "}
           · {winner.match.home} {winner.match.resultHome}-{winner.match.resultAway} {winner.match.away}

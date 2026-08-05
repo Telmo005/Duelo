@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Duelo Authentication Flow (Walking Skeleton)", () => {
+test.describe("DueloBet Authentication Flow (Walking Skeleton)", () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to landing page before each test
     await page.goto("/");

@@ -17,11 +17,11 @@ const TABS: { key: UserBetsTab; label: string }[] = [
 ];
 
 function statusMeta(bet: UserBetRow) {
-  if (bet.status === "waiting") return { label: "Aguarda adversário", className: "bg-primary-10 text-primary" };
-  if (bet.status === "matched") return { label: "Em curso", className: "bg-success-10 text-success" };
+  if (bet.status === "waiting") return { label: "Aguarda adversário", className: "bg-primary-10 text-primary-text" };
+  if (bet.status === "matched") return { label: "Em curso", className: "bg-success-10 text-success-text" };
   if (bet.status === "cancelled") return { label: "Cancelada", className: "bg-muted text-muted-foreground" };
   if (bet.status === "refunded") return { label: "Reembolsada", className: "bg-locked-10 text-locked" };
-  if (bet.won === true) return { label: "Ganhaste", className: "bg-success-10 text-success" };
+  if (bet.won === true) return { label: "Ganhaste", className: "bg-success-10 text-success-text" };
   if (bet.won === false) return { label: "Perdeste", className: "bg-destructive-10 text-destructive" };
   return { label: "Liquidada", className: "bg-muted text-muted-foreground" };
 }

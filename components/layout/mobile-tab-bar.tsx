@@ -52,7 +52,7 @@ function Tab({
       aria-current={active ? "page" : undefined}
       className={cn(
         "flex min-w-14 flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold transition-colors",
-        active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+        active ? "text-primary-text" : "text-muted-foreground hover:text-foreground"
       )}
     >
       <Icon className="size-[22px]" strokeWidth={active ? 2.4 : 2} aria-hidden />
@@ -85,7 +85,7 @@ function CreateTab({ href }: { href: string }) {
       <span className="-mt-4 flex size-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-elevated)] ring-4 ring-background">
         <CreateTabIcon />
       </span>
-      <span className="mt-0.5 text-[10px] font-bold text-primary">Criar</span>
+      <span className="mt-0.5 text-[10px] font-bold text-primary-text">Criar</span>
     </Link>
   );
 }

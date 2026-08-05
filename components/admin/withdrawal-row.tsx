@@ -57,14 +57,14 @@ export function WithdrawalRow({ withdrawal }: { withdrawal: PendingWithdrawalRow
             {withdrawal.reference} · {new Date(withdrawal.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-primary-10 px-2.5 py-1 text-xs font-bold text-primary">
+        <span className="shrink-0 rounded-full bg-primary-10 px-2.5 py-1 text-xs font-bold text-primary-text">
           {withdrawal.method === "mpesa" ? "M-Pesa" : "e-Mola"}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 rounded-xl bg-secondary/40 p-3 text-sm">
         <div>
-          <p className="text-[11px] font-medium text-muted-foreground">Conta Duelo</p>
+          <p className="text-[11px] font-medium text-muted-foreground">Conta DueloBet</p>
           <p className="truncate font-bold">{withdrawal.requesterDisplayName}</p>
           <p className="truncate text-xs text-muted-foreground">{withdrawal.requesterPhone ?? "sem número"}</p>
         </div>

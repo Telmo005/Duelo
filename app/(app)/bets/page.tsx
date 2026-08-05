@@ -12,7 +12,7 @@ import { getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { Plus, Swords, ArrowRight } from "lucide-react";
 
-export const metadata: Metadata = { title: "Minhas Apostas | Duelo" };
+export const metadata: Metadata = { title: "Minhas Apostas | DueloBet" };
 
 export default async function BetsPage() {
   const supabase = await createClient();

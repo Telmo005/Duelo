@@ -32,7 +32,7 @@ export function FeedSidebarLeft({
               aria-current={active ? "page" : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-2.5 py-2 text-[15px] font-semibold transition-colors",
-                active ? "bg-accent text-primary" : "text-foreground hover:bg-accent"
+                active ? "bg-accent text-primary-text" : "text-foreground hover:bg-accent"
               )}
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
@@ -63,7 +63,7 @@ export function FeedSidebarLeft({
               <span className="flex items-center gap-2 text-muted-foreground">
                 <ShieldCheck className="size-4" aria-hidden /> Pago automaticamente
               </span>
-              <span className="font-bold text-success">100%</span>
+              <span className="font-bold text-success-text">100%</span>
             </div>
           </div>
         </div>

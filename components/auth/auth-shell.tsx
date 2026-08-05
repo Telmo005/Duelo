@@ -21,7 +21,7 @@ export function AuthShell({
       {/* ── Branding panel (desktop only) ─────────────────────── */}
       <div className="hidden flex-col justify-center gap-10 px-12 lg:flex xl:px-20">
         <Link href="/" className="text-2xl font-extrabold tracking-tight text-primary">
-          Duelo
+          DueloBet
         </Link>
 
         <div className="max-w-md">
@@ -53,7 +53,7 @@ export function AuthShell({
                   <p className="text-sm font-bold">{d.match}</p>
                 </div>
               </div>
-              <p className="text-sm font-extrabold text-primary">{d.stake}</p>
+              <p className="text-sm font-extrabold text-primary-text">{d.stake}</p>
             </div>
           ))}
         </div>
@@ -71,11 +71,11 @@ export function AuthShell({
               Feed
             </Link>
             <div className="h-4 w-px bg-border" />
-            <span className="text-sm font-extrabold tracking-tight text-primary">Duelo</span>
+            <span className="text-sm font-extrabold tracking-tight text-primary">DueloBet</span>
           </div>
 
           <div className="mb-7">
-            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-primary">{eyebrow}</p>
+            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-primary-text">{eyebrow}</p>
             <h1 className="mb-1.5 text-[28px] font-extrabold tracking-tight text-foreground sm:text-3xl">{title}</h1>
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>

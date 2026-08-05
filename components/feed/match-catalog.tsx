@@ -168,7 +168,7 @@ function FeaturedCard({ match: m, now }: { match: CatalogMatch; now: number }) {
       {m.featured && (
         <Pin className="absolute right-2 top-2 size-2.5 rotate-45 fill-primary text-primary" aria-hidden />
       )}
-      <p className="truncate text-center text-[9px] font-bold uppercase tracking-wider text-primary/90">{m.league}</p>
+      <p className="truncate text-center text-[9px] font-bold uppercase tracking-wider text-primary-text">{m.league}</p>
       <div className="my-2.5 flex items-center justify-center gap-2">
         <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={32} />
         <span className="text-[9px] font-semibold text-muted-foreground">vs</span>

@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Duelo — Apostas P2P entre pessoas reais";
+export const alt = "DueloBet — Apostas P2P entre pessoas reais";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -40,7 +40,7 @@ export default async function OpengraphImage() {
         >
           D
         </div>
-        <span style={{ fontSize: 64, fontWeight: 800, color: "#F2C22A", letterSpacing: -1 }}>Duelo</span>
+        <span style={{ fontSize: 64, fontWeight: 800, color: "#F2C22A", letterSpacing: -1 }}>DueloBet</span>
         <span style={{ fontSize: 28, fontWeight: 600, color: "#94989F", marginTop: 16 }}>
           Apostas P2P entre pessoas reais
         </span>

@@ -5,7 +5,7 @@ import { logError } from "@/lib/errorLog";
 
 /**
  * Receives fan-out events from the PayGate gateway (mpesa/emola via
- * PaySuite, but Duelo never talks to PaySuite directly — see
+ * PaySuite, but DueloBet never talks to PaySuite directly — see
  * lib/paygate-client.ts). No user session — the request comes from
  * PayGate, not a logged-in browser — trust comes entirely from the HMAC
  * signature (X-Paygate-Signature), same pattern as the bet_* RPC guard:

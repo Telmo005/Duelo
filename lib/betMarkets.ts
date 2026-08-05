@@ -1,5 +1,5 @@
 /**
- * Single source of truth for every betting market Duelo offers — which
+ * Single source of truth for every betting market DueloBet offers — which
  * (market, prediction) pairs are valid, how a market resolves from a final
  * score, and how to label a prediction for display. Mirrors
  * bet_settle_match's SQL exactly (supabase/migrations/0035_extra_markets.sql)

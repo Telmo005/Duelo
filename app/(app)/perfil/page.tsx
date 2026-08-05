@@ -17,7 +17,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Wallet, Swords, MessageCircle, Gift } from "lucide-react";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Perfil | Duelo" };
+export const metadata: Metadata = { title: "Perfil | DueloBet" };
 
 export default async function ProfilePage() {
   const supabase = await createClient();

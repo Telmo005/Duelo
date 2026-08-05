@@ -217,7 +217,7 @@ function MoneySlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
   return (
     <div className="flex w-[76px] shrink-0 flex-col items-end leading-tight">
       <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{stakeLabel} MT</span>
-      <span className="flex items-center gap-1 text-[15px] font-bold tabular-nums text-success">
+      <span className="flex items-center gap-1 text-[15px] font-bold tabular-nums text-success-text">
         <TrendingUp className="size-3.5 shrink-0" aria-hidden />+{payoutLabel}
       </span>
     </div>

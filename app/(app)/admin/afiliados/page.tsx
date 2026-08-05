@@ -6,7 +6,7 @@ import { getWalletBalance } from "@/lib/wallet";
 import { PlatformSettingsForm } from "@/components/admin/platform-settings-form";
 import { AffiliateOverviewList } from "@/components/admin/affiliate-overview-list";
 
-export const metadata: Metadata = { title: "Afiliados | Admin | Duelo" };
+export const metadata: Metadata = { title: "Afiliados | Admin | DueloBet" };
 
 export default async function AdminAffiliatesPage() {
   const profile = await requireAdmin();

@@ -12,7 +12,7 @@ const jakartaSans = Plus_Jakarta_Sans({
 });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-const SITE_TITLE = "Duelo — Apostas P2P entre pessoas reais";
+const SITE_TITLE = "DueloBet — Apostas P2P entre pessoas reais";
 const SITE_DESCRIPTION =
   "Explora apostas criadas por outros utilizadores e entra no duelo. O dinheiro fica em custódia e o vencedor recebe automaticamente após o resultado oficial.";
 
@@ -20,20 +20,20 @@ export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
     default: SITE_TITLE,
-    template: "%s | Duelo",
+    template: "%s | DueloBet",
   },
   description: SITE_DESCRIPTION,
   keywords: ["apostas", "futebol", "P2P", "Moçambique", "M-Pesa", "e-Mola"],
   robots: { index: true, follow: true },
   // app/manifest.ts (file convention) auto-links the manifest itself —
   // no need to repeat its URL here.
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Duelo" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "DueloBet" },
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     type: "website",
     locale: "pt_MZ",
-    siteName: "Duelo",
+    siteName: "DueloBet",
   },
   twitter: {
     card: "summary_large_image",

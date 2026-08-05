@@ -13,7 +13,7 @@ import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 type ActiveAction = "settle" | "postponed" | "abandoned" | "delete" | "live" | "api" | "featured" | null;
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  live: { label: "● Ao vivo", className: "bg-primary-10 text-primary" },
+  live: { label: "● Ao vivo", className: "bg-primary-10 text-primary-text" },
   needs_review: { label: "Precisa de liquidação", className: "bg-destructive-10 text-destructive" },
 };
 
@@ -313,7 +313,7 @@ export function SettleMatchRow({ match, isAutoFeatured = false }: { match: Match
             onClick={handleRefreshFromApi}
             disabled={isPending}
             title="Consulta só este jogo — um único pedido"
-            className="press inline-flex items-center gap-1.5 rounded-lg border border-primary-30 bg-primary-10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="press inline-flex items-center gap-1.5 rounded-lg border border-primary-30 bg-primary-10 px-3 py-1.5 text-xs font-semibold text-primary-text hover:bg-primary-10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {activeAction === "api" ? <Spinner className="size-3" /> : <RefreshCw className="size-3" aria-hidden />}
             {activeAction === "api" ? "A consultar…" : "Última atualização"}
@@ -334,7 +334,7 @@ export function SettleMatchRow({ match, isAutoFeatured = false }: { match: Match
             onClick={handleTogglePause}
             disabled={isPending || liveHome === "" || liveAway === ""}
             className={`press inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              match.livePaused ? "border-success bg-success-10 text-success" : "border-border text-muted-foreground hover:bg-accent"
+              match.livePaused ? "border-success bg-success-10 text-success-text" : "border-border text-muted-foreground hover:bg-accent"
             }`}
           >
             {match.livePaused ? <Play className="size-3" aria-hidden /> : <Pause className="size-3" aria-hidden />}
@@ -404,7 +404,7 @@ export function SettleMatchRow({ match, isAutoFeatured = false }: { match: Match
           disabled={isPending}
           title="Fixa este jogo na faixa 'Destaques' do feed, independentemente da liga/data"
           className={`press inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            match.featured ? "border-primary bg-primary-10 text-primary" : "border-border text-muted-foreground hover:bg-accent"
+            match.featured ? "border-primary bg-primary-10 text-primary-text" : "border-border text-muted-foreground hover:bg-accent"
           }`}
         >
           {activeAction === "featured" ? <Spinner className="size-3" /> : <Pin className={`size-3 ${match.featured ? "fill-primary" : ""}`} aria-hidden />}
@@ -435,7 +435,7 @@ export function SettleMatchRow({ match, isAutoFeatured = false }: { match: Match
       </div>
 
       {isAutoFeatured && (
-        <p className="flex items-center gap-1.5 text-[11px] font-medium text-primary/80">
+        <p className="flex items-center gap-1.5 text-[11px] font-medium text-primary-text">
           🔥 Já aparece nos Destaques do feed por escolha automática (liga/data) — "Destacar" acima fixa-o manualmente
           por cima disso, não é preciso para continuar a aparecer.
         </p>

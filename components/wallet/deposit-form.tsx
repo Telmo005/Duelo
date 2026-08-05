@@ -153,7 +153,7 @@ export function DepositForm() {
             </ActionButton>
           </>
         )}
-        <Link href="/dashboard" className="mt-1 text-sm font-semibold text-primary">
+        <Link href="/dashboard" className="mt-1 text-sm font-semibold text-primary-text">
           Voltar à carteira
         </Link>
       </div>

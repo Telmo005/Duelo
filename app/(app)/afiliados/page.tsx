@@ -11,7 +11,7 @@ import { getAffiliateSummary, getReferredUsers } from "@/lib/affiliate";
 import { getWalletBalance, formatCentsAsMt } from "@/lib/wallet";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Afiliados | Duelo" };
+export const metadata: Metadata = { title: "Afiliados | DueloBet" };
 
 export default async function AffiliatesPage() {
   const supabase = await createClient();
@@ -32,7 +32,7 @@ export default async function AffiliatesPage() {
       <div className="mb-7">
         <h1 className="text-2xl font-extrabold tracking-tight lg:text-3xl">Afiliados</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Recomenda a Duelo a amigos — ganhas {summary.referralSharePct}% da comissão da casa em cada duelo que eles jogarem.
+          Recomenda a DueloBet a amigos — ganhas {summary.referralSharePct}% da comissão da casa em cada duelo que eles jogarem.
         </p>
       </div>
 

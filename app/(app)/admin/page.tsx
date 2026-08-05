@@ -10,7 +10,7 @@ import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { ReconcileDepositsButton } from "@/components/admin/reconcile-deposits-button";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Admin | Duelo" };
+export const metadata: Metadata = { title: "Admin | DueloBet" };
 
 const FLAG_LABELS: Record<string, string> = {
   same_device: "Mesmo dispositivo",

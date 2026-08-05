@@ -19,7 +19,7 @@ import { getUnreadNotificationCount } from "@/lib/notifications";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 
 export const metadata: Metadata = {
-  title: "Duelo — Apostas P2P entre pessoas reais",
+  title: "DueloBet — Apostas P2P entre pessoas reais",
   description: "Explora apostas criadas por outros utilizadores e entra no duelo. Custódia segura, liquidação automática.",
 };
 

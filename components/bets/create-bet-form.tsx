@@ -61,8 +61,8 @@ const MARKETS: Market[] = ["1x2", "total_goals", "btts"];
 // scanner can actually find them — all already emitted elsewhere in the app
 // for other components, so there's no risk of them being purged.
 const MARKET_BADGE_CLASS: Record<"primary" | "success" | "locked", string> = {
-  primary: "bg-primary-10 text-primary",
-  success: "bg-success-10 text-success",
+  primary: "bg-primary-10 text-primary-text",
+  success: "bg-success-10 text-success-text",
   locked: "bg-locked-10 text-locked",
 };
 
@@ -140,7 +140,7 @@ function FeaturedMatchCard({ match: m, onSelect }: { match: MatchOption; onSelec
       className="press relative flex w-[128px] shrink-0 flex-col rounded-2xl border border-primary-40 bg-card px-3 py-3 text-left shadow-[var(--shadow-elevated)]"
     >
       {m.featured && <Pin className="absolute right-2 top-2 size-2.5 rotate-45 fill-primary text-primary" aria-hidden />}
-      <p className="truncate text-center text-[9px] font-bold uppercase tracking-wider text-primary/90">{m.league}</p>
+      <p className="truncate text-center text-[9px] font-bold uppercase tracking-wider text-primary-text">{m.league}</p>
       <div className="my-2.5 flex items-center justify-center gap-2">
         <TeamBadge name={m.home} logoUrl={m.homeLogoUrl} size={32} />
         <span className="text-[9px] font-semibold text-muted-foreground">vs</span>
@@ -523,8 +523,8 @@ export function CreateBetForm({ matches, initialMatchId }: { matches: MatchOptio
                 emphasis
                 value={
                   <span>
-                    <span className="block text-success">{fmt(payout)} MT</span>
-                    <span className="block text-xs font-semibold text-success/70">+{fmt(profit)} MT de lucro</span>
+                    <span className="block text-success-text">{fmt(payout)} MT</span>
+                    <span className="block text-xs font-semibold text-success-text">+{fmt(profit)} MT de lucro</span>
                   </span>
                 }
               />

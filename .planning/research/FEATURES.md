@@ -33,15 +33,15 @@ Features users assume exist. Missing these = product feels broken or untrustwort
 
 ### Differentiators (Competitive Advantage)
 
-Not required for trust/safety, but where Duelo can win against both traditional sportsbooks and informal/friend betting.
+Not required for trust/safety, but where DueloBet can win against both traditional sportsbooks and informal/friend betting.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
 | Sub-30-second bet creation UX | Traditional sportsbooks (bet slip, odds boards, multi-step) and even exchanges (Sporttrade's share-price UI) are heavier than "pick a side, pick an amount, done" | LOW-MEDIUM | This is explicitly the founder's stated wedge — a deliberately restrained UI is the differentiator, not a token differentiator to bolt on later. |
-| No-vig / fair peer odds framing | Novig's entire pitch is "no house edge, price is set by users" — Duelo's 1:1 matched-stake model is even simpler to explain to a non-sophisticated Mozambican bettor than an order book | LOW | Marketing/positioning feature more than engineering, but the "you're not betting against the house" message is a real trust differentiator vs. incumbent sportsbooks. |
+| No-vig / fair peer odds framing | Novig's entire pitch is "no house edge, price is set by users" — DueloBet's 1:1 matched-stake model is even simpler to explain to a non-sophisticated Mozambican bettor than an order book | LOW | Marketing/positioning feature more than engineering, but the "you're not betting against the house" message is a real trust differentiator vs. incumbent sportsbooks. |
 | Mobile-money-native, zero-bank-account flow | Global exchanges (Sporttrade, Novig, Kalshi) are card/bank/crypto-first and don't serve mobile-money-only users at all — this is an open lane, not a crowded one | MEDIUM | This alone may be enough differentiation for launch; no need to compete on bet-type variety. |
-| Public win/loss track record & ranking | BettorEdge's differentiator is social proof/leaderboards around bettor skill; Duelo's PROJECT.md already includes a lightweight version (level, stats, ranking) | LOW-MEDIUM | Keep it read-only/passive for v1 (stats + ranking) — do not build the full social layer (see Anti-Features) yet. |
-| Instant, fully automated payout (no cash-out delay) | Traditional sportsbooks and even some exchanges have withdrawal review delays; if Duelo can settle-and-release-to-available-balance within seconds of the result feed firing, that's a felt difference for small-stake, high-frequency bettors | MEDIUM-HIGH | Depends entirely on result-feed reliability (see PITFALLS) — the differentiator is real but fragile if the data source is flaky. |
+| Public win/loss track record & ranking | BettorEdge's differentiator is social proof/leaderboards around bettor skill; DueloBet's PROJECT.md already includes a lightweight version (level, stats, ranking) | LOW-MEDIUM | Keep it read-only/passive for v1 (stats + ranking) — do not build the full social layer (see Anti-Features) yet. |
+| Instant, fully automated payout (no cash-out delay) | Traditional sportsbooks and even some exchanges have withdrawal review delays; if DueloBet can settle-and-release-to-available-balance within seconds of the result feed firing, that's a felt difference for small-stake, high-frequency bettors | MEDIUM-HIGH | Depends entirely on result-feed reliability (see PITFALLS) — the differentiator is real but fragile if the data source is flaky. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
@@ -49,14 +49,14 @@ Features that seem good but would dilute the "small, very well-designed core loo
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Order-book / partial-fill matching (Sporttrade/Novig/Kalshi style) | "Real" exchanges let you buy/sell at any price and size, which feels more sophisticated | Massively increases engineering complexity (matching engine, partial settlement, position netting) for a market of small, casual bettors placing ~10 MT bets — solves a liquidity problem Duelo doesn't have yet at this scale | Keep the founder's simpler model: full-stake 1-for-1 match, opponent always takes "the other side" of a binary framing. Revisit order-book style matching only if liquidity/volume data shows single-opponent matching is a bottleneck. |
+| Order-book / partial-fill matching (Sporttrade/Novig/Kalshi style) | "Real" exchanges let you buy/sell at any price and size, which feels more sophisticated | Massively increases engineering complexity (matching engine, partial settlement, position netting) for a market of small, casual bettors placing ~10 MT bets — solves a liquidity problem DueloBet doesn't have yet at this scale | Keep the founder's simpler model: full-stake 1-for-1 match, opponent always takes "the other side" of a binary framing. Revisit order-book style matching only if liquidity/volume data shows single-opponent matching is a bottleneck. |
 | Multiple market types (over/under, handicap, correct score) at launch | Traditional sportsbooks offer dozens of markets per match; feels like "missing features" vs incumbents | Each market type multiplies settlement logic, result-feed data requirements, and QA surface — directly conflicts with founder's "small, well-designed core loop first" | Already correctly scoped to v2+ in PROJECT.md; ship 1X2 only, expand once the create→match→settle loop is proven reliable. |
 | Chat / social messaging between bettors | Informal friend-betting apps (Kutt, BroThrow) lean into social/community as their hook | Introduces moderation, abuse, and harassment surface for a P2P money product before the core trust mechanics (escrow, settlement) are even validated | Defer; the win/loss profile + ranking already gives a lightweight social signal without needing real-time chat/moderation infrastructure. |
 | Full social layer (leaderboards, groups, private betting circles, feeds) | BettorEdge and similar competitors build entire communities around this | Distracts from validating the core financial loop; leaderboards/groups need retention and volume data that doesn't exist yet at MVP | Defer to v1.x/v2 once "does the matching+escrow+settlement loop work reliably" is answered. |
 | Full document-based KYC (ID upload, liveness check) at signup | "KYC is standard in gambling" is true for licensed, high-volume operators (per KYC industry sources) | Adds signup friction the founder has explicitly rejected for v1, and is disproportionate for a small-stake, single-country product pre-regulatory requirement | Self-declared 18+ checkbox only, as already decided; revisit when volume/regulatory pressure (per PROJECT.md's own noted risk) actually materializes. |
 | Advanced ML-based collusion/fraud detection | "Fraud is a $1.2B problem industry-wide" headlines suggest sophisticated tooling is required from day one | Overkill for MVP volume; behavioral-pattern ML needs a data corpus that doesn't exist yet, and the founder has already explicitly scoped this out | Ship the basic heuristic (same device/IP flag on creator vs. acceptor pairs) and log everything for a future ML pass once there's real fraud data to train on. |
 | Live/in-play betting | Exchanges like Sporttrade lean heavily on live betting and cash-out as core value | Requires real-time odds/line movement infrastructure and much tighter result-feed integration (partial-match state, live price risk) — a different, harder product than "pre-match 1X2 P2P bet" | Explicitly out of scope; v1 is pre-match only, matching PROJECT.md's "before kickoff" cancellation logic. |
-| Cash-out / sell your position before the match ends | Sporttrade's signature feature; feels like a natural evolution | Requires a live pricing mechanism and a counterparty willing to buy the position — meaningless without an order book, and Duelo doesn't have one by design | Not applicable until/unless Duelo evolves toward an exchange model; not a v1 gap. |
+| Cash-out / sell your position before the match ends | Sporttrade's signature feature; feels like a natural evolution | Requires a live pricing mechanism and a counterparty willing to buy the position — meaningless without an order book, and DueloBet doesn't have one by design | Not applicable until/unless DueloBet evolves toward an exchange model; not a v1 gap. |
 | Promotional/marketing push notifications (bonuses, "bet now" nudges) | Industry data shows heavy promotional notification use drives short-term engagement (35-50% CTR vs 2-3% email) | Documented consumer-harm and regulatory-scrutiny pattern (93% of major sportsbook notifications are promotional; regulators and consumer groups are actively pushing back) — also erodes trust in a P2P product whose pitch is fairness, not house-driven engagement | Keep notifications strictly transactional (matched, settled, refunded) for v1; if marketing notifications are added later, gate them behind explicit opt-in. |
 
 ## Feature Dependencies
@@ -195,7 +195,7 @@ Defer until product-market fit on the core loop is established — explicitly ou
 
 ## Competitor Feature Analysis
 
-| Feature | Sporttrade / Novig (US exchanges) | Kutt / BroThrow / WagerLab (friend-betting apps) | Duelo's Approach |
+| Feature | Sporttrade / Novig (US exchanges) | Kutt / BroThrow / WagerLab (friend-betting apps) | DueloBet's Approach |
 |---------|--------------------|--------------------|--------------------|
 | Matching model | Order book, partial fills, market-maker fallback for illiquid markets | Direct 1:1 challenge, sometimes negotiated terms | Simple full-stake 1-for-1 match, opponent always takes the opposite side — no order book, no negotiation |
 | Escrow | Exchange holds funds contractually/via custodial account until settlement | Pre-funded stakes (Kutt) so neither side can flake | Same principle (both stakes locked before match is live) but via internal wallet, not smart contracts |
@@ -230,5 +230,5 @@ Defer until product-market fit on the core loop is established — explicitly ou
 - `.planning/PROJECT.md` (project requirements, founder decisions, and scope constraints)
 
 ---
-*Feature research for: P2P sports betting platform (Duelo)*
+*Feature research for: P2P sports betting platform (DueloBet)*
 *Researched: 2026-07-09*

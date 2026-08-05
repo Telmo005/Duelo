@@ -25,7 +25,7 @@ export function AffiliateShareCard({ code }: { code: string }) {
   }
 
   function handleWhatsapp() {
-    const text = `Vem apostar comigo na Duelo — apostas 1x1 entre amigos, sem casa a ganhar. Usa o meu código ${code} ao criares a tua conta: ${shareUrl}`;
+    const text = `Vem apostar comigo na DueloBet — apostas 1x1 entre amigos, sem casa a ganhar. Usa o meu código ${code} ao criares a tua conta: ${shareUrl}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
 

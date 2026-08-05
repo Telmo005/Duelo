@@ -1,5 +1,5 @@
 /* ============================================================
-   Duelo — Global Styles v5
+   DueloBet — Global Styles v5
    Dark + Gold · Social-feed layout (Facebook/Instagram inspired)
    ============================================================ */
 
@@ -77,13 +77,26 @@
   --accent-foreground: #F2C22A;
 
   --destructive: #F0455B;
-  --destructive-foreground: #FFFFFF;
+  /* Dark near-black, not white — matches every other button foreground in
+     dark mode (primary/success/locked are all dark-on-saturated-fill).
+     White-on-#F0455B measures 3.68:1, below WCAG AA's 4.5:1 for normal-size
+     button text; this near-black measures ~5:1 against the same fill. */
+  --destructive-foreground: #14151D;
 
   --success: #34D399;
   --success-foreground: #14151D;
   --locked: #9C98F7;
   --locked-foreground: #14140F;
   --live: #F0455B;
+
+  /* Text-safe variants of --primary/--success for use as plain small text on
+     a neutral background (badges, labels, amounts) — as opposed to --primary/
+     --success themselves, which are tuned for button fills and large
+     headings/logos. In dark mode the base colors already clear 4.5:1 as text,
+     so these just equal their base; see the light-theme override below for
+     why they diverge there. */
+  --primary-text: #F2C22A;
+  --success-text: #34D399;
 
   --border: #2C2E3A;
   --input: #2C2E3A;
@@ -169,6 +182,21 @@
   --locked-foreground: #FFFFFF;
   --live: #DC2626;
 
+  /* --primary/--success at their button-fill lightness only clear 3.6–3.9:1
+     as plain text on a white/light card (fails WCAG AA's 4.5:1 for normal
+     text) — there's no single lightness that satisfies both "AA as text on
+     white" and "AA as a fill under near-black button text" simultaneously,
+     so text usage gets its own deepened token instead of reusing --primary/
+     --success directly. Reuses the existing --accent-foreground value for
+     gold (already proven at 4.7:1+ elsewhere in this file); success gets the
+     same treatment with emerald-700. Use these (not --primary/--success) for
+     any plain text, badge label, or amount sitting directly on background/
+     card — --primary/--success stay as-is for button fills and large
+     headings/logos, which already clear 3:1 (WCAG's large-text/logotype
+     threshold) or better.  */
+  --primary-text: #8A6508;
+  --success-text: #047857;
+
   --border: #E5E7EB;
   --input: #E5E7EB;
   --ring: #A9790C;
@@ -215,6 +243,7 @@ html[data-theme="light"] {
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -225,6 +254,7 @@ html[data-theme="light"] {
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-text: var(--success-text);
   --color-locked: var(--locked);
   --color-locked-foreground: var(--locked-foreground);
   --color-live: var(--live);

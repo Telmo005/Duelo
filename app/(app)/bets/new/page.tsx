@@ -12,7 +12,7 @@ import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
 import { BackLink } from "@/components/ui/back-link";
 import { CalendarX } from "lucide-react";
 
-export const metadata: Metadata = { title: "Nova aposta | Duelo" };
+export const metadata: Metadata = { title: "Nova aposta | DueloBet" };
 
 export default async function NewBetPage({ searchParams }: { searchParams: Promise<{ matchId?: string }> }) {
   const { matchId } = await searchParams;

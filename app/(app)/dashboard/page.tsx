@@ -11,7 +11,7 @@ import { WalletLedgerList } from "@/components/wallet/wallet-ledger-list";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { ArrowUpFromLine, Lock, Plus, ChartColumn } from "lucide-react";
 
-export const metadata: Metadata = { title: "Carteira | Duelo" };
+export const metadata: Metadata = { title: "Carteira | DueloBet" };
 
 export default async function DashboardPage() {
   const supabase = await createClient();

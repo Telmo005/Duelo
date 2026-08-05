@@ -14,9 +14,9 @@ import { marketPredictions, marketLabel, MARKET_EMOJI, MARKET_EMOJI_GRAYSCALE, M
 import type { BetReceipt } from "@/lib/bets";
 
 const STATUS_LABEL: Record<BetReceipt["status"], { label: string; className: string }> = {
-  waiting: { label: "À espera de adversário", className: "bg-primary-10 text-primary" },
+  waiting: { label: "À espera de adversário", className: "bg-primary-10 text-primary-text" },
   matched: { label: "Em jogo", className: "bg-live-10 text-live" },
-  settled: { label: "Concluída", className: "bg-success-10 text-success" },
+  settled: { label: "Concluída", className: "bg-success-10 text-success-text" },
   cancelled: { label: "Cancelada", className: "bg-muted text-muted-foreground" },
   refunded: { label: "Reembolsada", className: "bg-locked-10 text-locked" },
 };
@@ -38,8 +38,8 @@ type PredictionKey = string;
 // scanner can actually find them — all already emitted elsewhere in the app
 // for other components, so there's no risk of them being purged.
 const MARKET_BADGE_CLASS: Record<"primary" | "success" | "locked", string> = {
-  primary: "bg-primary-10 text-primary",
-  success: "bg-success-10 text-success",
+  primary: "bg-primary-10 text-primary-text",
+  success: "bg-success-10 text-success-text",
   locked: "bg-locked-10 text-locked",
 };
 
@@ -131,9 +131,9 @@ export function BetReceiptCard({
       // Short, self-contained challenge line — the link's own OG preview
       // already carries the match/crests/stake, so this only needs to say
       // *why* the recipient is getting this link, not repeat what's in it.
-      const text = `${bet.creator.name} desafiou-te para um duelo na Duelo. Aceita o desafio:`;
+      const text = `${bet.creator.name} desafiou-te para um duelo na DueloBet. Aceita o desafio:`;
       try {
-        await navigator.share({ title: "Duelo", text, url: shareUrl });
+        await navigator.share({ title: "DueloBet", text, url: shareUrl });
       } catch {
         // user cancelled the native share sheet — not an error
       }
@@ -178,9 +178,9 @@ export function BetReceiptCard({
     bet.status === "settled"
       ? isParticipant
         ? bet.winnerId === viewerId
-          ? { text: "Ganhaste", className: "text-success border-success" }
+          ? { text: "Ganhaste", className: "text-success-text border-success" }
           : { text: "Perdeste", className: "text-destructive border-destructive" }
-        : { text: "Concluído", className: "text-success border-success" }
+        : { text: "Concluído", className: "text-success-text border-success" }
       : bet.status === "refunded"
         ? { text: "Reembolsado", className: "text-locked border-locked" }
         : bet.status === "cancelled"
@@ -227,7 +227,7 @@ export function BetReceiptCard({
       <>
         <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{slot.role}</p>
         <p className="max-w-full truncate text-sm font-bold">{slot.name}</p>
-        <p className={`text-sm font-extrabold ${slot.role === "Criador" ? "text-primary" : "text-success"}`}>{slot.label}</p>
+        <p className={`text-sm font-extrabold ${slot.role === "Criador" ? "text-primary-text" : "text-success-text"}`}>{slot.label}</p>
       </>
     );
   }
@@ -413,7 +413,7 @@ export function BetReceiptCard({
               <ReceiptLine label="Pote total" value={`MT ${formatCentsAsMt(bet.potCents)}`} />
               <ReceiptLine label="Comissão (10%)" value={`-MT ${formatCentsAsMt(bet.commissionCents)}`} muted />
               <div className="my-1 border-t border-dashed border-border" />
-              <ReceiptLine label="GANHASTE" emphasis value={`MT ${formatCentsAsMt(bet.payoutCents)}`} valueClassName="text-success" />
+              <ReceiptLine label="GANHASTE" emphasis value={`MT ${formatCentsAsMt(bet.payoutCents)}`} valueClassName="text-success-text" />
             </>
           ) : isParticipant ? (
             <>
@@ -429,7 +429,7 @@ export function BetReceiptCard({
               <ReceiptLine label="Entrada de cada lado" value={`MT ${formatCentsAsMt(bet.stakeCents)}`} />
               <ReceiptLine label="Pote total" value={`MT ${formatCentsAsMt(bet.potCents)}`} />
               <div className="my-1 border-t border-dashed border-border" />
-              <ReceiptLine label="PRÉMIO PAGO" emphasis value={`MT ${formatCentsAsMt(bet.payoutCents)}`} valueClassName="text-success" />
+              <ReceiptLine label="PRÉMIO PAGO" emphasis value={`MT ${formatCentsAsMt(bet.payoutCents)}`} valueClassName="text-success-text" />
             </>
           )
         ) : bet.status === "refunded" && bet.refundReason === "no_correct_prediction" && bet.refundFeeCents != null ? (
@@ -462,7 +462,7 @@ export function BetReceiptCard({
             <ReceiptLine label="Pote total" value={`MT ${formatCentsAsMt(bet.potCents)}`} />
             <ReceiptLine label="Comissão (10%)" value={`-MT ${formatCentsAsMt(bet.commissionCents)}`} muted />
             <div className="my-1 border-t border-dashed border-border" />
-            <ReceiptLine label="RECEBES SE GANHAR" emphasis value={`MT ${formatCentsAsMt(bet.payoutCents)}`} valueClassName="text-success" />
+            <ReceiptLine label="RECEBES SE GANHAR" emphasis value={`MT ${formatCentsAsMt(bet.payoutCents)}`} valueClassName="text-success-text" />
           </>
         )}
       </div>
@@ -512,7 +512,7 @@ export function BetReceiptCard({
             <RotateCcw className="size-4" aria-hidden /> {bet.refundReason ? REFUND_MESSAGE[bet.refundReason] : "Valor devolvido"}
           </p>
         ) : bet.status === "settled" ? (
-          <p className="flex items-center justify-center gap-2 rounded-xl bg-success-10 py-3 text-sm font-semibold text-success">
+          <p className="flex items-center justify-center gap-2 rounded-xl bg-success-10 py-3 text-sm font-semibold text-success-text">
             <Trophy className="size-4" aria-hidden /> Aposta liquidada automaticamente
           </p>
         ) : null}
