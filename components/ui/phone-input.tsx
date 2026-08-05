@@ -36,6 +36,7 @@ export function PhoneInput({
   defaultValue,
   required,
   disabled,
+  readOnly,
   autoComplete,
   className,
 }: {
@@ -46,6 +47,12 @@ export function PhoneInput({
   defaultValue?: string;
   required?: boolean;
   disabled?: boolean;
+  /** Visually locks the field (e.g. once an SMS code has already been sent
+   *  to this number) without excluding it from the form's submitted
+   *  values — unlike `disabled`, which drops a field from FormData
+   *  entirely. The underlying hidden input keeps whatever value was last
+   *  typed; the visible select/input just stop reacting to input. */
+  readOnly?: boolean;
   autoComplete?: string;
   className?: string;
 }) {
@@ -59,7 +66,7 @@ export function PhoneInput({
       <div className="relative shrink-0">
         <select
           aria-label="Prefixo do país"
-          disabled={disabled}
+          disabled={disabled || readOnly}
           defaultValue={country.code}
           className="h-11 appearance-none rounded-xl border border-border bg-card py-0 pl-4 pr-7 text-[15px] font-bold outline-none focus:border-primary disabled:opacity-50"
         >
@@ -83,6 +90,7 @@ export function PhoneInput({
         onChange={(e) => setDigits(formatSubscriberNumber(e.target.value))}
         required={required}
         disabled={disabled}
+        readOnly={readOnly}
         autoComplete={autoComplete}
         maxLength={11}
         className={cn("h-11 rounded-xl px-4 text-[15px]", className)}

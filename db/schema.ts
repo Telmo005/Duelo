@@ -434,6 +434,29 @@ export const authAttempts = pgTable("auth_attempts", {
 export type AuthAttempt = typeof authAttempts.$inferSelect;
 
 /**
+ * phone_otps — one-time SMS codes for phone-number verification at
+ * registration (lib/actions/phoneVerification.ts, lib/phoneOtp.ts).
+ * Internal-only, never exposed via RLS/PostgREST — same posture as
+ * auth_attempts. One active code per phone (unique index): requesting a
+ * new code overwrites the previous row, so only the latest SMS is ever
+ * valid. Deleted on successful verification (single-use) — a stale row
+ * never survives a completed registration.
+ */
+export const phoneOtps = pgTable("phone_otps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  phone: text("phone").notNull(),
+  codeHash: text("code_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  ip: text("ip"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("phone_otps_phone_uq").on(t.phone),
+]);
+
+export type PhoneOtp = typeof phoneOtps.$inferSelect;
+
+/**
  * admin_audit_log — append-only trail of admin actions (password resets,
  * manual settlement/void). Written exclusively by lib/adminAudit.ts.
  * Satisfies the "auditoria e rastreabilidade completa" requirement for

@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState, useTransition } from "react";
+import { Suspense, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { registerUser } from "@/lib/actions/auth";
+import { requestPhoneVerification } from "@/lib/actions/phoneVerification";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -22,29 +23,72 @@ export default function RegisterPage() {
   );
 }
 
+const RESEND_COOLDOWN_S = 60;
+
 function RegisterForm() {
   const [isPending, startTransition] = useTransition();
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Two-phase form: "form" collects name/phone/password and sends the SMS
+  // code (requestPhoneVerification); "code" reveals the code field and the
+  // actual submit becomes registerUser, which re-verifies the code
+  // server-side before creating the account (see lib/phoneOtp.ts). Fields
+  // from phase "form" are never disabled once phase flips — a disabled
+  // input is excluded from FormData entirely, which would silently drop
+  // displayName/phone/password from the registerUser call.
+  const [phase, setPhase] = useState<"form" | "code">("form");
+  const [resendIn, setResendIn] = useState(0);
   // Manual entry always wins over the link-prefilled value — someone who
   // was dictated a code over WhatsApp/voice, with no link involved, needs
   // to be able to type over whatever (if anything) is here.
   const searchParams = useSearchParams();
   const [referralCode, setReferralCode] = useState(() => searchParams.get("ref") ?? "");
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [resendIn]);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
+    const phone = String(fd.get("phone") ?? "");
+
+    if (phase === "form") {
+      startTransition(async () => {
+        const result = await requestPhoneVerification({ phone });
+        if (result?.error) {
+          setError(result.error);
+          return;
+        }
+        setPhase("code");
+        setResendIn(RESEND_COOLDOWN_S);
+      });
+      return;
+    }
+
     startTransition(async () => {
       const result = await registerUser({
         displayName: fd.get("displayName"),
-        phone: fd.get("phone"),
+        phone,
         password: fd.get("password"),
         ageConfirmed,
+        otpCode: fd.get("otpCode"),
         referralCode: referralCode.trim() || undefined,
       });
       if (result?.error) setError(result.error);
+    });
+  }
+
+  function handleResend(phoneValue: string) {
+    if (resendIn > 0 || isPending) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await requestPhoneVerification({ phone: phoneValue });
+      if (result?.error) setError(result.error);
+      else setResendIn(RESEND_COOLDOWN_S);
     });
   }
 
@@ -73,9 +117,13 @@ function RegisterForm() {
           <Label htmlFor="phone">Número de telemóvel</Label>
           <PhoneInput
             id="phone" name="phone" defaultValue="+258 "
-            required disabled={isPending}
+            required disabled={isPending} readOnly={phase === "code"}
           />
-          <p className="text-[11px] text-muted-foreground">Vamos usar este número para entrares na tua conta.</p>
+          <p className="text-[11px] text-muted-foreground">
+            {phase === "form"
+              ? "Vamos enviar um código por SMS para confirmar este número."
+              : "Confirma o código que enviámos por SMS para este número."}
+          </p>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -86,6 +134,39 @@ function RegisterForm() {
             className="h-11 rounded-xl px-4 text-[15px]"
           />
         </div>
+
+        {phase === "code" && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="otpCode">Código de verificação</Label>
+            <Input
+              id="otpCode" name="otpCode" type="text" inputMode="numeric" autoComplete="one-time-code"
+              placeholder="000000" required disabled={isPending} maxLength={6}
+              className="h-11 rounded-xl px-4 text-center text-[17px] font-bold tracking-[0.3em]"
+            />
+            <div className="mt-0.5 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => { setPhase("form"); setError(null); setResendIn(0); }}
+                disabled={isPending}
+                className="text-[11px] font-semibold text-muted-foreground underline-offset-2 hover:underline"
+              >
+                Usar outro número
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  const form = e.currentTarget.closest("form");
+                  const phoneValue = form ? String(new FormData(form).get("phone") ?? "") : "";
+                  handleResend(phoneValue);
+                }}
+                disabled={resendIn > 0 || isPending}
+                className="text-[11px] font-semibold text-primary-text underline-offset-2 hover:underline disabled:text-muted-foreground disabled:no-underline"
+              >
+                {resendIn > 0 ? `Reenviar código (${resendIn}s)` : "Reenviar código"}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="referralCode">Código de convite (opcional)</Label>
@@ -136,7 +217,9 @@ function RegisterForm() {
           }`}
         >
           {isPending && <Spinner />}
-          {isPending ? "A criar conta…" : "Criar conta"}
+          {phase === "form"
+            ? (isPending ? "A enviar código…" : "Enviar código")
+            : (isPending ? "A criar conta…" : "Confirmar e criar conta")}
         </Button>
       </form>
 

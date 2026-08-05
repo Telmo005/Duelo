@@ -11,6 +11,8 @@ import { getRequestFingerprint } from "@/lib/requestInfo";
 import { checkLoginRateLimit, recordLoginAttempt, checkRegisterRateLimit, recordRegisterAttempt } from "@/lib/rateLimit";
 import { logError } from "@/lib/errorLog";
 import { generateReferralCode } from "@/lib/referral";
+import { verifyOtp, consumeOtp } from "@/lib/phoneOtp";
+import { sendPush } from "@/lib/messaging-client";
 
 /** postgres-js surfaces the raw libpq error fields directly on the thrown
  *  error (code = SQLSTATE, constraint_name) — used to tell "referral_code
@@ -52,10 +54,23 @@ export async function registerUser(
     return { error: firstError ?? "Dados inválidos" };
   }
 
-  const { displayName, password, ageConfirmed, referralCode } = parsed.data;
+  const { displayName, password, ageConfirmed, referralCode, otpCode } = parsed.data;
   const phone = normalizePhone(parsed.data.phone);
   const syntheticEmail = phoneToSyntheticEmail(phone);
   const { ip } = await getRequestFingerprint();
+
+  // Contact validation: the phone must be a real, reachable number the
+  // submitter actually controls — requestPhoneVerification (lib/actions/
+  // phoneVerification.ts) already sent a 6-digit SMS code for it. Checked
+  // before anything else so an invalid/expired/wrong code never creates a
+  // Supabase Auth user, touches the referral lookup's result, or counts
+  // against checkRegisterRateLimit below. Only verified here, NOT consumed
+  // yet — see consumeOtp's call site below (after the wallet is created)
+  // for why the delete has to wait until the account is fully committed.
+  const otpResult = await verifyOtp(phone, otpCode);
+  if (!otpResult.ok) {
+    return { error: otpResult.error };
+  }
 
   // Resolve the submitted invite code to a referrer BEFORE creating any
   // account — an unknown/mistyped code is never fatal to registration, it
@@ -172,6 +187,14 @@ export async function registerUser(
     await supabase.auth.admin.deleteUser(userId);
     return { error: "Erro ao criar a carteira. Tenta novamente." };
   }
+
+  // Only now is the account fully committed (auth user + profile + wallet
+  // all exist) — safe to consume the OTP. See consumeOtp's doc comment.
+  await consumeOtp(phone);
+
+  // Fire-and-forget admin push — never blocks/fails registration itself
+  // (sendPush swallows its own errors, see lib/messaging-client.ts).
+  await sendPush("Novo utilizador registado", `${displayName} (${phone}) criou conta.`);
 
   // 6. Sign user in immediately after registration
   const anonClient = await createClient();

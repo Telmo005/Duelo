@@ -80,3 +80,46 @@ export async function checkRegisterRateLimit(ip: string | null): Promise<RateLim
 export async function recordRegisterAttempt(phone: string, ip: string | null, success: boolean): Promise<void> {
   await db.insert(authAttempts).values({ phone, ip, success, kind: "register" });
 }
+
+/** OTP requests cost a real SMS via the messaging gateway — this caps
+ *  abuse independently of registration itself (checkRegisterRateLimit only
+ *  guards actual account creation, which happens after the code is
+ *  verified). Tighter per-phone ceiling than login/register since there's
+ *  no legitimate reason to request more than a couple of codes for the
+ *  same number in 15 minutes. */
+const MAX_OTP_REQUESTS_PER_PHONE = 3;
+const MAX_OTP_REQUESTS_PER_IP = 8;
+
+export async function checkOtpRequestRateLimit(phone: string, ip: string | null): Promise<RateLimitResult> {
+  const since = new Date(Date.now() - WINDOW_MS);
+
+  const [byPhone] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(authAttempts)
+    .where(and(eq(authAttempts.phone, phone), eq(authAttempts.kind, "otp_request"), gt(authAttempts.createdAt, since)));
+
+  if (Number(byPhone?.count ?? 0) >= MAX_OTP_REQUESTS_PER_PHONE) {
+    return { allowed: false, message: "Demasiados pedidos de código para este número. Aguarda alguns minutos." };
+  }
+
+  if (ip) {
+    const [byIp] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(authAttempts)
+      .where(and(eq(authAttempts.ip, ip), eq(authAttempts.kind, "otp_request"), gt(authAttempts.createdAt, since)));
+
+    if (Number(byIp?.count ?? 0) >= MAX_OTP_REQUESTS_PER_IP) {
+      return { allowed: false, message: "Demasiados pedidos a partir desta rede. Tenta novamente mais tarde." };
+    }
+  }
+
+  return { allowed: true };
+}
+
+/** Records an OTP request attempt — call after every requestPhoneVerification
+ *  call regardless of whether the SMS itself was actually sent, since this
+ *  ceiling exists to cap calls to the (paid) messaging gateway, not to
+ *  track delivery success. */
+export async function recordOtpRequestAttempt(phone: string, ip: string | null): Promise<void> {
+  await db.insert(authAttempts).values({ phone, ip, success: true, kind: "otp_request" });
+}

@@ -7,6 +7,8 @@ import { requireAdmin } from "@/lib/admin";
 import { logAdminAction } from "@/lib/adminAudit";
 import { withdrawalSchema } from "@/lib/validation/withdrawal";
 import { normalizePhone } from "@/lib/phone";
+import { sendPush } from "@/lib/messaging-client";
+import { formatCentsAsMt } from "@/lib/format";
 
 type ActionResult = { error?: string };
 
@@ -53,6 +55,11 @@ export async function createWithdrawalAction(input: Record<string, unknown>): Pr
   if (error) {
     return { error: friendlyWithdrawalError(error.message) };
   }
+
+  await sendPush(
+    "Novo levantamento pedido",
+    `${formatCentsAsMt(amountCents)} MT via ${parsed.data.method === "mpesa" ? "M-Pesa" : "e-Mola"} — revê em /admin/withdrawals.`
+  );
 
   revalidatePath("/dashboard");
   revalidatePath("/wallet/withdraw");

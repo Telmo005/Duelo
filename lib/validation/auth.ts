@@ -33,6 +33,11 @@ export const registerSchema = z.object({
       message: "Deves confirmar que tens 18 anos ou mais",
     }),
 
+  // The 6-digit SMS code from requestPhoneVerification (lib/actions/
+  // phoneVerification.ts) — registerUser verifies it against phone_otps
+  // before creating the Supabase Auth user, see verifyAndConsumeOtp.
+  otpCode: z.string().regex(/^\d{6}$/, "Código deve ter 6 dígitos"),
+
   // Optional — an invalid/unknown code never blocks registration (see
   // registerUser), it just means no referrer gets linked.
   referralCode: z.string().trim().max(20).optional(),

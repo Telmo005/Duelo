@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/admin";
 import { logAdminAction } from "@/lib/adminAudit";
 import { broadcastFeedEvent } from "@/lib/realtime";
+import { sendPush } from "@/lib/messaging-client";
 
 type ActionResult = { error?: string };
 
@@ -18,7 +19,7 @@ export async function settleMatchAction(matchId: string, resultHome: number, res
   const admin = await requireAdmin();
 
   const service = createServiceClient();
-  const { error } = await service.rpc("bet_settle_match", {
+  const { data, error } = await service.rpc("bet_settle_match", {
     p_match_id: matchId,
     p_result_home: resultHome,
     p_result_away: resultAway,
@@ -28,6 +29,12 @@ export async function settleMatchAction(matchId: string, resultHome: number, res
 
   await logAdminAction(admin.id, "settle_match", null, `Liquidação manual do jogo ${matchId}: ${resultHome}-${resultAway}`);
   await broadcastFeedEvent({ type: "bets_settled", matchId });
+
+  const settledCount = typeof data === "number" ? data : 0;
+  await sendPush(
+    "Jogo liquidado",
+    `Resultado ${resultHome}-${resultAway} — ${settledCount} aposta(s) processada(s).`
+  );
 
   revalidatePath("/admin/matches");
   revalidatePath("/admin");
