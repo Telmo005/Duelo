@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { depositSchema } from "@/lib/validation/deposit";
 import { PayGateClient } from "@/lib/paygate-client";
+import { logError } from "@/lib/errorLog";
 
 type ActionResult = { error?: string; depositId?: string; checkoutUrl?: string };
 
@@ -42,6 +43,7 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
     .single();
 
   if (insertError || !deposit) {
+    await logError("deposit_create", insertError, { userId: user.id, reference, stage: "insert_deposit" });
     return { error: "Falha ao registar depósito. Tenta novamente." };
   }
 
@@ -76,6 +78,8 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
         failure_reason: e instanceof Error ? e.message.slice(0, 500) : String(e).slice(0, 500),
       })
       .eq("id", deposit.id);
+
+    await logError("deposit_create", e, { depositId: deposit.id, userId: user.id, reference, stage: "create_charge" });
 
     return { error: "Falha ao iniciar pagamento. Tenta novamente." };
   }
