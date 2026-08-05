@@ -10,6 +10,13 @@
  */
 import crypto from "crypto";
 
+// No default timeout on fetch — an unreachable/misconfigured PAYGATE_BASE_URL
+// (wrong host, DNS that never resolves, gateway hard down) would otherwise
+// hang this call indefinitely instead of failing fast, taking the calling
+// server action down with it (confirmed in production: a deposit attempt
+// that never returned). Same fix as lib/messaging-client.ts.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 export type PaymentMethod = "mpesa" | "emola" | "credit_card";
 
 export interface CreateChargeInput {
@@ -78,6 +85,7 @@ export class PayGateClient {
         return_url: input.returnUrl,
         metadata: input.metadata,
       }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
     const json = await res.json().catch(() => null);
@@ -97,6 +105,7 @@ export class PayGateClient {
   async getCharge(gatewayPaymentId: string) {
     const res = await fetch(`${this.baseUrl}/api/v1/charges/${gatewayPaymentId}`, {
       headers: { Authorization: `Bearer ${this.apiKey}` },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) throw new Error(`PayGate getCharge falhou: ${res.status}`);

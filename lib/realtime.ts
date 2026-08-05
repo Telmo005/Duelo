@@ -16,6 +16,14 @@ import { FEED_TOPIC, FEED_BROADCAST_EVENT, type FeedEvent } from "@/lib/realtime
 
 export { FEED_TOPIC, FEED_BROADCAST_EVENT, type FeedEvent };
 
+// No timeout on this fetch would contradict the "must never block the
+// caller" promise below — a hung/unreachable Supabase Realtime endpoint
+// would otherwise stall this call indefinitely, and this function is
+// awaited from the middle of bet_create/bet_accept/settlement/withdrawal
+// server actions. Same class of bug found and fixed in lib/paygate-client.ts
+// and lib/messaging-client.ts.
+const REQUEST_TIMEOUT_MS = 5_000;
+
 /** Best-effort: a missed broadcast just means open clients rely on their
  *  next manual refresh/navigation. It must never throw into — or block —
  *  the caller, whose actual DB transaction has already committed. */
@@ -35,6 +43,7 @@ export async function broadcastFeedEvent(event: FeedEvent): Promise<void> {
       body: JSON.stringify({
         messages: [{ topic: FEED_TOPIC, event: FEED_BROADCAST_EVENT, payload: event, private: false }],
       }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
     console.error("broadcastFeedEvent failed", { event, err });
