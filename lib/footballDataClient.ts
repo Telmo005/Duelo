@@ -1,5 +1,10 @@
 const BASE_URL = "https://api.football-data.org/v4";
 
+// No timeout here would let a hung/unreachable vendor stall the calling
+// cron route indefinitely — same class of bug fixed in lib/paygate-client.ts,
+// lib/messaging-client.ts and lib/realtime.ts.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 export type FootballDataResponse<T = unknown> = {
   body?: T;
   error?: string;
@@ -24,6 +29,7 @@ export async function footballDataFetch<T = unknown>(path: string): Promise<Foot
     res = await fetch(`${BASE_URL}${path}`, {
       headers: { "X-Auth-Token": token },
       cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
