@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { PayGateClient, type PayGateWebhook } from "@/lib/paygate-client";
 import { logError } from "@/lib/errorLog";
+import { sendPush } from "@/lib/messaging-client";
+import { formatCentsAsMt } from "@/lib/format";
 
 /**
  * Receives fan-out events from the PayGate gateway (mpesa/emola via
@@ -126,6 +128,11 @@ export async function POST(request: Request) {
         p_link: "/dashboard",
         p_reference: deposit.reference,
       });
+
+      await sendPush(
+        "Novo depósito confirmado",
+        `${formatCentsAsMt(deposit.amount_cents)} MT via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"}.`
+      );
     }
   } else {
     const { data: flipped } = await service

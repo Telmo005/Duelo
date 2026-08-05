@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { errorLog } from "@/db/schema";
 import { desc } from "drizzle-orm";
+import { sendPush } from "@/lib/messaging-client";
 
 /**
  * Pulls a real message (and whatever other fields are useful) out of
@@ -44,6 +45,11 @@ export async function logError(source: string, error: unknown, context?: Record<
   } catch (dbErr) {
     console.error(`logError: failed to persist error from ${source}`, { message, dbErr });
   }
+
+  // Admin push per logged error — sendPush never throws and logs its own
+  // failures with console.error only (not logError), so this can never
+  // recurse. See lib/messaging-client.ts.
+  await sendPush(`Erro: ${source}`, message);
 }
 
 /** Most recent failures across every source, for /admin/errors. */

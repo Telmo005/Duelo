@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { importUpcomingFixtures } from "@/lib/fixtures-import";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 import { logError } from "@/lib/errorLog";
+import { sendPush } from "@/lib/messaging-client";
 
 /**
  * Imports upcoming fixtures for every covered competition (see
@@ -32,6 +33,14 @@ export async function GET(request: Request) {
     // shows up in /admin/errors instead of only in the raw cron response.
     if (result.errors.length > 0) {
       await logError("cron_import_fixtures", result.errors.join("; "), { errors: result.errors });
+    }
+    // Only push when something actually changed — a routine poll that finds
+    // nothing new would otherwise fire multiple times a day for no reason.
+    if (result.inserted > 0 || result.updated > 0) {
+      await sendPush(
+        "Importação de jogos concluída",
+        `${result.inserted} novo(s), ${result.updated} atualizado(s)${result.errors.length > 0 ? `, ${result.errors.length} falha(s)` : ""}.`
+      );
     }
     return NextResponse.json(result);
   } catch (err) {

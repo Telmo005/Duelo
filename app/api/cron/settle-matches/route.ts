@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 import { logError } from "@/lib/errorLog";
+import { sendPush } from "@/lib/messaging-client";
 
 /**
  * Advances every match's lifecycle purely by kickoff time — scheduled→live
@@ -35,5 +36,13 @@ export async function GET(request: Request) {
   }
 
   const result = Array.isArray(data) ? data[0] : data;
+
+  if (result?.to_needs_review > 0) {
+    await sendPush(
+      "Jogo(s) precisam de liquidação",
+      `${result.to_needs_review} jogo(s) passaram dos 90 min com apostas por liquidar — entra em /admin/matches.`
+    );
+  }
+
   return NextResponse.json(result ?? { to_live: 0, to_closed: 0, to_needs_review: 0 });
 }
