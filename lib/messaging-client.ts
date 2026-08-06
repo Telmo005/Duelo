@@ -66,6 +66,12 @@ export async function sendSms(to: string, message: string): Promise<SendResult> 
   }
 }
 
+/** Every push always shows this as its title — the notification should
+ *  read as coming from the app itself, not as a one-off label per event
+ *  type. Kept here (not imported from anywhere else) since this is the
+ *  one file that talks to the gateway; nothing else needs the app name. */
+const APP_NAME = "DueloBet";
+
 /**
  * Fires an Android push notification to the system owner's own device via
  * the gateway's celular-gateway — NOT a per-user SMS, this endpoint has no
@@ -75,6 +81,12 @@ export async function sendSms(to: string, message: string): Promise<SendResult> 
  * sites (don't leave the promise dangling) so the serverless function
  * doesn't get torn down mid-fetch right after the response is returned.
  *
+ * The notification's title is always the app name (see APP_NAME) — `subject`
+ * and `description` both go into the body instead, laid out like an email
+ * (subject line, blank line, description), so every call site still passes
+ * exactly the same two strings it always did (what event happened, and the
+ * details) without needing to change.
+ *
  * Deliberately logs failures with console.error only, NOT lib/errorLog.ts's
  * logError — logError itself calls sendPush for the "erro registado"
  * admin-notification hook, so sendPush calling back into logError would
@@ -82,10 +94,11 @@ export async function sendSms(to: string, message: string): Promise<SendResult> 
  * ...). A messaging-gateway outage is still visible in Vercel's function
  * logs; it just doesn't get a durable /admin/errors row of its own.
  */
-export async function sendPush(title: string, body: string): Promise<void> {
+export async function sendPush(subject: string, description: string): Promise<void> {
   const cfg = config();
+  const body = `${subject}\n\n${description}`;
   if (!cfg) {
-    console.error("sendPush: MESSAGING_BASE_URL/MESSAGING_API_KEY não configurados, a ignorar", { title });
+    console.error("sendPush: MESSAGING_BASE_URL/MESSAGING_API_KEY não configurados, a ignorar", { subject });
     return;
   }
 
@@ -93,14 +106,14 @@ export async function sendPush(title: string, body: string): Promise<void> {
     const res = await fetch(`${cfg.baseUrl}/api/internal/messages/push`, {
       method: "POST",
       headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ title: title.slice(0, 120), body: body.slice(0, 500) }),
+      body: JSON.stringify({ title: APP_NAME, body: body.slice(0, 500) }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      console.error(`sendPush falhou: ${res.status} ${text}`, { title });
+      console.error(`sendPush falhou: ${res.status} ${text}`, { subject });
     }
   } catch (err) {
-    console.error("sendPush: fetch falhou", { title, err });
+    console.error("sendPush: fetch falhou", { subject, err });
   }
 }
