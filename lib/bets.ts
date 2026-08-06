@@ -282,23 +282,38 @@ export type FeedCatalogMatch = {
   /** Admin-pinned into the feed's "Destaques" strip — see
    *  components/feed/match-catalog.tsx's pickFeatured. */
   featured: boolean;
-  /** 'scheduled' | 'live' | 'needs_review' — this list never includes a
-   *  terminal status (see getFeedMatchCatalog); used client-side to decide
-   *  whether tapping the row opens bet creation or shows the "already
-   *  started" explanation instead. */
+  /** 'scheduled' | 'live' | 'needs_review' | 'closed' — 'closed' only
+   *  appears for a recently-kicked-off match with no bets (see
+   *  getFeedMatchCatalog); used client-side to decide whether tapping the
+   *  row opens bet creation or shows the "already started" explanation
+   *  instead. */
   matchStatus: string;
   score?: { home: number; away: number };
   minute?: string;
 };
 
+/** How long a no-bets match that auto-closed (match_advance_lifecycle,
+ *  0028_match_live_lifecycle.sql — fires 90min after kickoff when nobody
+ *  placed a matched bet on it) stays visible here afterwards, purely so
+ *  someone can still see the final score. Unbounded would recreate the
+ *  exact incident getProcessedMatches' PROCESSED_MATCHES_LIMIT documents —
+ *  every closed match ever, forever, in a user-facing list. */
+const CLOSED_MATCH_VISIBILITY_MS = 24 * 60 * 60 * 1000;
+
 /** Every match still worth showing in the feed's "Jogos" tab — unlike
  *  getUpcomingMatches (the bet-creation picker), this also includes
  *  'live'/'needs_review' matches, so a match doesn't just vanish the moment
- *  it kicks off with no bets on it yet. Real complaint this fixes: users
- *  opened the app mid-final with no bets already placed on it and found
- *  nothing, no explanation, just gone. Tapping a started match shows an
- *  explanatory message instead of the bet form — bet_create still rejects
- *  it server-side regardless (see lib/actions/bets.ts); this is purely a
+ *  it kicks off with no bets on it yet, PLUS 'closed' matches from the last
+ *  24h (see CLOSED_MATCH_VISIBILITY_MS) — a match with no bets auto-closes
+ *  at the 90-minute mark (0028_match_live_lifecycle.sql) purely as an
+ *  admin-worklist cleanup, which used to also make it vanish from every
+ *  user-facing view at that exact moment. Real complaints this fixes: (1)
+ *  users opened the app mid-final with no bets already placed on it and
+ *  found nothing, no explanation, just gone; (2) the same for a match that
+ *  had already finished — people use the catalogue to follow scores even
+ *  when they never bet on it. Tapping a started match shows an explanatory
+ *  message instead of the bet form — bet_create still rejects it
+ *  server-side regardless (see lib/actions/bets.ts); this is purely a
  *  visibility fix, not a change to who can bet when. Uncached, like
  *  getUnsettledMatches/getFeedDuels — a live score staying fresh matters
  *  more here than it does for the picker. */
@@ -306,7 +321,10 @@ export async function getFeedMatchCatalog(): Promise<FeedCatalogMatch[]> {
   const rows = await db
     .select()
     .from(matches)
-    .where(inArray(matches.matchStatus, ["scheduled", "live", "needs_review"]))
+    .where(
+      sql`${matches.matchStatus} in ('scheduled', 'live', 'needs_review')
+        or (${matches.matchStatus} = 'closed' and ${matches.kickoffAt} > ${new Date(Date.now() - CLOSED_MATCH_VISIBILITY_MS).toISOString()})`
+    )
     .orderBy(asc(matches.kickoffAt));
 
   const startedIds = rows.filter((m) => m.matchStatus !== "scheduled").map((m) => m.id);

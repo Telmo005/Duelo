@@ -126,7 +126,12 @@ export type FeaturePriorityInfo = {
    *  picker's own list (getUpcomingMatches only ever returns 'scheduled'
    *  fixtures — a match that's kicked off is no longer offered there at
    *  all), so this field is optional rather than forcing every caller to
-   *  carry a status they'll never actually vary. */
+   *  carry a status they'll never actually vary. 'closed' (a finished match
+   *  nobody bet on, kept briefly in the catalogue purely so its score stays
+   *  visible — see getFeedMatchCatalog) is deliberately NOT treated as
+   *  automatically-featured below, unlike 'live'/'needs_review' — Destaques
+   *  is "what's on today and next," and a match that's been over for hours
+   *  with zero betting interest doesn't belong crowding that strip. */
   matchStatus?: string;
   /** Admin manual pin — see toggleMatchFeaturedAction. */
   featured?: boolean;
@@ -163,7 +168,8 @@ export function pickFeatured<T>(items: T[], now: number, getInfo: (item: T) => F
     .filter((item) => {
       const info = getInfo(item);
       if (info.featured) return true;
-      if (info.matchStatus && info.matchStatus !== "scheduled") return true;
+      if (info.matchStatus === "live" || info.matchStatus === "needs_review") return true;
+      if (info.matchStatus === "closed") return false;
       return new Date(info.kickoffAtIso).getTime() - now <= FEATURED_HORIZON_MS;
     })
     .sort((a, b) => new Date(getInfo(a).kickoffAtIso).getTime() - new Date(getInfo(b).kickoffAtIso).getTime());
