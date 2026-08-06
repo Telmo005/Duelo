@@ -91,7 +91,7 @@ export async function requestPhoneVerification(input: Record<string, unknown>): 
   // up (a shorter, accent-free variant would fit in one segment).
   const sms = await sendSms(
     phone,
-    `DueloBet\n\nBem-vindo!\nPara concluíres o registo, confirma o teu número com o código:\n\n${code}\n\nVálido por 10 minutos. Não o partilhes com ninguém.`
+    `Bem-vindo a DueloBet,\nPara concluíres o registo, confirma o teu número com o código:\n\n${code}\n\nVálido por 10 minutos.`
   );
   if (!sms.ok) {
     await logError("phone_otp", sms.error, { stage: "send_sms", phone });
