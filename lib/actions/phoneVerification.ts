@@ -80,7 +80,19 @@ export async function requestPhoneVerification(input: Record<string, unknown>): 
     console.error("recordOtpRequestAttempt failed:", err);
   }
 
-  const sms = await sendSms(phone, `O teu código DueloBet: ${code}. Válido por 10 minutos.`);
+  // No SMS provider "branded sender" for this app yet — the message comes
+  // from what looks like an ordinary phone number, so the greeting/layout
+  // itself has to carry the "this is really DueloBet" signal instead.
+  // Chosen deliberately over a terser accent-free one-liner: this reads as
+  // 3 SMS segments (accents force UCS-2 encoding, which caps a concatenated
+  // segment at 67 chars, vs. 153 for plain GSM-7 — this message runs well
+  // past that on its own), so roughly 3x the per-code cost. Worth it for
+  // the tone at current volume; revisit if OTP volume ever makes that add
+  // up (a shorter, accent-free variant would fit in one segment).
+  const sms = await sendSms(
+    phone,
+    `DueloBet\n\nBem-vindo!\nPara concluíres o registo, confirma o teu número com o código:\n\n${code}\n\nVálido por 10 minutos. Não o partilhes com ninguém.`
+  );
   if (!sms.ok) {
     await logError("phone_otp", sms.error, { stage: "send_sms", phone });
     return { error: "Não foi possível enviar o SMS. Tenta novamente." };
