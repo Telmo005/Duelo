@@ -1,13 +1,37 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 export const alt = "DueloBet — Apostas P2P entre pessoas reais";
-export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-/** Default share-preview image for any page that doesn't define its own
- *  (e.g. bet pages under /d/[id] override this with the match-specific
- *  card in app/d/[id]/opengraph-image.tsx). */
+/**
+ * Default share-preview image for any page that doesn't define its own
+ * (bet pages under /d/[id] always override this with the match-specific
+ * card in app/d/[id]/opengraph-image.tsx — this toggle never touches those).
+ *
+ * A link's preview image is fixed per URL by whoever controls the page —
+ * it's set once here and whatever platform scrapes the link (WhatsApp,
+ * Facebook, ...) caches that, so there's no "choose per share" at the
+ * viewer's end. This constant is the actual choice: flip it and redeploy
+ * to switch which image every share of the site's root link shows.
+ */
+const USE_CAMPAIGN_IMAGE = true;
+
+const CAMPAIGN_IMAGE_PATH = path.join(process.cwd(), "public/og-campaign.png");
+const CAMPAIGN_IMAGE_SIZE = { width: 1254, height: 1254 };
+const GENERATED_IMAGE_SIZE = { width: 1200, height: 630 };
+
+export const size = USE_CAMPAIGN_IMAGE ? CAMPAIGN_IMAGE_SIZE : GENERATED_IMAGE_SIZE;
+
 export default async function OpengraphImage() {
+  if (USE_CAMPAIGN_IMAGE) {
+    const file = await readFile(CAMPAIGN_IMAGE_PATH);
+    return new Response(new Uint8Array(file), {
+      headers: { "Content-Type": "image/png" },
+    });
+  }
+
   return new ImageResponse(
     (
       <div
@@ -46,6 +70,6 @@ export default async function OpengraphImage() {
         </span>
       </div>
     ),
-    { ...size }
+    { ...GENERATED_IMAGE_SIZE }
   );
 }
