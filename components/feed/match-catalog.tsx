@@ -34,11 +34,23 @@ export type CatalogMatch = {
   /** Admin-pinned into the Destaques strip regardless of what the
    *  automatic pick would have chosen — see pickFeatured below. */
   featured: boolean;
-  /** 'scheduled' | 'live' | 'needs_review' — see getFeedMatchCatalog. */
+  /** 'scheduled' | 'live' | 'needs_review' | 'closed' — see
+   *  getFeedMatchCatalog. 'closed' is a finished match nobody bet on, kept
+   *  around briefly purely so its score stays visible. */
   matchStatus: string;
   score?: { home: number; away: number };
   minute?: string;
 };
+
+/** 'live' is the only status still actually in progress — 'needs_review'
+ *  (past 90min, had bets) and 'closed' (past 90min, no bets) both just mean
+ *  "over, no live feed confirmed the exact final score" from the catalogue's
+ *  point of view, so both read as "Terminado" rather than the misleading
+ *  "AO VIVO". Falls back to the score itself when one was entered. */
+function liveStatusLabel(m: Pick<CatalogMatch, "matchStatus" | "score">): string {
+  if (m.score) return `${m.score.home}-${m.score.away}`;
+  return m.matchStatus === "live" ? "AO VIVO" : "Terminado";
+}
 
 /** Dims the row and shows a spinner while its navigation to /bets/new is in
  *  flight — same useLinkStatus pattern duel-post.tsx uses for the feed. */
@@ -88,7 +100,7 @@ function StartedRow({ match: m }: { match: CatalogMatch }) {
       <span className="flex shrink-0 flex-col items-end leading-none">
         <span className="flex items-center gap-1 text-xs font-extrabold tabular-nums text-live">
           <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
-          {m.score ? `${m.score.home}-${m.score.away}` : m.matchStatus === "needs_review" ? "Terminado" : "AO VIVO"}
+          {liveStatusLabel(m)}
         </span>
         {m.minute && <span className="mt-0.5 text-[9px] font-semibold text-live">{m.minute}</span>}
       </span>
@@ -181,7 +193,7 @@ function FeaturedCard({ match: m, now }: { match: CatalogMatch; now: number }) {
         {isLive ? (
           <span className="flex items-center gap-1 text-[10px] font-extrabold tabular-nums text-live">
             <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
-            {m.score ? `${m.score.home}-${m.score.away}` : m.matchStatus === "needs_review" ? "Terminado" : "AO VIVO"}
+            {liveStatusLabel(m)}
           </span>
         ) : (
           <span className="text-[10px] font-semibold text-muted-foreground">{m.kickoffLabel}</span>
