@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export const alt = "DueloBet — Apostas P2P entre pessoas reais";
+export const alt = "DueloBet — Apostas entre jogadores, não contra a casa";
 export const contentType = "image/png";
 
 /**
@@ -18,8 +18,16 @@ export const contentType = "image/png";
  */
 const USE_CAMPAIGN_IMAGE = true;
 
+// 1200x630 (≈1.91:1) — Facebook/WhatsApp's link-card renderer expects this
+// ratio and crops anything else to fit it. The source asset was generated
+// square (1254x1254); pasting it into a 1:1 slot got the top ("DUELO BET"
+// title) and bottom (footer bar) cropped off and visibly downscaled on
+// Facebook. Fixed by letterboxing the square art onto a 1200x630 canvas
+// (padded left/right, background color matched to the art's own near-black
+// ground) instead of cropping it — see the sharp one-off that produced
+// public/og-campaign.png from the original square export.
 const CAMPAIGN_IMAGE_PATH = path.join(process.cwd(), "public/og-campaign.png");
-const CAMPAIGN_IMAGE_SIZE = { width: 1254, height: 1254 };
+const CAMPAIGN_IMAGE_SIZE = { width: 1200, height: 630 };
 const GENERATED_IMAGE_SIZE = { width: 1200, height: 630 };
 
 export const size = USE_CAMPAIGN_IMAGE ? CAMPAIGN_IMAGE_SIZE : GENERATED_IMAGE_SIZE;
