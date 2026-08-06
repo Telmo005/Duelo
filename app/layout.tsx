@@ -12,9 +12,9 @@ const jakartaSans = Plus_Jakarta_Sans({
 });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-const SITE_TITLE = "DueloBet — Apostas P2P entre pessoas reais";
+const SITE_TITLE = "DueloBet — Apostas entre jogadores, não contra a casa";
 const SITE_DESCRIPTION =
-  "Explora apostas criadas por outros utilizadores e entra no duelo. O dinheiro fica em custódia e o vencedor recebe automaticamente após o resultado oficial.";
+  "Apostas 1x1 entre jogadores reais. O dinheiro fica em custódia e o vencedor recebe automaticamente após o resultado oficial.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
