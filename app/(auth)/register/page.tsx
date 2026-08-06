@@ -86,7 +86,7 @@ function RegisterForm() {
             id="phone" name="phone" defaultValue="+258 "
             required disabled={isPending}
           />
-          <p className="text-[11px] text-muted-foreground">Vamos enviar um código por SMS para confirmar este número.</p>
+          <p className="text-[11px] text-primary">Vamos enviar um código por SMS para confirmar este número.</p>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -98,7 +98,7 @@ function RegisterForm() {
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+      {/*<div className="flex flex-col gap-1.5">
           <Label htmlFor="referralCode">Código de convite (opcional)</Label>
           <Input
             id="referralCode" name="referralCode" type="text" placeholder="Ex: K7M2QRX"
@@ -107,7 +107,7 @@ function RegisterForm() {
             onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
             className="h-11 rounded-xl px-4 text-[15px] uppercase"
           />
-        </div>
+        </div>*/}
 
         {/* 18+ toggle */}
         <button
@@ -147,7 +147,7 @@ function RegisterForm() {
           }`}
         >
           {isPending && <Spinner />}
-          {isPending ? "A enviar código…" : "Enviar código"}
+          {isPending ? "A enviar código…" : "Continuar"}
         </Button>
       </form>
 
