@@ -115,8 +115,8 @@ export const deposits = pgTable("deposits", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull(),
   amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
-  method: text("method").notNull(), // 'mpesa' | 'emola'
-  phone: text("phone").notNull(),
+  method: text("method").notNull(), // 'mpesa' | 'emola' | 'mkesh' | 'visa_mastercard'
+  phone: text("phone"),
   status: text("status").notNull().default("pending"), // 'pending' | 'success' | 'failed'
   reference: text("reference").notNull(),
   gatewayPaymentId: text("gateway_payment_id"),

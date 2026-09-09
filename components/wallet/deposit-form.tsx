@@ -10,16 +10,22 @@ import { OptionCard } from "@/components/ui/option-card";
 import { ActionButton } from "@/components/ui/action-button";
 import { createDepositAction } from "@/lib/actions/deposit";
 
+// Visa/Mastercard existe no gateway mas não é oferecido ainda — precisa de
+// payer_email, e o perfil não tem email para quem se registou por telefone
+// (o único fluxo activo hoje). Ver lib/validation/deposit.ts.
 const METHODS = [
   { key: "mpesa", label: "M-Pesa", hint: "Números 84 · 85" },
   { key: "emola", label: "e-Mola", hint: "Números 86 · 87" },
+  { key: "mkesh", label: "mKesh", hint: "Mobile money" },
 ] as const;
 
 const QUICK_AMOUNTS = [100, 250, 500, 1000, 2500];
 
-// PayGate/PaySuite não confirma na hora — o webhook normalmente chega em
-// poucos segundos, mas o utilizador pode demorar a concluir no telemóvel.
-// Para de perguntar depois deste tempo e mostra a mensagem de fallback.
+// A app espera sempre pelo webhook do PayGate para confirmar (mesmo quando
+// mpesa já confirma síncrono do lado da Debito Pay, o gateway só nos avisa
+// via webhook, igual aos restantes métodos) — normalmente chega em poucos
+// segundos, mas o utilizador pode demorar a concluir no telemóvel. Para de
+// perguntar depois deste tempo e mostra a mensagem de fallback.
 const POLL_INTERVAL_MS = 2500;
 const POLL_TIMEOUT_MS = 3 * 60 * 1000;
 
@@ -88,14 +94,28 @@ export function DepositForm() {
       return;
     }
 
-    if (result.checkoutUrl && result.depositId) {
+    if (result.depositId) {
+      // mpesa pode devolver o resultado já aqui (síncrono) — se já se sabe
+      // que falhou, mostra o motivo real do gateway já, em vez de entrar na
+      // espera/polling para só descobrir isto 2-3 segundos depois.
+      if (result.immediateStatus === "failed") {
+        setError(result.message || "O pagamento falhou. Tenta novamente.");
+        setPhase("form");
+        return;
+      }
+
+      // Nenhum método oferecido aqui devolve checkoutUrl hoje (só
+      // visa_mastercard tem Hosted Checkout, e ainda não está disponível —
+      // ver METHODS acima), mas o fluxo já suporta quando isso mudar.
       // Alguns navegadores (sobretudo em telemóvel) bloqueiam popups abertos
       // depois de um `await` — deixamos de contar como "gesto directo" do
       // utilizador. Guardamos o URL e mostramos sempre um botão manual na
-      // tela de espera, para o caso desta tentativa automática ser bloqueada.
-      const popup = window.open(result.checkoutUrl, "_blank");
-      setPopupBlocked(!popup || popup.closed);
-      setCheckoutUrl(result.checkoutUrl);
+      // tela de espera, para o caso desta tentativa ser bloqueada.
+      if (result.checkoutUrl) {
+        const popup = window.open(result.checkoutUrl, "_blank");
+        setPopupBlocked(!popup || popup.closed);
+        setCheckoutUrl(result.checkoutUrl);
+      }
       setDepositId(result.depositId);
       setPhase("waiting");
     } else {
@@ -119,9 +139,11 @@ export function DepositForm() {
             <div>
               <p className="text-base font-bold">A confirmar o teu depósito…</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {popupBlocked
-                  ? "O teu navegador bloqueou a aba de pagamento. Toca no botão abaixo para abrir e concluíres no PaySuite."
-                  : "Abrimos uma nova aba para concluíres o pagamento com segurança. Confirma no teu telemóvel quando for solicitado — pode demorar alguns segundos."}
+                {!checkoutUrl
+                  ? "Confirma o pagamento no teu telemóvel quando for solicitado — pode demorar alguns segundos."
+                  : popupBlocked
+                  ? "O teu navegador bloqueou a aba de pagamento. Toca no botão abaixo para abrir e concluíres o pagamento."
+                  : "Abrimos uma nova aba para concluíres o pagamento com segurança."}
               </p>
             </div>
             {checkoutUrl ? (
@@ -239,7 +261,7 @@ export function DepositForm() {
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs leading-relaxed text-muted-foreground">
         <ShieldCheck className="size-3.5 text-success" aria-hidden />
-        Pagamento processado com segurança via PaySuite. O número é pedido no checkout.
+        Pagamento processado com segurança.
       </p>
     </form>
   );

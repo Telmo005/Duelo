@@ -7,14 +7,30 @@ import { depositSchema } from "@/lib/validation/deposit";
 import { PayGateClient } from "@/lib/paygate-client";
 import { logError } from "@/lib/errorLog";
 
-type ActionResult = { error?: string; depositId?: string; checkoutUrl?: string };
+type ActionResult = {
+  error?: string;
+  depositId?: string;
+  checkoutUrl?: string;
+  /** Preenchido só quando mpesa já confirma (falha ou sucesso) na própria
+   *  resposta de createCharge — evita esperar 3 minutos de polling por um
+   *  resultado que já se sabe. */
+  immediateStatus?: "success" | "failed";
+  /** Motivo devolvido pelo gateway (ex.: "Saldo insuficiente"), só relevante
+   *  junto de immediateStatus === "failed". */
+  message?: string | null;
+};
 
 /**
  * createDepositAction — starts a deposit. Inserts a 'pending' deposits row
  * (our own idempotency reference), then asks PayGate to create the charge.
  * The actual wallet credit happens later, in app/api/webhooks/paygate/route.ts,
  * once PayGate confirms the payment — never here (the user hasn't paid yet
- * at this point, they're about to be redirected to the checkout page).
+ * at this point). mpesa/emola/mkesh confirm on the payer's own phone, with no
+ * redirect (mpesa's result can even arrive synchronously in createCharge's own
+ * response — see immediateStatus). visa_mastercard exists in the PayGate
+ * client but isn't offered here yet: it needs payer_email, and profiles.email
+ * is null for every phone+password signup (the only reachable flow today) —
+ * see lib/validation/deposit.ts.
  */
 export async function createDepositAction(input: Record<string, unknown>): Promise<ActionResult> {
   const parsed = depositSchema.safeParse(input);
@@ -26,10 +42,32 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) redirect("/login");
 
+  const service = createServiceClient();
+
+  // O gateway exige payer_phone (mpesa/emola/mkesh) e payer_name sempre —
+  // vêm do perfil (já recolhidos e verificados no signup), nunca pedidos de
+  // novo aqui. profiles.phone é guardado com espaços ("+258 84 XXX XXXX");
+  // o gateway exige E.164 estrito, sem espaços.
+  const { data: profile, error: profileError } = await service
+    .from("profiles")
+    .select("phone, email, display_name")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    await logError("deposit_create", profileError, { userId: user.id, stage: "load_profile" });
+    return { error: "Falha ao carregar o teu perfil. Tenta novamente." };
+  }
+
+  // Todos os métodos hoje oferecidos (mpesa/emola/mkesh) exigem telefone —
+  // só o fluxo Google OAuth (ainda oculto) deixa profiles.phone a null, mas
+  // guardamos mesmo assim para nunca rebentar com um TypeError se isso mudar.
+  if (!profile.phone) {
+    return { error: "A tua conta não tem número de telefone associado. Contacta o suporte." };
+  }
+
   const amountCents = Math.round(parsed.data.amountMt * 100);
   const reference = `DUE-DEP-${Date.now()}-${randomUUID().slice(0, 8)}`;
-
-  const service = createServiceClient();
 
   const { data: deposit, error: insertError } = await service
     .from("deposits")
@@ -59,6 +97,9 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
       returnUrl: process.env.NEXT_PUBLIC_APP_URL
         ? `${process.env.NEXT_PUBLIC_APP_URL}/wallet/deposit`
         : undefined,
+      payerPhone: profile.phone.replace(/\s/g, ""),
+      payerName: profile.display_name,
+      payerEmail: profile.email ?? undefined,
     });
 
     await service
@@ -69,7 +110,18 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
       })
       .eq("id", deposit.id);
 
-    return { depositId: deposit.id, checkoutUrl: charge.checkoutUrl ?? undefined };
+    // mpesa pode devolver o resultado já aqui (síncrono). NÃO escrevemos
+    // deposits.status/wallet_credit a partir daqui — isso continua a ser
+    // exclusivo do webhook (app/api/webhooks/paygate/route.ts), que chega
+    // quase de imediato mesmo neste caso (o gateway dispara o fan-out antes
+    // de responder). immediateStatus é só uma dica de UI para não mostrar
+    // "a aguardar" quando já se sabe que falhou.
+    return {
+      depositId: deposit.id,
+      checkoutUrl: charge.checkoutUrl ?? undefined,
+      immediateStatus: charge.status === "success" || charge.status === "failed" ? charge.status : undefined,
+      message: charge.status === "failed" ? charge.message : undefined,
+    };
   } catch (e) {
     await service
       .from("deposits")
