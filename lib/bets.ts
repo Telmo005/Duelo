@@ -347,7 +347,11 @@ export async function getFeedMatchCatalog(): Promise<FeedCatalogMatch[]> {
       featured: m.featured,
       matchStatus: m.matchStatus,
       score: isStarted && live?.live_home != null && live?.live_away != null ? { home: live.live_home, away: live.live_away } : undefined,
-      minute: isStarted ? `${computeLiveMinuteLabel(m.kickoffAt, live)}'${live?.live_paused ? " ⏸" : ""}` : undefined,
+      // Ticking clock only makes sense while the match is truly 'live' — a
+      // 'needs_review'/'closed' match is already over, so it shouldn't keep
+      // counting up from kickoff (would read "90+'" forever, a full day
+      // later, for anything an admin hasn't settled yet).
+      minute: m.matchStatus === "live" ? `${computeLiveMinuteLabel(m.kickoffAt, live)}'${live?.live_paused ? " ⏸" : ""}` : undefined,
     };
   });
 }
@@ -452,6 +456,11 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
       // anything) reads as the match mysteriously going backwards in time.
       const live = liveById.get(match.id);
       const isLive = bet.status === "matched" && (match.matchStatus === "live" || match.matchStatus === "needs_review");
+      // Distinct from isLive: gates the pulsing dot/"AO VIVO" wording so a
+      // 'needs_review' match (past 90min, awaiting an admin to key in the
+      // result) reads as "A confirmar" instead of still pulsing "live" —
+      // see the livePulsing comment on Duel in duel-post.tsx.
+      const livePulsing = match.matchStatus === "live";
 
       return {
         id: bet.id,
@@ -482,8 +491,11 @@ export async function getFeedDuels(limit = 30): Promise<Duel[]> {
         // in real time from whatever was last entered, or freezes at that
         // number while paused (half-time/injury break) — see
         // computeLiveMinuteLabel. With no admin entry yet, falls back to the
-        // automatic kickoff-based clock.
-        minute: isLive ? `${computeLiveMinuteLabel(match.kickoffAt, live)}'${live?.live_paused ? " ⏸" : ""}` : undefined,
+        // automatic kickoff-based clock. Only shown while livePulsing (a
+        // 'needs_review' match doesn't need a stale "90+'" clock alongside
+        // its "A confirmar" label).
+        minute: livePulsing ? `${computeLiveMinuteLabel(match.kickoffAt, live)}'${live?.live_paused ? " ⏸" : ""}` : undefined,
+        livePulsing,
       };
     })
     .filter((d): d is Duel => d !== null)

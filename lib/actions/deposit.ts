@@ -6,6 +6,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { depositSchema } from "@/lib/validation/deposit";
 import { PayGateClient } from "@/lib/paygate-client";
 import { logError } from "@/lib/errorLog";
+import { normalizePhone } from "@/lib/phone";
 
 type ActionResult = {
   error?: string;
@@ -44,13 +45,16 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
 
   const service = createServiceClient();
 
-  // O gateway exige payer_phone (mpesa/emola/mkesh) e payer_name sempre —
-  // vêm do perfil (já recolhidos e verificados no signup), nunca pedidos de
-  // novo aqui. profiles.phone é guardado com espaços ("+258 84 XXX XXXX");
-  // o gateway exige E.164 estrito, sem espaços.
+  // payer_name/payer_email vêm sempre do perfil (já recolhidos e verificados
+  // no signup) — mas payer_phone já NÃO vem do perfil: o número registado na
+  // conta é só a identidade de login, pode ser de uma operadora diferente da
+  // carteira móvel escolhida aqui (ex.: conta registada com número Movitel a
+  // pagar via M-Pesa/Vodacom). O número que efectivamente vai pagar é agora
+  // um campo próprio do formulário (ver lib/validation/deposit.ts), validado
+  // contra o prefixo real do método escolhido.
   const { data: profile, error: profileError } = await service
     .from("profiles")
-    .select("phone, email, display_name")
+    .select("email, display_name")
     .eq("id", user.id)
     .single();
 
@@ -59,13 +63,7 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
     return { error: "Falha ao carregar o teu perfil. Tenta novamente." };
   }
 
-  // Todos os métodos hoje oferecidos (mpesa/emola/mkesh) exigem telefone —
-  // só o fluxo Google OAuth (ainda oculto) deixa profiles.phone a null, mas
-  // guardamos mesmo assim para nunca rebentar com um TypeError se isso mudar.
-  if (!profile.phone) {
-    return { error: "A tua conta não tem número de telefone associado. Contacta o suporte." };
-  }
-
+  const payerPhone = normalizePhone(parsed.data.phone);
   const amountCents = Math.round(parsed.data.amountMt * 100);
   const reference = `DUE-DEP-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
@@ -97,7 +95,7 @@ export async function createDepositAction(input: Record<string, unknown>): Promi
       returnUrl: process.env.NEXT_PUBLIC_APP_URL
         ? `${process.env.NEXT_PUBLIC_APP_URL}/wallet/deposit`
         : undefined,
-      payerPhone: profile.phone.replace(/\s/g, ""),
+      payerPhone,
       payerName: profile.display_name,
       payerEmail: profile.email ?? undefined,
     });

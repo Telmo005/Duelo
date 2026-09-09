@@ -31,7 +31,7 @@ export default async function DepositPage() {
       </div>
 
       <div className="max-w-md">
-        <DepositForm />
+        <DepositForm defaultPhone={profile.phone ?? ""} />
       </div>
     </AppShell>
   );
