@@ -82,6 +82,13 @@ function notifyAlreadyStarted() {
  * into a form that would just error out at the end.
  */
 function StartedRow({ match: m }: { match: CatalogMatch }) {
+  // Only a match still genuinely in its 90-minute window pulses as "live" —
+  // 'needs_review'/'closed' are already over (just awaiting an admin to key
+  // in the confirmed result), so they read as a plain static "Terminado"/
+  // score instead of a red dot that would otherwise keep pulsing forever,
+  // even a full day after kickoff, for any match an admin hasn't gotten to
+  // yet (see liveStatusLabel and getFeedMatchCatalog in lib/bets.ts).
+  const isReallyLive = m.matchStatus === "live";
   return (
     <button
       type="button"
@@ -98,11 +105,11 @@ function StartedRow({ match: m }: { match: CatalogMatch }) {
         </p>
       </span>
       <span className="flex shrink-0 flex-col items-end leading-none">
-        <span className="flex items-center gap-1 text-xs font-extrabold tabular-nums text-live">
-          <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
+        <span className={`flex items-center gap-1 text-xs font-extrabold tabular-nums ${isReallyLive ? "text-live" : "text-muted-foreground"}`}>
+          {isReallyLive && <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />}
           {liveStatusLabel(m)}
         </span>
-        {m.minute && <span className="mt-0.5 text-[9px] font-semibold text-live">{m.minute}</span>}
+        {isReallyLive && m.minute && <span className="mt-0.5 text-[9px] font-semibold text-live">{m.minute}</span>}
       </span>
     </button>
   );
@@ -174,7 +181,9 @@ function featuredInfo(m: CatalogMatch): FeaturePriorityInfo {
  *  layout genuinely doesn't share markup with the compact list row. */
 function FeaturedCard({ match: m, now }: { match: CatalogMatch; now: number }) {
   const started = isStarted(m, now);
-  const isLive = m.matchStatus !== "scheduled";
+  // Same distinction as StartedRow: the pulsing dot is reserved for a match
+  // truly inside its 90-minute window, not every started-but-unsettled one.
+  const isLive = m.matchStatus === "live";
   const inner = (
     <>
       {m.featured && (
@@ -190,9 +199,9 @@ function FeaturedCard({ match: m, now }: { match: CatalogMatch; now: number }) {
         {m.home} <span className="font-normal text-muted-foreground">vs</span> {m.away}
       </p>
       <div className="mt-2 flex items-center justify-center">
-        {isLive ? (
-          <span className="flex items-center gap-1 text-[10px] font-extrabold tabular-nums text-live">
-            <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
+        {started ? (
+          <span className={`flex items-center gap-1 text-[10px] font-extrabold tabular-nums ${isLive ? "text-live" : "text-muted-foreground"}`}>
+            {isLive && <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />}
             {liveStatusLabel(m)}
           </span>
         ) : (

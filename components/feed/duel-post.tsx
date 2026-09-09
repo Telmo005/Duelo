@@ -67,6 +67,16 @@ export type Duel = {
    *  feed; until that's wired up it only appears on the marketing preview. */
   score?: { home: number; away: number };
   minute?: string;
+  /** True only while the match is genuinely inside its 90-minute window
+   *  (matchStatus === "live" — see getFeedDuels in lib/bets.ts). `status`
+   *  stays "live" past that point too (matchStatus "needs_review", awaiting
+   *  an admin to key in the confirmed result) so the row doesn't regress to
+   *  a stale pre-kickoff date, but the red pulsing dot and "AO VIVO" wording
+   *  are reserved for this flag — otherwise a match that finished a full day
+   *  ago and nobody's settled yet would keep pulsing "live" forever.
+   *  Defaults true (undefined) so the logged-out marketing preview's demo
+   *  data, which has no matchStatus to derive this from, still pulses. */
+  livePulsing?: boolean;
 };
 
 /** Small emoji marker for which market a duel is on — 🏆 for 1x2 (who wins),
@@ -136,20 +146,22 @@ function TimeSlot({ duel, canJoin }: { duel: Duel; canJoin: boolean }) {
     // as live, just without digits, instead of falling back to a stale
     // pre-kickoff date/time.
     const hasScore = !!duel.score;
+    const pulsing = duel.livePulsing !== false;
+    const colorClass = pulsing ? "text-live" : "text-muted-foreground";
     return (
       <div className="flex w-14 shrink-0 flex-col items-center justify-center leading-none">
         {hasScore ? (
-          <span className="flex items-center gap-1 text-sm font-extrabold tabular-nums text-live">
-            <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
+          <span className={`flex items-center gap-1 text-sm font-extrabold tabular-nums ${colorClass}`}>
+            {pulsing && <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />}
             {duel.score!.home}-{duel.score!.away}
           </span>
         ) : (
-          <span className="flex items-center gap-1 text-[10px] font-extrabold text-live">
-            <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />
-            AO VIVO
+          <span className={`flex items-center gap-1 text-[10px] font-extrabold ${colorClass}`}>
+            {pulsing && <span className="size-1.5 shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite] rounded-full bg-live" aria-hidden />}
+            {pulsing ? "AO VIVO" : "A confirmar"}
           </span>
         )}
-        {duel.minute && <span className="mt-0.5 text-[9px] font-semibold text-live/80">{duel.minute}</span>}
+        {pulsing && duel.minute && <span className="mt-0.5 text-[9px] font-semibold text-live/80">{duel.minute}</span>}
       </div>
     );
   }
