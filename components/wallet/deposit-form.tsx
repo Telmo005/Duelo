@@ -8,6 +8,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { SectionLabel } from "@/components/ui/section-label";
 import { OptionCard } from "@/components/ui/option-card";
 import { ActionButton } from "@/components/ui/action-button";
+import { Label } from "@/components/ui/label";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { createDepositAction } from "@/lib/actions/deposit";
 
 // Visa/Mastercard existe no gateway mas não é oferecido ainda — precisa de
@@ -16,7 +18,7 @@ import { createDepositAction } from "@/lib/actions/deposit";
 const METHODS = [
   { key: "mpesa", label: "M-Pesa", hint: "Números 84 · 85" },
   { key: "emola", label: "e-Mola", hint: "Números 86 · 87" },
-  { key: "mkesh", label: "mKesh", hint: "Mobile money" },
+  { key: "mkesh", label: "mKesh", hint: "Números 82 · 83" },
 ] as const;
 
 const QUICK_AMOUNTS = [100, 250, 500, 1000, 2500];
@@ -32,7 +34,7 @@ const POLL_TIMEOUT_MS = 3 * 60 * 1000;
 type MethodKey = (typeof METHODS)[number]["key"];
 type Phase = "form" | "submitting" | "waiting" | "timeout";
 
-export function DepositForm() {
+export function DepositForm({ defaultPhone }: { defaultPhone: string }) {
   const router = useRouter();
   const [method, setMethod] = useState<MethodKey | null>(null);
   const [amount, setAmount] = useState("");
@@ -79,14 +81,15 @@ export function DepositForm() {
     return () => clearInterval(interval);
   }, [phase, depositId, router]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canSubmit || !method) return;
 
     setError(null);
     setPhase("submitting");
 
-    const result = await createDepositAction({ method, amountMt: amount });
+    const fd = new FormData(e.currentTarget);
+    const result = await createDepositAction({ method, amountMt: amount, phone: fd.get("phone") });
 
     if (result.error) {
       setError(result.error);
@@ -240,6 +243,20 @@ export function DepositForm() {
               {v.toLocaleString("pt")} MT
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Phone */}
+      <div>
+        <SectionLabel step={3}>Número que vai pagar</SectionLabel>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="deposit-phone">Número de telemóvel</Label>
+          <PhoneInput id="deposit-phone" name="phone" defaultValue={defaultPhone} required disabled={phase === "submitting"} />
+          <p className="text-xs text-muted-foreground">
+            {method
+              ? `Tem de ser um número ${methodLabel} (${METHODS.find((m) => m.key === method)?.hint.replace("Números ", "")}) — pode ser diferente do número da tua conta.`
+              : "Escolhe o método acima para saber que números são aceites."}
+          </p>
         </div>
       </div>
 
