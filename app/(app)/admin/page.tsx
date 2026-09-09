@@ -9,6 +9,7 @@ import { formatCentsAsMt, getWalletBalance } from "@/lib/wallet";
 import { LinkPendingSpinner } from "@/components/ui/link-pending-spinner";
 import { ReconcileDepositsButton } from "@/components/admin/reconcile-deposits-button";
 import { MOZAMBIQUE_TIMEZONE } from "@/lib/format";
+import { methodLabel } from "@/lib/paygate-client";
 
 export const metadata: Metadata = { title: "Admin | DueloBet" };
 
@@ -156,7 +157,7 @@ export default async function AdminPage() {
                 <div>
                   <p className="font-bold">{d.displayName} · {formatCentsAsMt(d.amountCents)} MT</p>
                   <p className="text-xs text-muted-foreground">
-                    {d.method === "mpesa" ? "M-Pesa" : "e-Mola"} · {d.reference} · {new Date(d.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
+                    {methodLabel(d.method)} · {d.reference} · {new Date(d.createdAt).toLocaleString("pt", { dateStyle: "short", timeStyle: "short", timeZone: MOZAMBIQUE_TIMEZONE })}
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${d.status === "pending" ? "bg-primary-10 text-primary" : "bg-destructive-10 text-destructive"}`}>

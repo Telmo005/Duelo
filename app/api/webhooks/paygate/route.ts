@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { PayGateClient, type PayGateWebhook } from "@/lib/paygate-client";
+import { PayGateClient, methodLabel, type PayGateWebhook } from "@/lib/paygate-client";
 import { logError } from "@/lib/errorLog";
 import { sendPush } from "@/lib/messaging-client";
 import { formatCentsAsMt } from "@/lib/format";
 
 /**
- * Receives fan-out events from the PayGate gateway (mpesa/emola via
- * PaySuite, but DueloBet never talks to PaySuite directly — see
- * lib/paygate-client.ts). No user session — the request comes from
+ * Receives fan-out events from the PayGate gateway (mpesa/emola/mkesh/
+ * visa_mastercard via Debito Pay, but DueloBet never talks to Debito Pay
+ * directly — see lib/paygate-client.ts). No user session — the request comes from
  * PayGate, not a logged-in browser — trust comes entirely from the HMAC
  * signature (X-Paygate-Signature), same pattern as the bet_* RPC guard:
  * this route's only job is to flip `deposits.status` and, on success,
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       p_amount_cents: deposit.amount_cents,
       p_type: "deposit",
       p_reference: deposit.reference,
-      p_description: `Depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"}`,
+      p_description: `Depósito via ${methodLabel(deposit.method)}`,
     });
 
     if (creditError) {
@@ -123,15 +123,15 @@ export async function POST(request: Request) {
         p_type: "deposit_success",
         p_title: "Depósito confirmado",
         p_body: wasFailed
-          ? `Afinal confirmou-se — o teu depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"} está disponível na carteira.`
-          : `O teu depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"} está disponível na carteira.`,
+          ? `Afinal confirmou-se — o teu depósito via ${methodLabel(deposit.method)} está disponível na carteira.`
+          : `O teu depósito via ${methodLabel(deposit.method)} está disponível na carteira.`,
         p_link: "/dashboard",
         p_reference: deposit.reference,
       });
 
       await sendPush(
         "Novo depósito confirmado",
-        `${formatCentsAsMt(deposit.amount_cents)} MT via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"}.`
+        `${formatCentsAsMt(deposit.amount_cents)} MT via ${methodLabel(deposit.method)}.`
       );
     }
   } else {

@@ -1,6 +1,6 @@
 /**
  * PayGate client SDK — copiado do payment-gateway repo (sdk/paygate-client.ts).
- * Usa-o em vez de chamar o PaySuite diretamente. Zero dependências; usa só
+ * Usa-o em vez de chamar a Debito Pay directamente. Zero dependências; usa só
  * `fetch` e `crypto` (Node).
  *
  * Variáveis de ambiente (dadas pelo register-app do payment-gateway):
@@ -17,7 +17,26 @@ import crypto from "crypto";
 // that never returned). Same fix as lib/messaging-client.ts.
 const REQUEST_TIMEOUT_MS = 15_000;
 
-export type PaymentMethod = "mpesa" | "emola" | "credit_card";
+// Migração PayGate -> Debito Pay: 'credit_card' passou a 'visa_mastercard',
+// e há um método novo, 'mkesh'. mpesa confirma síncrono (status já vem
+// 'success'/'failed' na resposta de createCharge); emola/mkesh/visa_mastercard
+// nascem 'pending' — só visa_mastercard devolve checkoutUrl (Hosted
+// Checkout). 'payfast' (ZAR) fica de fora: o Duelo só serve utilizadores
+// moçambicanos (profiles.phone é validado como +258) e cobra sempre em MZN.
+export type PaymentMethod = "mpesa" | "emola" | "mkesh" | "visa_mastercard";
+
+const METHOD_LABELS: Record<PaymentMethod, string> = {
+  mpesa: "M-Pesa",
+  emola: "e-Mola",
+  mkesh: "mKesh",
+  visa_mastercard: "Visa/Mastercard",
+};
+
+/** Rótulo amigável de um método para notificações/emails — usado no webhook
+ *  e no job de reconciliação, para não repetir o mapeamento em cada sítio. */
+export function methodLabel(method: string): string {
+  return METHOD_LABELS[method as PaymentMethod] ?? method;
+}
 
 export interface CreateChargeInput {
   /** Referência ÚNICA do teu app — chave de idempotência (ex.: deposits.reference). */
@@ -27,6 +46,11 @@ export interface CreateChargeInput {
   currency?: string;
   description?: string;
   returnUrl?: string;
+  /** Obrigatório para mpesa/emola/mkesh, formato E.164 (+258...). */
+  payerPhone?: string;
+  payerName: string;
+  /** Obrigatório para visa_mastercard. */
+  payerEmail?: string;
   /** Metadados leves ecoados no webhook. NÃO metas payloads pesados. */
   metadata?: Record<string, unknown>;
 }
@@ -35,6 +59,7 @@ export interface CreateChargeResult {
   gatewayPaymentId: string;
   reference: string;
   status: "pending" | "success" | "failed";
+  message: string | null;
   checkoutUrl: string | null;
 }
 
@@ -83,6 +108,9 @@ export class PayGateClient {
         currency: input.currency ?? "MZN",
         description: input.description,
         return_url: input.returnUrl,
+        payer_phone: input.payerPhone,
+        payer_name: input.payerName,
+        payer_email: input.payerEmail,
         metadata: input.metadata,
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -97,6 +125,7 @@ export class PayGateClient {
       gatewayPaymentId: json.gateway_payment_id,
       reference: json.reference,
       status: json.status,
+      message: json.message ?? null,
       checkoutUrl: json.checkout_url ?? null,
     };
   }

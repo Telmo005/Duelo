@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { PayGateClient } from "@/lib/paygate-client";
+import { PayGateClient, methodLabel } from "@/lib/paygate-client";
 import { logError } from "@/lib/errorLog";
 
 export type ReconcileResult = { checked: number; credited: number; markedFailed: number };
@@ -69,7 +69,7 @@ export async function reconcileStuckDeposits(): Promise<ReconcileResult> {
         p_amount_cents: deposit.amount_cents,
         p_type: "deposit",
         p_reference: deposit.reference,
-        p_description: `Depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"}`,
+        p_description: `Depósito via ${methodLabel(deposit.method)}`,
       });
 
       if (creditError) {
@@ -90,7 +90,7 @@ export async function reconcileStuckDeposits(): Promise<ReconcileResult> {
           p_user_id: deposit.user_id,
           p_type: "deposit_success",
           p_title: "Depósito confirmado",
-          p_body: `O teu depósito via ${deposit.method === "mpesa" ? "M-Pesa" : "e-Mola"} está disponível na carteira.`,
+          p_body: `O teu depósito via ${methodLabel(deposit.method)} está disponível na carteira.`,
           p_link: "/dashboard",
           p_reference: deposit.reference,
         });
